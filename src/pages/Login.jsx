@@ -37,7 +37,7 @@ export default function Login() {
         </div>
 
         <h1 style={styles.title}>Libot Admin</h1>
-        <p style={styles.subtitle}>Sign in to manage your content</p>
+        <p style={styles.subtitle}>Sign in to access your account</p>
 
         {error && <div style={styles.error}>{error}</div>}
 
