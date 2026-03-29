@@ -79,7 +79,7 @@ export default function Login() {
 }
 
 const styles = {
-  container: { minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f5f0ef', padding: 20 },
+  container: { minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#a5a09f', padding: 20 },
   card:      { background: '#fff', borderRadius: 20, padding: '40px 44px', width: '100%', maxWidth: 400, boxShadow: '0 4px 32px rgba(74,46,44,0.1)', border: '1px solid #f0e0de' },
   logoWrap:  { display: 'flex', justifyContent: 'center', marginBottom: 20 },
   logo:      { width: 52, height: 52, borderRadius: 16, background: 'linear-gradient(135deg, #6b4b45, #4a2e2c)', color: '#fff', fontWeight: 700, fontSize: 22, display: 'flex', alignItems: 'center', justifyContent: 'center' },
