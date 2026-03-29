@@ -6,13 +6,15 @@ export default function Login() {
   const [email, setEmail]       = useState('');
   const [password, setPassword] = useState('');
   const [error, setError]       = useState('');
+  const [loading, setLoading]   = useState(false);
   const navigate = useNavigate();
 
   const handleLogin = async () => {
+    if (!email || !password) { setError('Please fill in all fields'); return; }
     try {
       setError('');
+      setLoading(true);
       const data = await authAPI.login(email, password);
-      console.log('Login response:', data); // 👈 check this in console
       if (data.success && data.token) {
         localStorage.setItem('token', data.token);
         navigate('/dashboard');
@@ -20,49 +22,72 @@ export default function Login() {
         setError(data.message || 'Login failed');
       }
     } catch (err) {
-      console.error('Login error:', err); // 👈 check this in console
-      setError(err?.response?.data?.message || err.message || 'Login failed');
+      setError(err?.response?.data?.message || 'Login failed');
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
     <div style={styles.container}>
       <div style={styles.card}>
-        <h2 style={{ color: '#4a2e2c', marginBottom: 8 }}>🗺 Libot Admin</h2>
-        <p style={{ color: '#7a5a58', marginBottom: 20, fontSize: 14 }}>Sign in to your admin account</p>
 
-        {error && (
-          <div style={styles.errorBox}>
-            {error}
-          </div>
-        )}
+        <div style={styles.logoWrap}>
+          <div style={styles.logo}>L</div>
+        </div>
 
-        <input
-          placeholder="Email"
-          value={email}
-          onChange={e => setEmail(e.target.value)}
-          style={styles.input}
-          type="email"
-        />
-        <input
-          placeholder="Password"
-          value={password}
-          onChange={e => setPassword(e.target.value)}
-          style={styles.input}
-          type="password"
-        />
-        <button onClick={handleLogin} style={styles.button}>
-          Login
+        <h1 style={styles.title}>Libot Admin</h1>
+        <p style={styles.subtitle}>Sign in to manage your content</p>
+
+        {error && <div style={styles.error}>{error}</div>}
+
+        <div style={styles.field}>
+          <label style={styles.label}>Email</label>
+          <input
+            type="email"
+            placeholder="admin@libot.com"
+            value={email}
+            onChange={e => setEmail(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && handleLogin()}
+            style={styles.input}
+          />
+        </div>
+
+        <div style={styles.field}>
+          <label style={styles.label}>Password</label>
+          <input
+            type="password"
+            placeholder="••••••••"
+            value={password}
+            onChange={e => setPassword(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && handleLogin()}
+            style={styles.input}
+          />
+        </div>
+
+        <button
+          onClick={handleLogin}
+          disabled={loading}
+          style={{ ...styles.btn, opacity: loading ? 0.7 : 1 }}
+        >
+          {loading ? 'Signing in...' : 'Sign In'}
         </button>
+
       </div>
     </div>
   );
 }
 
 const styles = {
-  container: { display:'flex', justifyContent:'center', alignItems:'center', height:'100vh', background:'#faf5f4' },
-  card:      { background:'#fff', padding:40, borderRadius:16, width:340, display:'flex', flexDirection:'column', gap:12, boxShadow:'0 4px 24px rgba(0,0,0,0.08)' },
-  input:     { padding:12, borderRadius:8, border:'1px solid #f0e0de', fontSize:14, outline:'none' },
-  button:    { padding:14, background:'#6b4b45', color:'#fff', border:'none', borderRadius:8, fontWeight:700, cursor:'pointer', fontSize:15 },
-  errorBox:  { background:'#fff0f0', border:'1px solid #ffcccc', borderRadius:8, padding:10, color:'#c0392b', fontSize:13 },
+  container: { minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f5f0ef', padding: 20 },
+  card:      { background: '#fff', borderRadius: 20, padding: '40px 44px', width: '100%', maxWidth: 400, boxShadow: '0 4px 32px rgba(74,46,44,0.1)', border: '1px solid #f0e0de' },
+  logoWrap:  { display: 'flex', justifyContent: 'center', marginBottom: 20 },
+  logo:      { width: 52, height: 52, borderRadius: 16, background: 'linear-gradient(135deg, #6b4b45, #4a2e2c)', color: '#fff', fontWeight: 700, fontSize: 22, display: 'flex', alignItems: 'center', justifyContent: 'center' },
+  title:     { fontSize: 22, fontWeight: 700, color: '#2d1f1e', textAlign: 'center', marginBottom: 6 },
+  subtitle:  { fontSize: 14, color: '#9a7a78', textAlign: 'center', marginBottom: 28 },
+  error:     { background: '#fff0f0', border: '1px solid #ffd0d0', borderRadius: 9, padding: '10px 14px', color: '#c0392b', fontSize: 13, marginBottom: 16 },
+  field:     { marginBottom: 16 },
+  label:     { display: 'block', fontSize: 12, fontWeight: 600, color: '#9a7a78', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.04em' },
+  input:     { width: '100%', padding: '11px 14px', borderRadius: 9, border: '1px solid #f0e0de', fontSize: 14, color: '#2d1f1e', outline: 'none', background: '#fafafa', boxSizing: 'border-box' },
+  btn:       { width: '100%', padding: 13, borderRadius: 10, border: 'none', background: 'linear-gradient(135deg, #6b4b45, #4a2e2c)', color: '#fff', fontWeight: 700, fontSize: 15, cursor: 'pointer', marginTop: 8 },
 };
