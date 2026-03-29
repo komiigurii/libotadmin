@@ -100,7 +100,7 @@ const styles = {
   statValue:   { fontSize: 26, fontWeight: 700, color: '#2d1f1e' },
   statLabel:   { fontSize: 13, color: '#9a7a78', marginTop: 2 },
   section:     { marginBottom: 32 },
-  sectionTitle:{ fontSize: 17, fontWeight: 600, color: '#2d1f1e', marginBottom: 14 },
+  sectionTitle:{ fontSize: 17, fontWeight: 600, color: '#ac9d9b', marginBottom: 14 },
   card:        { background: '#fff', borderRadius: 14, border: '1px solid #f0e0de', overflow: 'hidden', boxShadow: '0 1px 4px rgba(74,46,44,0.07)' },
   empty:       { padding: 40, textAlign: 'center', color: '#9a7a78' },
   spotRow:     { display: 'flex', alignItems: 'center', gap: 14, padding: '14px 20px', borderBottom: '1px solid #faf0ee' },
