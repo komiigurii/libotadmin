@@ -90,8 +90,8 @@ export default function Dashboard() {
 const styles = {
   page:        { padding: '32px 40px', maxWidth: 1100, margin: '0 auto' },
   header:      { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 32 },
-  title:       { fontSize: 26, fontWeight: 700, color: '#2d1f1e', marginBottom: 4 },
-  subtitle:    { fontSize: 14, color: '#9a7a78' },
+  title:       { fontSize: 26, fontWeight: 700, color: '#ceb3b1', marginBottom: 4 },
+  subtitle:    { fontSize: 14, color: '#a08a89' },
   primaryBtn:  { padding: '10px 22px', background: '#6b4b45', color: '#fff', border: 'none', borderRadius: 10, fontWeight: 600, fontSize: 14, cursor: 'pointer' },
   loading:     { textAlign: 'center', padding: 60, color: '#9a7a78' },
   statsGrid:   { display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 32 },
