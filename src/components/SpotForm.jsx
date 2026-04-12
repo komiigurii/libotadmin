@@ -3,7 +3,7 @@ import { useState } from 'react';
 const CATEGORIES = ['Historical', 'Religious', 'Nature', 'Festivals'];
 const emptyArModel = () => ({ lat: '', lng: '' });
 
-export default function SpotForm({ initial, onSave, onCancel }) {
+export default function SpotForm({ initial, onSave, onCancel, saving = false }) {
   const [form, setForm] = useState({
     name:            initial?.name             || '',
     category:        initial?.category?.[0]    || '',
@@ -63,15 +63,13 @@ export default function SpotForm({ initial, onSave, onCancel }) {
     <div style={styles.overlay}>
       <div style={styles.modal}>
 
-        {/* Header */}
         <div style={styles.modalHeader}>
           <h2 style={styles.modalTitle}>{initial ? 'Edit Spot' : 'Add New Spot'}</h2>
-          <button onClick={onCancel} style={styles.closeBtn}>✕</button>
+          <button onClick={onCancel} style={styles.closeBtn} disabled={saving}>✕</button>
         </div>
 
         <div style={styles.body}>
 
-          {/* ── Basic Info ── */}
           <div style={styles.section}>
             <p style={styles.sectionTitle}>Basic Info</p>
             <div style={styles.grid}>
@@ -103,7 +101,6 @@ export default function SpotForm({ initial, onSave, onCancel }) {
             </div>
           </div>
 
-          {/* ── Media ── */}
           <div style={styles.section}>
             <p style={styles.sectionTitle}>Media</p>
             <div style={styles.grid}>
@@ -128,7 +125,6 @@ export default function SpotForm({ initial, onSave, onCancel }) {
             </div>
           </div>
 
-          {/* ── Spot GPS ── */}
           <div style={styles.section}>
             <p style={styles.sectionTitle}>Spot Location <span style={styles.hint}>(real GPS coordinates)</span></p>
             <div style={styles.grid}>
@@ -142,12 +138,7 @@ export default function SpotForm({ initial, onSave, onCancel }) {
               </div>
               {form.coordinates_lat && form.coordinates_lng && (
                 <div style={styles.fullWidth}>
-                  
-                  <a href={`https://www.google.com/maps?q=${form.coordinates_lat},${form.coordinates_lng}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    style={styles.mapLink}
-                  >
+                  <a href={`https://www.google.com/maps?q=${form.coordinates_lat},${form.coordinates_lng}`} target="_blank" rel="noreferrer" style={styles.mapLink}>
                     Preview spot on Google Maps →
                   </a>
                 </div>
@@ -155,7 +146,6 @@ export default function SpotForm({ initial, onSave, onCancel }) {
             </div>
           </div>
 
-          {/* ── AR Models ── */}
           <div style={styles.section}>
             <div style={styles.arHeader}>
               <div>
@@ -181,58 +171,35 @@ export default function SpotForm({ initial, onSave, onCancel }) {
                     <span style={styles.arBadgeDot} />
                     AR Model {index + 1}
                   </div>
-                  <button onClick={() => removeArModel(index)} style={styles.removeBtn}>
-                    ✕ Remove
-                  </button>
+                  <button onClick={() => removeArModel(index)} style={styles.removeBtn}>✕ Remove</button>
                 </div>
-
                 <div style={styles.grid}>
                   <div>
                     <label style={styles.label}>Latitude</label>
-                    <input
-                      value={model.lat}
-                      onChange={e => handleArChange(index, 'lat', e.target.value)}
-                      style={styles.input}
-                      placeholder="e.g. 14.846306"
-                    />
+                    <input value={model.lat} onChange={e => handleArChange(index, 'lat', e.target.value)} style={styles.input} placeholder="e.g. 14.846306" />
                   </div>
                   <div>
                     <label style={styles.label}>Longitude</label>
-                    <input
-                      value={model.lng}
-                      onChange={e => handleArChange(index, 'lng', e.target.value)}
-                      style={styles.input}
-                      placeholder="e.g. 120.812528"
-                    />
+                    <input value={model.lng} onChange={e => handleArChange(index, 'lng', e.target.value)} style={styles.input} placeholder="e.g. 120.812528" />
                   </div>
                 </div>
-
                 {model.lat && model.lng && (
-                  
-                  <a href={`https://www.google.com/maps?q=${model.lat},${model.lng}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    style={styles.mapLink}
-                  >
+                  <a href={`https://www.google.com/maps?q=${model.lat},${model.lng}`} target="_blank" rel="noreferrer" style={styles.mapLink}>
                     Preview AR position on Google Maps →
                   </a>
                 )}
               </div>
             ))}
-
           </div>
 
         </div>
 
-        {/* Footer */}
         <div style={styles.footer}>
-          <div style={styles.footerLeft}>
-            <span style={styles.requiredNote}>* Required fields</span>
-          </div>
+          <div><span style={styles.requiredNote}>* Required fields</span></div>
           <div style={styles.footerRight}>
-            <button onClick={onCancel} style={styles.cancelBtn}>Cancel</button>
-            <button onClick={handleSave} style={styles.saveBtn}>
-              {initial ? 'Save Changes' : 'Add Spot'}
+            <button onClick={onCancel} style={styles.cancelBtn} disabled={saving}>Cancel</button>
+            <button onClick={handleSave} style={{ ...styles.saveBtn, opacity: saving ? 0.7 : 1 }} disabled={saving}>
+              {saving ? 'Saving...' : initial ? 'Save Changes' : 'Add Spot'}
             </button>
           </div>
         </div>
@@ -262,22 +229,17 @@ const styles = {
   imgPreview:   { width: '100%', height: 140, objectFit: 'cover', borderRadius: 10, marginTop: 10, border: '1px solid #f0e0de' },
   badgePreview: { width: 60, height: 60, objectFit: 'contain', borderRadius: 10, marginTop: 10, border: '1px solid #f0e0de' },
   mapLink:      { display: 'inline-block', marginTop: 10, fontSize: 13, color: '#6b4b45', fontWeight: 600, textDecoration: 'none' },
-
-  // AR section
-  arHeader:    { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 },
-  arSubtitle:  { fontSize: 13, color: '#9a7a78', marginTop: 2 },
-  arCount:     { fontWeight: 600, color: '#6b4b45' },
-  addArBtn:    { padding: '8px 16px', background: '#6b4b45', color: '#fff', border: 'none', borderRadius: 8, fontWeight: 600, fontSize: 13, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 },
-  emptyAr:     { background: '#faf5f4', borderRadius: 10, padding: '20px', textAlign: 'center', color: '#9a7a78', fontSize: 14, border: '1px dashed #f0e0de' },
-  arCard:      { background: '#faf5f4', borderRadius: 12, padding: 16, marginBottom: 12, border: '1px solid #f0e0de' },
-  arCardHeader:{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
-  arBadge:     { display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 700, color: '#4a2e2c' },
-  arBadgeDot:  { width: 8, height: 8, borderRadius: '50%', background: '#6b4b45', display: 'inline-block' },
-  removeBtn:   { padding: '5px 12px', background: '#fff0f0', color: '#c0392b', border: '1px solid #ffd0d0', borderRadius: 7, fontWeight: 600, fontSize: 12, cursor: 'pointer' },
-
-  // Footer
+  arHeader:     { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 },
+  arSubtitle:   { fontSize: 13, color: '#9a7a78', marginTop: 2 },
+  arCount:      { fontWeight: 600, color: '#6b4b45' },
+  addArBtn:     { padding: '8px 16px', background: '#6b4b45', color: '#fff', border: 'none', borderRadius: 8, fontWeight: 600, fontSize: 13, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 },
+  emptyAr:      { background: '#faf5f4', borderRadius: 10, padding: '20px', textAlign: 'center', color: '#9a7a78', fontSize: 14, border: '1px dashed #f0e0de' },
+  arCard:       { background: '#faf5f4', borderRadius: 12, padding: 16, marginBottom: 12, border: '1px solid #f0e0de' },
+  arCardHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+  arBadge:      { display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 700, color: '#4a2e2c' },
+  arBadgeDot:   { width: 8, height: 8, borderRadius: '50%', background: '#6b4b45', display: 'inline-block' },
+  removeBtn:    { padding: '5px 12px', background: '#fff0f0', color: '#c0392b', border: '1px solid #ffd0d0', borderRadius: 7, fontWeight: 600, fontSize: 12, cursor: 'pointer' },
   footer:       { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 28px', borderTop: '1px solid #f0e0de', flexShrink: 0 },
-  footerLeft:   { },
   footerRight:  { display: 'flex', gap: 10 },
   requiredNote: { fontSize: 12, color: '#9a7a78' },
   cancelBtn:    { padding: '10px 22px', borderRadius: 9, border: '1px solid #f0e0de', background: '#fff', color: '#7a5a58', fontWeight: 600, fontSize: 14, cursor: 'pointer' },
