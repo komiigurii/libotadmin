@@ -11,7 +11,8 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false }) 
     entranceFee:     initial?.entranceFee      || '',
     visitingHours:   initial?.visitingHours    || '',
     image:           initial?.image            || '',
-    modelUrl:        initial?.modelUrl         || '',
+    modelUrl:        initial?.modelUrl         || '',   // display 3D model (not AR)
+    ARModelUrl:    initial?.ARModelUrl      || '',  // AR scene model
     Badge:           initial?.Badge            || '',
     coordinates_lat: initial?.coordinates?.lat || '',
     coordinates_lng: initial?.coordinates?.lng || '',
@@ -48,13 +49,14 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false }) 
       entranceFee:   form.entranceFee,
       visitingHours: form.visitingHours,
       image:         form.image,
-      modelUrl:      form.modelUrl,
+      modelUrl:      form.modelUrl,       // display model (unchanged)
+      ARModelUrl:  form.ARModelUrl,   // AR model — saved with correct field name
       Badge:         form.Badge,
       coordinates: {
         lat: parseFloat(form.coordinates_lat) || null,
         lng: parseFloat(form.coordinates_lng) || null,
       },
-      modelsCoordinates: arModels.filter(m => m.lat && m.lng),
+      modelsCoordinates: arModels.filter(m => m.lat && m.lng).map(m => ({ lat: parseFloat(m.lat), lng: parseFloat(m.lng) })),
     };
     onSave(payload);
   };
@@ -70,6 +72,7 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false }) 
 
         <div style={styles.body}>
 
+          {/* ── Basic Info ─────────────────────────────────────────────────── */}
           <div style={styles.section}>
             <p style={styles.sectionTitle}>Basic Info</p>
             <div style={styles.grid}>
@@ -101,9 +104,12 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false }) 
             </div>
           </div>
 
+          {/* ── Media ──────────────────────────────────────────────────────── */}
           <div style={styles.section}>
             <p style={styles.sectionTitle}>Media</p>
             <div style={styles.grid}>
+
+              {/* Spot image */}
               <div style={styles.fullWidth}>
                 <label style={styles.label}>Image URL <span style={styles.required}>*</span></label>
                 <input name="image" value={form.image} onChange={handleChange} style={styles.input} placeholder="https://res.cloudinary.com/..." />
@@ -111,10 +117,47 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false }) 
                   <img src={form.image} alt="preview" style={styles.imgPreview} onError={e => e.target.style.display = 'none'} />
                 )}
               </div>
+
+              {/* Display 3D model — NOT used in AR */}
               <div style={styles.fullWidth}>
-                <label style={styles.label}>3D Model URL <span style={styles.hint}>(Cloudinary .glb)</span></label>
-                <input name="modelUrl" value={form.modelUrl} onChange={handleChange} style={styles.input} placeholder="https://res.cloudinary.com/...model.glb" />
+                <label style={styles.label}>
+                  Display 3D Model URL
+                  <span style={styles.hint}> (shown in spot detail screen — not AR)</span>
+                </label>
+                <input
+                  name="modelUrl"
+                  value={form.modelUrl}
+                  onChange={handleChange}
+                  style={styles.input}
+                  placeholder="https://res.cloudinary.com/...model.glb"
+                />
               </div>
+
+              {/* AR 3D model — THIS is what shows in the AR camera */}
+              <div style={styles.fullWidth}>
+                <label style={styles.label}>
+                  AR 3D Model URL
+                  <span style={styles.hint}> (shown in AR camera — must be on Vercel)</span>
+                </label>
+                <input
+                  name="ARModelUrl"
+                  value={form.ARModelUrl}
+                  onChange={handleChange}
+                  style={{ ...styles.input, borderColor: form.ARModelUrl ? '#6b4b45' : '#f0e0de' }}
+                  placeholder="https://ar-web-lemon.vercel.app/assets/yourmodel.glb"
+                />
+                {/* Live validity hint */}
+                {form.ARModelUrl && !form.ARModelUrl.startsWith('https://ar-web-lemon.vercel.app') && (
+                  <p style={styles.arWarning}>
+                    ⚠️ Use a Vercel-hosted URL to avoid CORS errors in AR.
+                  </p>
+                )}
+                {form.ARModelUrl && form.ARModelUrl.startsWith('https://ar-web-lemon.vercel.app') && (
+                  <p style={styles.arOk}>✅ Valid Vercel AR model URL</p>
+                )}
+              </div>
+
+              {/* Badge */}
               <div style={styles.fullWidth}>
                 <label style={styles.label}>Badge Image URL <span style={styles.hint}>(reward badge for visiting)</span></label>
                 <input name="Badge" value={form.Badge} onChange={handleChange} style={styles.input} placeholder="https://res.cloudinary.com/...badge.png" />
@@ -122,9 +165,11 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false }) 
                   <img src={form.Badge} alt="badge" style={styles.badgePreview} onError={e => e.target.style.display = 'none'} />
                 )}
               </div>
+
             </div>
           </div>
 
+          {/* ── Spot Location ───────────────────────────────────────────────── */}
           <div style={styles.section}>
             <p style={styles.sectionTitle}>Spot Location <span style={styles.hint}>(real GPS coordinates)</span></p>
             <div style={styles.grid}>
@@ -146,21 +191,22 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false }) 
             </div>
           </div>
 
+          {/* ── AR Model Positions ──────────────────────────────────────────── */}
           <div style={styles.section}>
             <div style={styles.arHeader}>
               <div>
                 <p style={styles.sectionTitle}>AR Model Positions</p>
                 <p style={styles.arSubtitle}>
-                  Each entry places one AR 3D model at a GPS location.
-                  {arModels.length > 0 && <span style={styles.arCount}> {arModels.length} model{arModels.length > 1 ? 's' : ''}</span>}
+                  GPS coordinates where the AR model will appear in the camera.
+                  {arModels.length > 0 && <span style={styles.arCount}> {arModels.length} position{arModels.length > 1 ? 's' : ''}</span>}
                 </p>
               </div>
-              <button onClick={addArModel} style={styles.addArBtn}>+ Add AR Model</button>
+              <button onClick={addArModel} style={styles.addArBtn}>+ Add Position</button>
             </div>
 
             {arModels.length === 0 && (
               <div style={styles.emptyAr}>
-                <p>No AR models added yet. Click "+ Add AR Model" to add one.</p>
+                <p>No AR positions added yet. Click "+ Add Position" to add one.</p>
               </div>
             )}
 
@@ -169,7 +215,7 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false }) 
                 <div style={styles.arCardHeader}>
                   <div style={styles.arBadge}>
                     <span style={styles.arBadgeDot} />
-                    AR Model {index + 1}
+                    Position {index + 1}
                   </div>
                   <button onClick={() => removeArModel(index)} style={styles.removeBtn}>✕ Remove</button>
                 </div>
@@ -244,4 +290,6 @@ const styles = {
   requiredNote: { fontSize: 12, color: '#9a7a78' },
   cancelBtn:    { padding: '10px 22px', borderRadius: 9, border: '1px solid #f0e0de', background: '#fff', color: '#7a5a58', fontWeight: 600, fontSize: 14, cursor: 'pointer' },
   saveBtn:      { padding: '10px 22px', borderRadius: 9, border: 'none', background: '#6b4b45', color: '#fff', fontWeight: 600, fontSize: 14, cursor: 'pointer' },
+  arWarning:    { marginTop: 6, fontSize: 12, color: '#c0392b', fontWeight: 500 },
+  arOk:         { marginTop: 6, fontSize: 12, color: '#27ae60', fontWeight: 500 },
 };
