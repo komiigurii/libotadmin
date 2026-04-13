@@ -15,7 +15,6 @@ export default function Dashboard() {
 
   const stats = [
     { label: 'Total Spots',    value: spots.length,                                    color: '#6b4b45' },
-    { label: 'Categories',     value: new Set(spots.map(s => s.category)).size,        color: '#4a2e2c' },
     { label: 'Free Spots',     value: spots.filter(s => !s.entranceFee || s.entranceFee === 'Free').length, color: '#8b6b5a' },
     { label: 'Total Visits',   value: spots.reduce((a, s) => a + (s.visitCount || 0), 0), color: '#3d2420' },
   ];
@@ -94,7 +93,7 @@ const styles = {
   subtitle:    { fontSize: 14, color: '#d3afa8' },
   primaryBtn:  { padding: '10px 22px', background: '#6b4b45', color: '#fff', border: 'none', borderRadius: 10, fontWeight: 600, fontSize: 14, cursor: 'pointer' },
   loading:     { textAlign: 'center', padding: 60, color: '#9a7a78' },
-  statsGrid:   { display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 32 },
+  statsGrid:   { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, marginBottom: 32 },
   statCard:    { background: '#fff', borderRadius: 14, padding: '20px 24px', display: 'flex', alignItems: 'center', gap: 16, boxShadow: '0 1px 4px rgba(74,46,44,0.07)', border: '1px solid #f0e0de' },
   statIcon:    { width: 44, height: 44, borderRadius: 12, color: '#fff', fontWeight: 700, fontSize: 18, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   statValue:   { fontSize: 26, fontWeight: 700, color: '#2d1f1e' },
