@@ -49,8 +49,8 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false }) 
       entranceFee:   form.entranceFee,
       visitingHours: form.visitingHours,
       image:         form.image,
-      modelUrl:      form.modelUrl,       // display model (unchanged)
-      ARModelUrl:  form.ARModelUrl,   // AR model — saved with correct field name
+      modelUrl:      form.modelUrl,
+      ARModelUrl:  form.ARModelUrl,
       Badge:         form.Badge,
       coordinates: {
         lat: parseFloat(form.coordinates_lat) || null,
