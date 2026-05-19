@@ -12,10 +12,12 @@ api.interceptors.request.use((config) => {
 });
 
 export const spotAPI = {
-  getAll:  ()         => api.get('/api/spots').then(r => r.data.spots),
-  create:  (data)     => api.post('/api/spots', data).then(r => r.data),
-  update:  (id, data) => api.put(`/api/spots/${id}`, data).then(r => r.data),
-  delete:  (id)       => api.delete(`/api/spots/${id}`).then(r => r.data),
+  getAll:       ()           => api.get('/api/spots').then(r => r.data.spots),
+  create:       (data)       => api.post('/api/spots', data).then(r => r.data),
+  update:       (id, data)   => api.put(`/api/spots/${id}`, data).then(r => r.data),
+  delete:       (id)         => api.delete(`/api/spots/${id}`).then(r => r.data),
+  getPending:   ()           => api.get('/api/spots/pending').then(r => r.data), 
+  reviewChange: (id, action) => api.patch(`/api/spots/pending/${id}`, { action }).then(r => r.data), 
 };
 
 export const authAPI = {

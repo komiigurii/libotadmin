@@ -3,7 +3,7 @@ import Login          from './pages/Login';
 import Dashboard      from './pages/Dashboard';
 import Spots          from './pages/Spots';
 import Reports        from './pages/Reports';
-import PendingChanges from './pages/PendingChanges';
+import PendingChanges from './pages/Pendingchanges';
 import Navbar         from './components/Navbar';
 
 const PrivateRoute = ({ children }) => {
@@ -20,7 +20,7 @@ const ModeratorRoute = ({ children }) => {
   const role = localStorage.getItem('role');
   return role === 'moderator' ? children : <Navigate to="/dashboard" />;
 };
-
+  
 export default function App() {
   return (
     <BrowserRouter>
