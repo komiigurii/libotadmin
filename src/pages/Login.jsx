@@ -19,9 +19,9 @@ export default function Login() {
         localStorage.setItem('token', data.token);
         localStorage.setItem('role', data.role || 'admin');
         if (data.role === 'moderator') {
-          navigate('/Pendingchanges');
+          navigate('/dashboard');
         } else {
-          navigate('/Dashboard');
+          navigate('/pending');
         }
       } else {
         setError(data.message || 'Login failed');
