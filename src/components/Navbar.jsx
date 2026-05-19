@@ -12,6 +12,7 @@ export default function Navbar() {
   const navItems = [
     { label: 'Dashboard', path: '/dashboard' },
     { label: 'Spots',     path: '/spots' },
+    { label: 'Reports',   path: '/reports' },
   ];
 
   return (
