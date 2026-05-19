@@ -11,7 +11,7 @@ export default function Navbar() {
     navigate('/login');
   };
 
-  const navItems = role === 'moderator'
+  const navItems = role === 'admin'
     ? [{ label: 'Pending Changes', path: '/pending' }]
     : [
         { label: 'Dashboard', path: '/dashboard' },

@@ -20,7 +20,7 @@ const ModeratorRoute = ({ children }) => {
   const role = localStorage.getItem('role');
   return role === 'moderator' ? children : <Navigate to="/dashboard" />;
 };
-  
+
 export default function App() {
   return (
     <BrowserRouter>
@@ -30,10 +30,10 @@ export default function App() {
           <PrivateRoute>
             <Navbar />
             <Routes>
-              <Route path="/dashboard" element={<AdminRoute><Dashboard /></AdminRoute>} />
+              <Route path="/dashboard" element={<ModeratorRoute><Dashboard /></ModeratorRoute>} />
               <Route path="/spots"     element={<AdminRoute><Spots /></AdminRoute>} />
               <Route path="/reports"   element={<AdminRoute><Reports /></AdminRoute>} />
-              <Route path="/pending"   element={<ModeratorRoute><PendingChanges /></ModeratorRoute>} />
+              <Route path="/pending"   element={<AdminRoute><PendingChanges /></AdminRoute>} />
               <Route path="*" element={
                 <Navigate to={localStorage.getItem('role') === 'moderator' ? '/pending' : '/dashboard'} />
               } />
