@@ -56,10 +56,14 @@ export default function Spots() {
     }
   };
 
-  const filtered = spots.filter(s =>
-    s.name?.toLowerCase().includes(search.toLowerCase()) ||
-    s.category?.toLowerCase().includes(search.toLowerCase())
-  );
+  const filtered = spots.filter(s => {
+    const name = s.name?.toLowerCase() || '';
+    const cat = Array.isArray(s.category)
+      ? s.category.join(' ').toLowerCase()
+      : (s.category || '').toLowerCase();
+    const q = search.toLowerCase();
+    return name.includes(q) || cat.includes(q);
+  });
 
   return (
     <div style={styles.page}>
