@@ -17,7 +17,12 @@ export default function Login() {
       const data = await authAPI.login(email, password);
       if (data.success && data.token) {
         localStorage.setItem('token', data.token);
-        navigate('/dashboard');
+        localStorage.setItem('role', data.role || 'admin');
+        if (data.role === 'moderator') {
+          navigate('/pending');
+        } else {
+          navigate('/dashboard');
+        }
       } else {
         setError(data.message || 'Login failed');
       }
@@ -45,7 +50,7 @@ export default function Login() {
           <label style={styles.label}>Email</label>
           <input
             type="email"
-            placeholder="admin@libot.com"
+            placeholder="email"
             value={email}
             onChange={e => setEmail(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && handleLogin()}
@@ -57,7 +62,7 @@ export default function Login() {
           <label style={styles.label}>Password</label>
           <input
             type="password"
-            placeholder="••••••••"
+            placeholder="password"
             value={password}
             onChange={e => setPassword(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && handleLogin()}
