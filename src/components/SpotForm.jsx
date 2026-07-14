@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { theme as t } from '../theme';
 
 const CATEGORIES = ['Historical', 'Religious', 'Nature', 'Festivals'];
 const emptyArModel = () => ({ lat: '', lng: '' });
@@ -11,8 +12,8 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false }) 
     entranceFee:     initial?.entranceFee      || '',
     visitingHours:   initial?.visitingHours    || '',
     image:           initial?.image            || '',
-    modelUrl:        initial?.modelUrl         || '',   // display 3D model (not AR)
-    ARModelUrl:    initial?.ARModelUrl      || '',  // AR scene model
+    modelUrl:        initial?.modelUrl         || '',
+    ARModelUrl:    initial?.ARModelUrl      || '',
     Badge:           initial?.Badge            || '',
     coordinates_lat: initial?.coordinates?.lat || '',
     coordinates_lng: initial?.coordinates?.lng || '',
@@ -72,7 +73,6 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false }) 
 
         <div style={styles.body}>
 
-          {/* ── Basic Info ─────────────────────────────────────────────────── */}
           <div style={styles.section}>
             <p style={styles.sectionTitle}>Basic Info</p>
             <div style={styles.grid}>
@@ -104,12 +104,10 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false }) 
             </div>
           </div>
 
-          {/* ── Media ──────────────────────────────────────────────────────── */}
           <div style={styles.section}>
             <p style={styles.sectionTitle}>Media</p>
             <div style={styles.grid}>
 
-              {/* Spot image */}
               <div style={styles.fullWidth}>
                 <label style={styles.label}>Image URL <span style={styles.required}>*</span></label>
                 <input name="image" value={form.image} onChange={handleChange} style={styles.input} placeholder="https://res.cloudinary.com/..." />
@@ -118,7 +116,6 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false }) 
                 )}
               </div>
 
-              {/* Display 3D model — NOT used in AR */}
               <div style={styles.fullWidth}>
                 <label style={styles.label}>
                   Display 3D Model URL
@@ -133,7 +130,6 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false }) 
                 />
               </div>
 
-              {/* AR 3D model — THIS is what shows in the AR camera */}
               <div style={styles.fullWidth}>
                 <label style={styles.label}>
                   AR 3D Model URL
@@ -143,10 +139,9 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false }) 
                   name="ARModelUrl"
                   value={form.ARModelUrl}
                   onChange={handleChange}
-                  style={{ ...styles.input, borderColor: form.ARModelUrl ? '#6b4b45' : '#f0e0de' }}
+                  style={{ ...styles.input, borderColor: form.ARModelUrl ? t.brand : t.border }}
                   placeholder="https://ar-web-lemon.vercel.app/assets/yourmodel.glb"
                 />
-                {/* Live validity hint */}
                 {form.ARModelUrl && !form.ARModelUrl.startsWith('https://ar-web-lemon.vercel.app') && (
                   <p style={styles.arWarning}>
                     ⚠️ Use a Vercel-hosted URL to avoid CORS errors in AR.
@@ -157,7 +152,6 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false }) 
                 )}
               </div>
 
-              {/* Badge */}
               <div style={styles.fullWidth}>
                 <label style={styles.label}>Badge Image URL <span style={styles.hint}>(reward badge for visiting)</span></label>
                 <input name="Badge" value={form.Badge} onChange={handleChange} style={styles.input} placeholder="https://res.cloudinary.com/...badge.png" />
@@ -169,7 +163,6 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false }) 
             </div>
           </div>
 
-          {/* ── Spot Location ───────────────────────────────────────────────── */}
           <div style={styles.section}>
             <p style={styles.sectionTitle}>Spot Location <span style={styles.hint}>(real GPS coordinates)</span></p>
             <div style={styles.grid}>
@@ -191,7 +184,6 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false }) 
             </div>
           </div>
 
-          {/* ── AR Model Positions ──────────────────────────────────────────── */}
           <div style={styles.section}>
             <div style={styles.arHeader}>
               <div>
@@ -256,40 +248,40 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false }) 
 }
 
 const styles = {
-  overlay:      { position: 'fixed', inset: 0, background: 'rgba(45,31,30,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200, padding: 20 },
-  modal:        { background: '#fff', borderRadius: 18, width: '100%', maxWidth: 680, maxHeight: '90vh', display: 'flex', flexDirection: 'column', boxShadow: '0 20px 60px rgba(74,46,44,0.2)' },
-  modalHeader:  { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '22px 28px', borderBottom: '1px solid #f0e0de', flexShrink: 0 },
-  modalTitle:   { fontSize: 20, fontWeight: 700, color: '#2d1f1e' },
-  closeBtn:     { width: 32, height: 32, borderRadius: 8, border: 'none', background: '#faf0ee', color: '#4a2e2c', fontWeight: 700, cursor: 'pointer', fontSize: 14 },
+  overlay:      { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200, padding: 20 },
+  modal:        { background: t.cardBg, borderRadius: 18, width: '100%', maxWidth: 680, maxHeight: '90vh', display: 'flex', flexDirection: 'column', boxShadow: '0 20px 60px rgba(0,0,0,0.5)', border: `1px solid ${t.border}` },
+  modalHeader:  { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '22px 28px', borderBottom: `1px solid ${t.divider}`, flexShrink: 0 },
+  modalTitle:   { fontSize: 20, fontWeight: 700, color: t.textPrimary },
+  closeBtn:     { width: 32, height: 32, borderRadius: 8, border: 'none', background: t.brandSoft, color: t.textPrimary, fontWeight: 700, cursor: 'pointer', fontSize: 14 },
   body:         { overflowY: 'auto', flex: 1, padding: '0 28px 8px' },
-  section:      { paddingTop: 20, paddingBottom: 16, borderBottom: '1px solid #faf0ee' },
-  sectionTitle: { fontSize: 13, fontWeight: 700, color: '#4a2e2c', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 },
+  section:      { paddingTop: 20, paddingBottom: 16, borderBottom: `1px solid ${t.divider}` },
+  sectionTitle: { fontSize: 13, fontWeight: 700, color: t.textPrimary, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 },
   grid:         { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginTop: 14 },
   fullWidth:    { gridColumn: '1 / -1' },
-  label:        { display: 'block', fontSize: 12, fontWeight: 600, color: '#9a7a78', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.04em' },
-  required:     { color: '#e74c3c', fontWeight: 700 },
-  hint:         { fontSize: 11, color: '#b0908e', fontWeight: 400, textTransform: 'none', letterSpacing: 0, marginLeft: 4 },
-  input:        { width: '100%', padding: '10px 14px', borderRadius: 9, border: '1px solid #f0e0de', fontSize: 14, color: '#2d1f1e', outline: 'none', background: '#fafafa', boxSizing: 'border-box' },
-  select:       { width: '100%', padding: '10px 14px', borderRadius: 9, border: '1px solid #f0e0de', fontSize: 14, color: '#2d1f1e', outline: 'none', background: '#fafafa', boxSizing: 'border-box', cursor: 'pointer', appearance: 'none', backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%239a7a78' d='M6 8L1 3h10z'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 14px center' },
-  textarea:     { width: '100%', padding: '10px 14px', borderRadius: 9, border: '1px solid #f0e0de', fontSize: 14, color: '#2d1f1e', outline: 'none', background: '#fafafa', resize: 'vertical', boxSizing: 'border-box', fontFamily: 'inherit' },
-  imgPreview:   { width: '100%', height: 140, objectFit: 'cover', borderRadius: 10, marginTop: 10, border: '1px solid #f0e0de' },
-  badgePreview: { width: 60, height: 60, objectFit: 'contain', borderRadius: 10, marginTop: 10, border: '1px solid #f0e0de' },
-  mapLink:      { display: 'inline-block', marginTop: 10, fontSize: 13, color: '#6b4b45', fontWeight: 600, textDecoration: 'none' },
+  label:        { display: 'block', fontSize: 12, fontWeight: 600, color: t.textSecondary, marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.04em' },
+  required:     { color: t.danger, fontWeight: 700 },
+  hint:         { fontSize: 11, color: t.textMuted, fontWeight: 400, textTransform: 'none', letterSpacing: 0, marginLeft: 4 },
+  input:        { width: '100%', padding: '10px 14px', borderRadius: 9, border: `1px solid ${t.border}`, fontSize: 14, color: t.textPrimary, outline: 'none', background: t.sidebarBg, boxSizing: 'border-box' },
+  select:       { width: '100%', padding: '10px 14px', borderRadius: 9, border: `1px solid ${t.border}`, fontSize: 14, color: t.textPrimary, outline: 'none', background: t.sidebarBg, boxSizing: 'border-box', cursor: 'pointer', appearance: 'none', backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23b89c96' d='M6 8L1 3h10z'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 14px center' },
+  textarea:     { width: '100%', padding: '10px 14px', borderRadius: 9, border: `1px solid ${t.border}`, fontSize: 14, color: t.textPrimary, outline: 'none', background: t.sidebarBg, resize: 'vertical', boxSizing: 'border-box', fontFamily: 'inherit' },
+  imgPreview:   { width: '100%', height: 140, objectFit: 'cover', borderRadius: 10, marginTop: 10, border: `1px solid ${t.border}` },
+  badgePreview: { width: 60, height: 60, objectFit: 'contain', borderRadius: 10, marginTop: 10, border: `1px solid ${t.border}` },
+  mapLink:      { display: 'inline-block', marginTop: 10, fontSize: 13, color: t.brand, fontWeight: 600, textDecoration: 'none' },
   arHeader:     { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 },
-  arSubtitle:   { fontSize: 13, color: '#9a7a78', marginTop: 2 },
-  arCount:      { fontWeight: 600, color: '#6b4b45' },
-  addArBtn:     { padding: '8px 16px', background: '#6b4b45', color: '#fff', border: 'none', borderRadius: 8, fontWeight: 600, fontSize: 13, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 },
-  emptyAr:      { background: '#faf5f4', borderRadius: 10, padding: '20px', textAlign: 'center', color: '#9a7a78', fontSize: 14, border: '1px dashed #f0e0de' },
-  arCard:       { background: '#faf5f4', borderRadius: 12, padding: 16, marginBottom: 12, border: '1px solid #f0e0de' },
+  arSubtitle:   { fontSize: 13, color: t.textSecondary, marginTop: 2 },
+  arCount:      { fontWeight: 600, color: t.brand },
+  addArBtn:     { padding: '8px 16px', background: t.brandSolid, color: '#fff', border: 'none', borderRadius: 8, fontWeight: 600, fontSize: 13, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 },
+  emptyAr:      { background: t.sidebarBg, borderRadius: 10, padding: '20px', textAlign: 'center', color: t.textSecondary, fontSize: 14, border: `1px dashed ${t.border}` },
+  arCard:       { background: t.sidebarBg, borderRadius: 12, padding: 16, marginBottom: 12, border: `1px solid ${t.border}` },
   arCardHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
-  arBadge:      { display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 700, color: '#4a2e2c' },
-  arBadgeDot:   { width: 8, height: 8, borderRadius: '50%', background: '#6b4b45', display: 'inline-block' },
-  removeBtn:    { padding: '5px 12px', background: '#fff0f0', color: '#c0392b', border: '1px solid #ffd0d0', borderRadius: 7, fontWeight: 600, fontSize: 12, cursor: 'pointer' },
-  footer:       { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 28px', borderTop: '1px solid #f0e0de', flexShrink: 0 },
+  arBadge:      { display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 700, color: t.textPrimary },
+  arBadgeDot:   { width: 8, height: 8, borderRadius: '50%', background: t.brand, display: 'inline-block' },
+  removeBtn:    { padding: '5px 12px', background: t.dangerBg, color: t.danger, border: `1px solid ${t.danger}44`, borderRadius: 7, fontWeight: 600, fontSize: 12, cursor: 'pointer' },
+  footer:       { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 28px', borderTop: `1px solid ${t.divider}`, flexShrink: 0 },
   footerRight:  { display: 'flex', gap: 10 },
-  requiredNote: { fontSize: 12, color: '#9a7a78' },
-  cancelBtn:    { padding: '10px 22px', borderRadius: 9, border: '1px solid #f0e0de', background: '#fff', color: '#7a5a58', fontWeight: 600, fontSize: 14, cursor: 'pointer' },
-  saveBtn:      { padding: '10px 22px', borderRadius: 9, border: 'none', background: '#6b4b45', color: '#fff', fontWeight: 600, fontSize: 14, cursor: 'pointer' },
-  arWarning:    { marginTop: 6, fontSize: 12, color: '#c0392b', fontWeight: 500 },
-  arOk:         { marginTop: 6, fontSize: 12, color: '#27ae60', fontWeight: 500 },
+  requiredNote: { fontSize: 12, color: t.textSecondary },
+  cancelBtn:    { padding: '10px 22px', borderRadius: 9, border: `1px solid ${t.border}`, background: 'transparent', color: t.textSecondary, fontWeight: 600, fontSize: 14, cursor: 'pointer' },
+  saveBtn:      { padding: '10px 22px', borderRadius: 9, border: 'none', background: t.brandSolid, color: '#fff', fontWeight: 600, fontSize: 14, cursor: 'pointer' },
+  arWarning:    { marginTop: 6, fontSize: 12, color: t.danger, fontWeight: 500 },
+  arOk:         { marginTop: 6, fontSize: 12, color: t.success, fontWeight: 500 },
 };

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { authAPI } from '../api/api';
+import { theme as t } from '../theme';
 
 export default function Login() {
   const [email, setEmail]       = useState('');
@@ -21,7 +22,7 @@ export default function Login() {
         if (data.role === 'moderator') {
           navigate('/dashboard');
         } else {
-          navigate('/pending');
+          navigate('/comments');
         }
       } else {
         setError(data.message || 'Login failed');
@@ -84,15 +85,15 @@ export default function Login() {
 }
 
 const styles = {
-  container: { minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#a5a09f', padding: 20 },
-  card:      { background: '#fff', borderRadius: 20, padding: '40px 44px', width: '100%', maxWidth: 400, boxShadow: '0 4px 32px rgba(74,46,44,0.1)', border: '1px solid #f0e0de' },
+  container: { minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: t.bg, padding: 20 },
+  card:      { background: t.cardBg, borderRadius: 20, padding: '40px 44px', width: '100%', maxWidth: 400, boxShadow: '0 4px 32px rgba(0,0,0,0.4)', border: `1px solid ${t.border}` },
   logoWrap:  { display: 'flex', justifyContent: 'center', marginBottom: 20 },
-  logo:      { width: 52, height: 52, borderRadius: 16, background: 'linear-gradient(135deg, #6b4b45, #4a2e2c)', color: '#fff', fontWeight: 700, fontSize: 22, display: 'flex', alignItems: 'center', justifyContent: 'center' },
-  title:     { fontSize: 22, fontWeight: 700, color: '#2d1f1e', textAlign: 'center', marginBottom: 6 },
-  subtitle:  { fontSize: 14, color: '#9a7a78', textAlign: 'center', marginBottom: 28 },
-  error:     { background: '#fff0f0', border: '1px solid #ffd0d0', borderRadius: 9, padding: '10px 14px', color: '#c0392b', fontSize: 13, marginBottom: 16 },
+  logo:      { width: 52, height: 52, borderRadius: 16, background: t.brandSolid, color: '#fff', fontWeight: 700, fontSize: 22, display: 'flex', alignItems: 'center', justifyContent: 'center' },
+  title:     { fontSize: 22, fontWeight: 700, color: t.textPrimary, textAlign: 'center', marginBottom: 6 },
+  subtitle:  { fontSize: 14, color: t.textSecondary, textAlign: 'center', marginBottom: 28 },
+  error:     { background: t.dangerBg, border: `1px solid ${t.danger}44`, borderRadius: 9, padding: '10px 14px', color: t.danger, fontSize: 13, marginBottom: 16 },
   field:     { marginBottom: 16 },
-  label:     { display: 'block', fontSize: 12, fontWeight: 600, color: '#9a7a78', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.04em' },
-  input:     { width: '100%', padding: '11px 14px', borderRadius: 9, border: '1px solid #f0e0de', fontSize: 14, color: '#2d1f1e', outline: 'none', background: '#fafafa', boxSizing: 'border-box' },
-  btn:       { width: '100%', padding: 13, borderRadius: 10, border: 'none', background: 'linear-gradient(135deg, #6b4b45, #4a2e2c)', color: '#fff', fontWeight: 700, fontSize: 15, cursor: 'pointer', marginTop: 8 },
+  label:     { display: 'block', fontSize: 12, fontWeight: 600, color: t.textSecondary, marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.04em' },
+  input:     { width: '100%', padding: '11px 14px', borderRadius: 9, border: `1px solid ${t.border}`, fontSize: 14, color: t.textPrimary, outline: 'none', background: t.sidebarBg, boxSizing: 'border-box' },
+  btn:       { width: '100%', padding: 13, borderRadius: 10, border: 'none', background: t.brandSolid, color: '#fff', fontWeight: 700, fontSize: 15, cursor: 'pointer', marginTop: 8 },
 };

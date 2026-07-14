@@ -1,4 +1,5 @@
 import { useNavigate, useLocation } from 'react-router-dom';
+import { theme as t } from '../theme';
 
 export default function Navbar() {
   const navigate = useNavigate();
@@ -11,41 +12,70 @@ export default function Navbar() {
     navigate('/login');
   };
 
-  const navItems = role === 'admin'
-    ? [{ label: 'Pending Changes', path: '/pending' }]
+  const isModerator = role === 'moderator';
+
+  const navItems = isModerator
+    ? [
+        { label: 'Dashboard', path: '/dashboard', icon: '⊞' },
+        { label: 'Spots',     path: '/spots',     icon: '📍' },
+        { label: 'Comments',  path: '/comments',  icon: '💬' },
+      ]
     : [
-        { label: 'Dashboard', path: '/dashboard' },
-        { label: 'Spots',     path: '/spots' },
-        { label: 'Reports',   path: '/reports' },
+        { label: 'All Comments',    path: '/comments',      icon: '💬' },
+        { label: 'Mod Requests',    path: '/mod-requests',  icon: '🛡' },
+
+        { label: 'Inactive Users',  path: '/inactive-users',icon: '👥' },
+        { label: 'Spots',           path: '/spots',         icon: '⊞' },
+        { label: 'Notifications',   path: '/notifications', icon: '🔔' },
       ];
 
+  const home = isModerator ? '/dashboard' : '/comments';
+
   return (
-    <nav style={styles.nav}>
-      <div style={styles.brand} onClick={() => navigate(role === 'moderator' ? '/pending' : '/dashboard')}>
-        <div style={styles.logo}>L</div>
-        <span style={styles.brandText}>Libot Admin</span>
+    <nav style={s.sidebar}>
+      <div style={s.brand} onClick={() => navigate(home)}>
+        <div style={s.logoBox}><span style={s.logoLetter}>L</span></div>
+        <div>
+          <div style={s.brandName}>Libot</div>
+          <div style={s.brandSub}>Admin Console</div>
+        </div>
       </div>
 
-      <div style={styles.navLinks}>
-        {navItems.map(item => (
-          <button
-            key={item.path}
-            onClick={() => navigate(item.path)}
-            style={{
-              ...styles.navBtn,
-              ...(location.pathname === item.path ? styles.navBtnActive : {})
-            }}
-          >
-            {item.label}
-          </button>
-        ))}
+      <div style={s.roleSection}>
+        <p style={s.roleLabel}>Role</p>
+        <div style={s.roleRow}>
+          <span style={{ ...s.rolePill, ...(isModerator ? s.rolePillMod : s.rolePillAdmin) }}>
+            {isModerator ? 'MOD' : 'ADMIN'}
+          </span>
+        </div>
+        <div style={s.roleActive}>
+          <span style={s.roleDot} />
+          {isModerator ? 'Moderator' : 'Administrator'}
+        </div>
       </div>
 
-      <div style={styles.right}>
-        <span style={{ ...styles.roleBadge, ...(role === 'moderator' ? styles.roleBadgeModerator : {}) }}>
-          {role === 'moderator' ? 'Moderator' : 'Admin'}
-        </span>
-        <button onClick={logout} style={styles.logoutBtn}>
+      <div style={s.navSection}>
+        <p style={s.navLabel}>Navigation</p>
+        <div style={s.links}>
+          {navItems.map(item => {
+            const active = location.pathname === item.path;
+            return (
+              <button
+                key={item.path}
+                onClick={() => navigate(item.path)}
+                style={{ ...s.link, ...(active ? s.linkActive : {}) }}
+              >
+                <span style={s.linkIcon}>{item.icon}</span>
+                <span style={{ flex: 1, textAlign: 'left' }}>{item.label}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <div style={s.footer}>
+        <button onClick={logout} style={s.logoutBtn}>
+          <span style={{ fontSize: 14 }}>🚪</span>
           Logout
         </button>
       </div>
@@ -53,41 +83,41 @@ export default function Navbar() {
   );
 }
 
-const styles = {
-  nav: {
-    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-    padding: '0 32px', height: 64,
-    background: '#fff',
-    borderBottom: '1px solid #f0e0de',
-    position: 'sticky', top: 0, zIndex: 100,
-    boxShadow: '0 1px 8px rgba(74,46,44,0.06)',
+const s = {
+  sidebar: {
+    display: 'flex', flexDirection: 'column', width: 272, minWidth: 272, height: '100vh',
+    background: t.sidebarBg, borderRight: `1px solid ${t.divider}`, position: 'sticky', top: 0, flexShrink: 0,
   },
-  brand:     { display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' },
-  logo: {
-    width: 34, height: 34, borderRadius: 10,
-    background: 'linear-gradient(135deg, #6b4b45, #4a2e2c)',
-    color: '#fff', fontWeight: 700, fontSize: 16,
-    display: 'flex', alignItems: 'center', justifyContent: 'center',
+  brand: { display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', padding: '20px 20px 18px' },
+  logoBox: { width: 34, height: 34, borderRadius: 9, background: t.brandSolid, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  logoLetter: { color: '#fff', fontWeight: 700, fontSize: 16 },
+  brandName:  { color: t.textPrimary, fontWeight: 700, fontSize: 15, lineHeight: 1.2 },
+  brandSub:   { color: t.textMuted, fontSize: 10, fontWeight: 500, letterSpacing: '0.08em', textTransform: 'uppercase' },
+
+  roleSection: { padding: '4px 20px 18px', borderBottom: `1px solid ${t.divider}` },
+  roleLabel:   { fontSize: 10, fontWeight: 700, color: t.textMuted, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 },
+  roleRow:     { display: 'flex', gap: 6, marginBottom: 10 },
+  rolePill:    { padding: '5px 14px', borderRadius: 8, fontSize: 12, fontWeight: 700, letterSpacing: '0.03em' },
+  rolePillMod:   { background: t.infoBg, color: t.info },
+  rolePillAdmin: { background: t.brandSolid, color: '#fff' },
+  roleActive:  { display: 'flex', alignItems: 'center', gap: 7, fontSize: 12, color: t.textSecondary, fontWeight: 500 },
+  roleDot:     { width: 6, height: 6, borderRadius: '50%', background: t.success, flexShrink: 0 },
+
+  navSection: { flex: 1, padding: '18px 14px', overflowY: 'auto' },
+  navLabel:   { fontSize: 10, fontWeight: 700, color: t.textMuted, textTransform: 'uppercase', letterSpacing: '0.08em', margin: '0 8px 10px' },
+  links:      { display: 'flex', flexDirection: 'column', gap: 2 },
+  link: {
+    display: 'flex', alignItems: 'center', gap: 11, padding: '9px 12px', borderRadius: 9, border: 'none',
+    background: 'transparent', color: t.textSecondary, fontWeight: 500, fontSize: 13.5, cursor: 'pointer',
+    transition: 'all 0.15s', width: '100%',
   },
-  brandText:          { fontWeight: 700, fontSize: 17, color: '#4a2e2c' },
-  navLinks:           { display: 'flex', gap: 4 },
-  navBtn: {
-    padding: '7px 16px', borderRadius: 8, border: 'none',
-    background: 'transparent', color: '#7a5a58',
-    fontWeight: 500, fontSize: 14, cursor: 'pointer',
-    transition: 'all 0.15s',
-  },
-  navBtnActive:       { background: '#faf0ee', color: '#4a2e2c', fontWeight: 600 },
-  right:              { display: 'flex', alignItems: 'center', gap: 10 },
-  roleBadge: {
-    padding: '4px 12px', borderRadius: 20, fontSize: 12, fontWeight: 600,
-    background: '#faf0ee', color: '#6b4b45', border: '1px solid #f0e0de',
-  },
-  roleBadgeModerator: { background: '#f0f4ff', color: '#3b5bdb', border: '1px solid #dde3ff' },
+  linkActive: { background: t.brandSoft, color: t.textPrimary, fontWeight: 600 },
+  linkIcon: { fontSize: 14, width: 18, textAlign: 'center', flexShrink: 0 },
+
+  footer: { padding: '14px 20px 20px', borderTop: `1px solid ${t.divider}` },
   logoutBtn: {
-    padding: '7px 18px', borderRadius: 8,
-    border: '1px solid #f0e0de',
-    background: '#fff', color: '#7a5a58',
-    fontWeight: 500, fontSize: 14, cursor: 'pointer',
+    display: 'flex', alignItems: 'center', gap: 8, padding: '9px 14px', borderRadius: 9,
+    border: `1px solid ${t.border}`, background: 'transparent', color: t.textMuted, fontSize: 13,
+    fontWeight: 500, cursor: 'pointer', width: '100%',
   },
 };

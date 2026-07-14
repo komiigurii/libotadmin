@@ -12,12 +12,34 @@ api.interceptors.request.use((config) => {
 });
 
 export const spotAPI = {
-  getAll:       ()           => api.get('/api/spots').then(r => r.data.spots),
-  create:       (data)       => api.post('/api/spots', data).then(r => r.data),
-  update:       (id, data)   => api.put(`/api/spots/${id}`, data).then(r => r.data),
-  delete:       (id)         => api.delete(`/api/spots/${id}`).then(r => r.data),
-  getPending:   ()           => api.get('/api/spots/pending').then(r => r.data), 
-  reviewChange: (id, action) => api.patch(`/api/spots/pending/${id}`, { action }).then(r => r.data), 
+  getAll:        ()           => api.get('/api/spots').then(r => r.data.spots),
+  getMine:       ()           => api.get('/api/spots/moderator').then(r => r.data.spots),
+  create:        (data)       => api.post('/api/spots', data).then(r => r.data),
+  update:        (id, data)   => api.put(`/api/spots/${id}`, data).then(r => r.data),
+  delete:        (id)         => api.delete(`/api/spots/${id}`).then(r => r.data),
+  getPending:    ()           => api.get('/api/spots/pending').then(r => r.data),
+  proposeChange: (id, data)   => api.patch(`/api/spots/${id}/propose`, data).then(r => r.data),
+  reviewChange:  (id, action) => api.patch(`/api/spots/${id}/review`, { action }).then(r => r.data),
+};
+
+export const commentAPI = {
+  getAll: (params = {}) => {
+    const query = new URLSearchParams(params).toString();
+    return api.get(`/api/reviews/admin/all${query ? '?' + query : ''}`).then(r => r.data);
+  },
+  getMine: ()                  => api.get('/api/reviews/admin/mine').then(r => r.data),
+  requestReview: (id, reason)  =>
+    api.patch(`/api/reviews/${id}/flag`, { reason }).then(r => r.data),
+  decide: (id, decision)       =>
+    api.patch(`/api/reviews/${id}/flag-decision`, { decision }).then(r => r.data),
+  delete: (id)                 => api.delete(`/api/reviews/admin/${id}`).then(r => r.data),
+  banUser: (id, banReason)     =>
+    api.patch(`/api/reviews/${id}/ban-user`, { banReason }).then(r => r.data),
+};
+
+export const inactiveUsersAPI = {
+  getAll:  ()             => api.get('/api/admin/inactive-users').then(r => r.data),
+  archive: (clerkUserId)  => api.patch(`/api/admin/inactive-users/${clerkUserId}/archive`).then(r => r.data),
 };
 
 export const authAPI = {
