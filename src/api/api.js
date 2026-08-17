@@ -47,4 +47,17 @@ export const authAPI = {
     api.post('/api/auth/admin-login', { email, password }).then(r => r.data),
 };
 
+// type: 'image' | 'badge' | 'model'
+export const uploadAPI = {
+  spotMedia: (file, type = 'image') => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return api
+      .post(`/api/upload/spot?type=${type}`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      })
+      .then(r => r.data);
+  },
+};
+
 export default api;

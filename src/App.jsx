@@ -1,9 +1,9 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Login          from './pages/Login';
-import Dashboard      from './pages/Dashboard';
 import Spots          from './pages/Spots';
 import Comments       from './pages/Comments';
 import ModRequests    from './pages/ModRequests';
+import MyReviewRequests from './pages/MyReviewRequests';
 import InactiveUsers  from './pages/InactiveUsers';
 import Notifications  from './pages/Notifications';
 import Navbar         from './components/Navbar';
@@ -22,7 +22,7 @@ const ModeratorRoute = ({ children }) => {
 
 const AdminRoute = ({ children }) => {
   const role = localStorage.getItem('role');
-  return role === 'admin' ? children : <Navigate to="/dashboard" replace />;
+  return role === 'admin' ? children : <Navigate to="/my-review-requests" replace />;
 };
 
 export default function App() {
@@ -39,7 +39,7 @@ export default function App() {
                 <Navbar />
                 <main style={shell.main}>
                   <Routes>
-                    <Route path="/dashboard" element={<ModeratorRoute><Dashboard /></ModeratorRoute>} />
+                    <Route path="/my-review-requests" element={<ModeratorRoute><MyReviewRequests /></ModeratorRoute>} />
 
                     <Route path="/mod-requests"   element={<AdminRoute><ModRequests /></AdminRoute>} />
                     <Route path="/inactive-users" element={<AdminRoute><InactiveUsers /></AdminRoute>} />
@@ -52,7 +52,7 @@ export default function App() {
                       path="*"
                       element={
                         <Navigate
-                          to={localStorage.getItem('role') === 'admin' ? '/comments' : '/dashboard'}
+                          to={localStorage.getItem('role') === 'admin' ? '/comments' : '/my-review-requests'}
                           replace
                         />
                       }
