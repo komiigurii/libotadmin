@@ -41,7 +41,7 @@ export default function App() {
                   <Routes>
                     <Route path="/my-review-requests" element={<ModeratorRoute><MyReviewRequests /></ModeratorRoute>} />
 
-                    <Route path="/mod-requests"   element={<AdminRoute><ModRequests /></AdminRoute>} />
+                    <Route path="/mod-requests"   element={<ModeratorRoute><ModRequests /></ModeratorRoute>} />
                     <Route path="/inactive-users" element={<AdminRoute><InactiveUsers /></AdminRoute>} />
                     <Route path="/notifications"  element={<AdminRoute><Notifications /></AdminRoute>} />
 

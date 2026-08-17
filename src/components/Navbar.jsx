@@ -23,7 +23,7 @@ export default function Navbar() {
       ]
     : [
         { label: 'All Comments',    path: '/comments' },
-        { label: 'Mod Requests',    path: '/mod-requests' },
+        { label: 'Mod Requests',    path: '/mod-requests', disabled: true },
         { label: 'Inactive Users',  path: '/inactive-users' },
         { label: 'Spots',           path: '/spots' },
         { label: 'Notifications',  path: '/notifications' },
@@ -60,8 +60,12 @@ export default function Navbar() {
             return (
               <button
                 key={item.path}
-                onClick={() => navigate(item.path)}
-                style={{ ...s.link, ...(active ? s.linkActive : {}) }}
+                onClick={() => !item.disabled && navigate(item.path)}
+                disabled={item.disabled}
+                style={{
+                  ...s.link,
+                  ...(active ? s.linkActive : {}),
+                  ...(item.disabled ? s.linkDisabled : {}) }}
               >
                 <span>{item.label}</span>
                 {active && <span style={s.linkChevron}>›</span>}
@@ -82,6 +86,11 @@ export default function Navbar() {
 }
 
 const s = {
+  linkDisabled: {
+    opacity: 0.4,
+    cursor: 'not-allowed',
+    pointerEvents: 'none'
+  },
   sidebar: {
     display: 'flex', flexDirection: 'column', width: 240, minWidth: 240, height: '100vh',
     background: t.sidebarBg, borderRight: `1px solid ${t.divider}`, position: 'sticky', top: 0, flexShrink: 0,
