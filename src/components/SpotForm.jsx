@@ -417,8 +417,9 @@ function SpotMapPicker({ spotLat, spotLng, onSpotChange, arModels, addingAr, onP
 export default function SpotForm({ initial, onSave, onCancel, saving = false, isModerator = false }) {
   const [form, setForm] = useState({
     name:            initial?.name             || '',
-    category:        Array.isArray(initial?.category) ? initial.category : (initial?.category ? [initial.category] : []),
+    category:        (Array.isArray(initial?.category) ? initial.category : (initial?.category ? [initial.category] : [])).filter(c => CATEGORIES.includes(c)),
     description:     initial?.description      || '',
+    city:            initial?.city             || '',
     entranceFee:     initial?.entranceFee      || '',
     visitingHours:   initial?.visitingHours    || '',
     image:           initial?.image            || '',
@@ -489,6 +490,7 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
   const handleSave = () => {
     if (!form.name)            return alert('Name is required');
     if (!form.category.length) return alert('Select at least one category');
+    if (!form.city)             return alert('City is required');
     if (!form.image)           return alert('Image is required');
     if (!form.coordinates_lat || !form.coordinates_lng) return alert('Spot location is required');
 
@@ -496,6 +498,7 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
       name:          form.name,
       category:      form.category,
       description:   form.description,
+      city:          form.city,
       entranceFee:   form.entranceFee,
       visitingHours: form.visitingHours,
       image:         form.image,
@@ -540,6 +543,11 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
             <div style={styles.field}>
               <label style={styles.label}>Name <span style={styles.required}>*</span></label>
               <input name="name" value={form.name} onChange={handleChange} style={styles.input} placeholder="e.g. Barasoain Church" />
+            </div>
+
+            <div style={styles.field}>
+              <label style={styles.label}>City <span style={styles.required}>*</span></label>
+              <input name="city" value={form.city} onChange={handleChange} style={styles.input} placeholder="e.g. Malolos City" />
             </div>
 
             <div style={styles.field}>
