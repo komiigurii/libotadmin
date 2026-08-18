@@ -136,7 +136,7 @@ export default function Spots() {
                   : <div style={s.cardImgPh}>{spot.name?.[0]}</div>
                 }
                 <span style={s.categoryBadge}>
-                  {Array.isArray(spot.category) ? spot.category[0] : spot.category || '—'}
+                  {Array.isArray(spot.category) ? spot.category.join(' / ') : spot.category || '—'}
                 </span>
                 {spot.pendingChange && (
                   <span style={s.pendingBadge}>pending change</span>
@@ -153,7 +153,7 @@ export default function Spots() {
                 <div style={s.detailList}>
                   <div style={s.detailRow}>
                     <span style={s.detailIcon}>📍</span>
-                    <span style={s.detailText}>{spot.City || '—'}</span>
+                    <span style={s.detailText}>{spot.city || '—'}</span>
                   </div>
                   <div style={s.detailRow}>
                     <span style={s.detailIcon}>🕒</span>
