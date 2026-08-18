@@ -1,9 +1,9 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Login          from './pages/Login';
 import Spots          from './pages/Spots';
-import comments       from './pages/comments';
+import Comments       from './pages/Comments';
 import ModRequests    from './pages/ModRequests';
-import myReviewRequests from './pages/myReviewRequests';
+import myReviewRequests from './pages/MyReviewRequests';
 import InactiveUsers  from './pages/InactiveUsers';
 import Notifications  from './pages/Notifications';
 import Navbar         from './components/Navbar';
@@ -17,12 +17,12 @@ const PrivateRoute = ({ children }) => {
 
 const ModeratorRoute = ({ children }) => {
   const role = localStorage.getItem('role');
-  return role === 'moderator' ? children : <Navigate to="/comments" replace />;
+  return role === 'moderator' ? children : <Navigate to="/Comments" replace />;
 };
 
 const AdminRoute = ({ children }) => {
   const role = localStorage.getItem('role');
-  return role === 'admin' ? children : <Navigate to="/my-review-requests" replace />;
+  return role === 'admin' ? children : <Navigate to="/My-review-requests" replace />;
 };
 
 export default function App() {
@@ -39,20 +39,20 @@ export default function App() {
                 <Navbar />
                 <main style={shell.main}>
                   <Routes>
-                    <Route path="/my-review-requests" element={<ModeratorRoute><myReviewRequests /></ModeratorRoute>} />
+                    <Route path="/my-review-requests" element={<ModeratorRoute><MyReviewRequests /></ModeratorRoute>} />
 
                     <Route path="/mod-requests"   element={<ModeratorRoute><ModRequests /></ModeratorRoute>} />
                     <Route path="/inactive-users" element={<AdminRoute><InactiveUsers /></AdminRoute>} />
                     <Route path="/notifications"  element={<AdminRoute><Notifications /></AdminRoute>} />
 
                     <Route path="/spots"     element={<Spots />} />
-                    <Route path="/comments"  element={<comments />} />
+                    <Route path="/Comments"  element={<Comments />} />
 
                     <Route
                       path="*"
                       element={
                         <Navigate
-                          to={localStorage.getItem('role') === 'admin' ? '/comments' : '/my-review-requests'}
+                          to={localStorage.getItem('role') === 'admin' ? '/Comments' : '/My-review-requests'}
                           replace
                         />
                       }
