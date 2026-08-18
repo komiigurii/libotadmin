@@ -3,7 +3,7 @@ import Login          from './pages/Login';
 import Spots          from './pages/Spots';
 import Comments       from './pages/Comments';
 import ModRequests    from './pages/ModRequests';
-import myReviewRequests from './pages/MyReviewRequests';
+import MyReviewRequests from './pages/MyReviewRequests';
 import InactiveUsers  from './pages/InactiveUsers';
 import Notifications  from './pages/Notifications';
 import Navbar         from './components/Navbar';
