@@ -1,9 +1,9 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Login          from './pages/Login';
 import Spots          from './pages/Spots';
-import Comments       from './pages/Comments';
+import comments       from './pages/comments';
 import ModRequests    from './pages/ModRequests';
-import MyReviewRequests from './pages/MyReviewRequests';
+import myReviewRequests from './pages/myReviewRequests';
 import InactiveUsers  from './pages/InactiveUsers';
 import Notifications  from './pages/Notifications';
 import Navbar         from './components/Navbar';
@@ -39,14 +39,14 @@ export default function App() {
                 <Navbar />
                 <main style={shell.main}>
                   <Routes>
-                    <Route path="/my-review-requests" element={<ModeratorRoute><MyReviewRequests /></ModeratorRoute>} />
+                    <Route path="/my-review-requests" element={<ModeratorRoute><myReviewRequests /></ModeratorRoute>} />
 
                     <Route path="/mod-requests"   element={<ModeratorRoute><ModRequests /></ModeratorRoute>} />
                     <Route path="/inactive-users" element={<AdminRoute><InactiveUsers /></AdminRoute>} />
                     <Route path="/notifications"  element={<AdminRoute><Notifications /></AdminRoute>} />
 
                     <Route path="/spots"     element={<Spots />} />
-                    <Route path="/comments"  element={<Comments />} />
+                    <Route path="/comments"  element={<comments />} />
 
                     <Route
                       path="*"
