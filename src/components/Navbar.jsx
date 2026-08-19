@@ -23,7 +23,7 @@ export default function Navbar() {
       ]
     : [
         { label: 'All Comments',    path: '/comments' },
-        { label: 'Mod Requests',    path: '/mod-requests', disabled: true },
+        { label: 'Mod Requests',    path: '/mod-requests'},
         { label: 'Inactive Users',  path: '/inactive-users' },
         { label: 'Spots',           path: '/spots' },
         { label: 'Notifications',  path: '/notifications' },
