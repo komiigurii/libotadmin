@@ -17,12 +17,12 @@ const PrivateRoute = ({ children }) => {
 
 const ModeratorRoute = ({ children }) => {
   const role = localStorage.getItem('role');
-  return role === 'moderator' ? children : <Navigate to="/comments" replace />;
+  return role === 'moderator' ? children : <Navigate to="/Comments" replace />;
 };
 
 const AdminRoute = ({ children }) => {
   const role = localStorage.getItem('role');
-  return role === 'admin' ? children : <Navigate to="/my-review-requests" replace />;
+  return role === 'admin' ? children : <Navigate to="/My-review-requests" replace />;
 };
 
 export default function App() {
@@ -46,13 +46,13 @@ export default function App() {
                     <Route path="/notifications"  element={<AdminRoute><Notifications /></AdminRoute>} />
 
                     <Route path="/spots"     element={<Spots />} />
-                    <Route path="/comments"  element={<Comments />} />
+                    <Route path="/Comments"  element={<Comments />} />
 
                     <Route
                       path="*"
                       element={
                         <Navigate
-                          to={localStorage.getItem('role') === 'admin' ? '/comments' : '/my-review-requests'}
+                          to={localStorage.getItem('role') === 'admin' ? '/Comments' : '/My-review-requests'}
                           replace
                         />
                       }
