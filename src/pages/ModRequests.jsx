@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { commentAPI, spotAPI } from '../api/api';
+import { commentAPI, spotAPI, accountActionAPI } from '../api/api';
 import { theme as t } from '../theme';
 
 const STATUS_PILL = {
@@ -7,6 +7,8 @@ const STATUS_PILL = {
   approved: { background: t.successBg, color: t.success, label: 'Approved' },
   rejected: { background: t.dangerBg,  color: t.danger,  label: 'Rejected' },
 };
+
+const ACTION_LABELS = { warn: 'Warn (mute)', suspend: 'Suspend' };
 
 const FIELD_LABELS = {
   name: 'Name', location: 'Location', category: 'Category', description: 'Description',
@@ -26,6 +28,7 @@ function toArray(data) {
   if (!data) return [];
   if (Array.isArray(data))         return data;
   if (Array.isArray(data.reviews)) return data.reviews;
+  if (Array.isArray(data.actions)) return data.actions;
   if (Array.isArray(data.data))    return data.data;
   return [];
 }
@@ -134,14 +137,18 @@ export default function ModRequests() {
   const [error,    setError]    = useState(null);
   const [statusFilter, setStatusFilter] = useState('');
   const [acting, setActing] = useState(null);
+  // Per-request admin override for the account action to apply on approval.
+  // Keyed by `${kind}-${id}`. Defaults to the mod's proposedAction if present.
+  const [actionOverrides, setActionOverrides] = useState({});
 
   const load = async () => {
     setLoading(true);
     setError(null);
     try {
-      const [commentsData, pendingSpotsData] = await Promise.all([
+      const [commentsData, pendingSpotsData, accountActionsData] = await Promise.all([
         commentAPI.getAll(),
         spotAPI.getPending(),
+        accountActionAPI.getAll(),
       ]);
 
       const commentReqs = toArray(commentsData)
@@ -168,7 +175,18 @@ export default function ModRequests() {
           body: spot,
         }));
 
-      const all = [...commentReqs, ...spotItems].sort((a, b) => new Date(b.date) - new Date(a.date));
+      const accountItems = toArray(accountActionsData)
+        .map(a => ({
+          kind: 'account',
+          id: a._id,
+          status: a.status,
+          title: a.proposedByName || 'Moderator',
+          subtitle: a.targetName || a.clerkUserId,
+          date: a.proposedAt || a.createdAt,
+          body: a,
+        }));
+
+      const all = [...commentReqs, ...spotItems, ...accountItems].sort((a, b) => new Date(b.date) - new Date(a.date));
       setRequests(all);
     } catch {
       setError('Failed to load mod requests.');
@@ -182,10 +200,10 @@ export default function ModRequests() {
   const visible = requests.filter(r => !statusFilter || r.status === statusFilter);
   const pendingCount = requests.filter(r => r.status === 'pending').length;
 
-  const decideComment = async (id, decision) => {
+  const decideComment = async (id, decision, actionType) => {
     setActing(id);
     try {
-      const data = await commentAPI.decide(id, decision);
+      const data = await commentAPI.decide(id, decision, actionType || 'none');
       if (data?.success !== false) load();
       else alert('Failed: ' + (data?.message || 'Unknown error'));
     } catch { alert('Network error'); }
@@ -202,12 +220,22 @@ export default function ModRequests() {
     setActing(null);
   };
 
+  const decideAccount = async (id, decision) => {
+    setActing(id);
+    try {
+      const data = await accountActionAPI.decide(id, decision);
+      if (data?.success !== false) load();
+      else alert('Failed: ' + (data?.message || 'Unknown error'));
+    } catch { alert('Network error'); }
+    setActing(null);
+  };
+
   return (
     <div style={s.page}>
       <div style={s.pageHeader}>
         <div>
           <h1 style={s.pageTitle}>Mod Requests</h1>
-          <p style={s.pageSub}>Comment flags and spot edit proposals submitted by moderators</p>
+          <p style={s.pageSub}>Comment flags, account actions, and spot edit proposals submitted by moderators</p>
         </div>
       </div>
 
@@ -235,6 +263,8 @@ export default function ModRequests() {
           const pill = STATUS_PILL[r.status] || STATUS_PILL.pending;
           const isPending = r.status === 'pending';
           const isActing = acting === r.id;
+          const overrideKey = `${r.kind}-${r.id}`;
+          const kindLabel = r.kind === 'spot' ? 'Spot edit' : r.kind === 'account' ? 'Account action' : 'Comment flag';
 
           return (
             <div key={`${r.kind}-${r.id}`} style={s.card}>
@@ -243,13 +273,17 @@ export default function ModRequests() {
               <div style={s.cardHead}>
                 <div style={{ minWidth: 0 }}>
                   <div style={s.eyebrowRow}>
-                    <span style={s.eyebrow}>{r.kind === 'spot' ? 'Spot edit' : 'Comment flag'}</span>
+                    <span style={s.eyebrow}>{kindLabel}</span>
                     <span style={{ ...s.statusPill, background: pill.background, color: pill.color }}>{pill.label}</span>
                   </div>
                   <div style={s.heading}>
-                    {r.kind === 'spot'
-                      ? r.subtitle
-                      : <>{r.title} <span style={s.headingMuted}>flagged a review on</span> {r.subtitle}</>}
+                    {r.kind === 'spot' && r.subtitle}
+                    {r.kind === 'comment' && (
+                      <>{r.title} <span style={s.headingMuted}>flagged a review on</span> {r.subtitle}</>
+                    )}
+                    {r.kind === 'account' && (
+                      <>{r.title} <span style={s.headingMuted}>proposed suspending</span> {r.subtitle}</>
+                    )}
                   </div>
                 </div>
                 <span style={s.dateText}>
@@ -257,12 +291,24 @@ export default function ModRequests() {
                 </span>
               </div>
 
-              {r.kind === 'comment' ? (
+              {r.kind === 'comment' && (
                 <div style={s.commentBody}>
                   <p style={s.quote}>"{(r.body.comment || '').slice(0, 140)}{(r.body.comment || '').length > 140 ? '…' : ''}"</p>
                   {r.body.flagReason && <p style={s.modNote}><span style={s.modNoteLabel}>Mod's note </span>{r.body.flagReason}</p>}
                 </div>
-              ) : (
+              )}
+
+              {r.kind === 'account' && (
+                <div style={s.commentBody}>
+                  <p style={s.modNote}><span style={s.modNoteLabel}>Reason </span>{r.body.reason}</p>
+                  <p style={s.modNote}><span style={s.modNoteLabel}>Source </span>{r.body.sourceType === 'inactivity' ? 'Account inactivity' : 'Manual'}</p>
+                  {r.status !== 'pending' && r.body.resultSummary && (
+                    <p style={s.modNote}><span style={s.modNoteLabel}>Result </span>{r.body.resultSummary}</p>
+                  )}
+                </div>
+              )}
+
+              {r.kind === 'spot' && (
                 <div style={s.fieldList}>
                   {Object.entries(r.body.pendingChange)
                     .filter(([k]) => k !== 'submittedBy' && k !== 'submittedAt')
@@ -272,18 +318,44 @@ export default function ModRequests() {
                 </div>
               )}
 
+              {isPending && r.kind === 'comment' && (
+                <div style={s.actionRow}>
+                  <span style={s.actionRowLabel}>Account action on approve</span>
+                  <select
+                    value={actionOverrides[overrideKey] ?? (r.body.proposedAction || '')}
+                    onChange={e => setActionOverrides(prev => ({ ...prev, [overrideKey]: e.target.value }))}
+                    style={s.actionSelect}
+                  >
+                    <option value="">No account action</option>
+                    <option value="warn">Warn (mute)</option>
+                    <option value="suspend">Suspend</option>
+                  </select>
+                  {r.body.proposedAction && (
+                    <span style={s.suggestedTag}>Mod suggested: {ACTION_LABELS[r.body.proposedAction]}</span>
+                  )}
+                </div>
+              )}
+
               {isPending && (
                 <div style={s.actions}>
                   <button
                     disabled={isActing}
-                    onClick={() => r.kind === 'comment' ? decideComment(r.id, 'approved') : decideSpot(r.id, 'approve')}
+                    onClick={() => {
+                      if (r.kind === 'comment') decideComment(r.id, 'approved', actionOverrides[overrideKey] ?? r.body.proposedAction);
+                      else if (r.kind === 'account') decideAccount(r.id, 'approved');
+                      else decideSpot(r.id, 'approve');
+                    }}
                     style={{ ...s.btn, ...s.btnApprove, opacity: isActing ? 0.6 : 1 }}
                   >
                     Approve
                   </button>
                   <button
                     disabled={isActing}
-                    onClick={() => r.kind === 'comment' ? decideComment(r.id, 'rejected') : decideSpot(r.id, 'reject')}
+                    onClick={() => {
+                      if (r.kind === 'comment') decideComment(r.id, 'rejected');
+                      else if (r.kind === 'account') decideAccount(r.id, 'rejected');
+                      else decideSpot(r.id, 'reject');
+                    }}
                     style={{ ...s.btn, ...s.btnDisapprove, opacity: isActing ? 0.6 : 1 }}
                   >
                     Disapprove
@@ -319,8 +391,13 @@ const s = {
 
   commentBody: { borderTop: `1px solid ${t.divider}`, paddingTop: 10 },
   quote:      { fontSize: 12, color: t.textSecondary, fontStyle: 'italic', margin: '0 0 4px', lineHeight: 1.4 },
-  modNote:    { fontSize: 10.5, color: t.textMuted, margin: 0 },
+  modNote:    { fontSize: 10.5, color: t.textMuted, margin: '0 0 2px' },
   modNoteLabel: { fontWeight: 600, color: t.textSecondary },
+
+  actionRow:   { display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginTop: 10, paddingTop: 10, borderTop: `1px solid ${t.divider}` },
+  actionRowLabel: { fontSize: 10.5, fontWeight: 600, color: t.textSecondary },
+  actionSelect: { padding: '5px 9px', borderRadius: 6, border: `1px solid ${t.border}`, fontSize: 11, color: t.textPrimary, background: t.sidebarBg, outline: 'none', cursor: 'pointer' },
+  suggestedTag: { fontSize: 10, fontWeight: 600, color: t.warning, background: t.warningBg, padding: '3px 8px', borderRadius: 6 },
 
   // ── Field diff list ─────────────────────────────────────────
   fieldList: { display: 'flex', flexDirection: 'column', borderTop: `1px solid ${t.divider}` },
