@@ -11,6 +11,8 @@ const STATUS_PILL = {
   rejected:  { background: t.dangerBg,  color: t.danger,  label: 'REJECTED' },
 };
 
+const ACTION_LABELS = { warn: 'Warn (mute)', suspend: 'Suspend' };
+
 function toArray(data) {
   if (!data) return [];
   if (Array.isArray(data))         return data;
@@ -105,9 +107,10 @@ export default function Comments() {
 }
 
 function CommentRow({ comment, isModerator, expanded, onToggle, onUpdated }) {
-  const [reason,    setReason]    = useState('');
-  const [banReason, setBanReason] = useState('');
-  const [saving,    setSaving]    = useState(false);
+  const [reason,         setReason]         = useState('');
+  const [proposedAction, setProposedAction] = useState('');
+  const [banReason,      setBanReason]      = useState('');
+  const [saving,         setSaving]         = useState(false);
 
   const userName  = (comment.userId && typeof comment.userId === 'object' ? comment.userId.name : comment.userName) || 'Anonymous';
   const spotName  = (comment.spotId && typeof comment.spotId === 'object' ? comment.spotId.name : '') || '—';
@@ -120,7 +123,7 @@ function CommentRow({ comment, isModerator, expanded, onToggle, onUpdated }) {
     if (!reason.trim()) { alert('Add a short reason for admin'); return; }
     setSaving(true);
     try {
-      const data = await commentAPI.requestReview(comment._id, reason.trim());
+      const data = await commentAPI.requestReview(comment._id, reason.trim(), proposedAction || null);
       if (data?.success !== false) onUpdated();
       else alert('Failed: ' + (data?.message || 'Unknown error'));
     } catch { alert('Network error'); }
@@ -165,6 +168,9 @@ function CommentRow({ comment, isModerator, expanded, onToggle, onUpdated }) {
             </span>
             <span style={s.locPill}>{spotName}{spotCity ? ` · ${spotCity}` : ''}</span>
             <span style={{ ...s.statusPill, background: pill.background, color: pill.color }}>{pill.label}</span>
+            {flagStatus === 'pending' && comment.proposedAction && (
+              <span style={s.suggestPill}>Suggested: {ACTION_LABELS[comment.proposedAction] || comment.proposedAction}</span>
+            )}
           </div>
           <p style={s.commentText}>{comment.comment}</p>
           <div style={s.reactRow}>
@@ -195,6 +201,16 @@ function CommentRow({ comment, isModerator, expanded, onToggle, onUpdated }) {
             style={s.textarea}
             rows={2}
           />
+          <p style={{ ...s.panelLabel, marginTop: 10 }}>Suggested action (admin has final say)</p>
+          <select
+            value={proposedAction}
+            onChange={e => setProposedAction(e.target.value)}
+            style={s.select}
+          >
+            <option value="">No account action — just review the comment</option>
+            <option value="warn">Warn (mute comments temporarily)</option>
+            <option value="suspend">Suspend account</option>
+          </select>
           <div style={s.actions}>
             <button disabled={saving} onClick={requestReview} style={{ ...s.btn, ...s.btnPrimary, opacity: saving ? 0.6 : 1 }}>
               Send to admin
@@ -242,6 +258,7 @@ const s = {
   dateText:   { fontSize: 12, color: t.textMuted },
   locPill:    { padding: '3px 10px', background: t.sidebarBg, border: `1px solid ${t.border}`, borderRadius: 20, fontSize: 11, fontWeight: 500, color: t.textSecondary },
   statusPill: { padding: '3px 10px', borderRadius: 6, fontSize: 10, fontWeight: 700, letterSpacing: '0.03em' },
+  suggestPill:{ padding: '3px 10px', borderRadius: 6, fontSize: 10, fontWeight: 700, letterSpacing: '0.02em', background: t.warningBg, color: t.warning },
   commentText:{ fontSize: 14, color: t.textSecondary, lineHeight: 1.5, margin: '2px 0 8px' },
   reactRow:   { display: 'flex', gap: 14 },
   react:      { fontSize: 12, color: t.textMuted },
@@ -252,6 +269,7 @@ const s = {
   panel:      { borderTop: `1px solid ${t.divider}`, padding: '14px 18px 18px', background: t.sidebarBg },
   panelLabel: { fontSize: 12, fontWeight: 600, color: t.textPrimary, margin: '0 0 6px' },
   textarea:   { width: '100%', padding: '9px 12px', borderRadius: 8, border: `1.5px solid ${t.border}`, fontSize: 13, color: t.textPrimary, background: t.cardBg, resize: 'vertical', outline: 'none', boxSizing: 'border-box' },
+  select:     { width: '100%', padding: '9px 12px', borderRadius: 8, border: `1.5px solid ${t.border}`, fontSize: 13, color: t.textPrimary, background: t.cardBg, outline: 'none', boxSizing: 'border-box', cursor: 'pointer' },
   actions:    { display: 'flex', gap: 8, marginTop: 10 },
   btn:        { padding: '8px 18px', borderRadius: 8, fontWeight: 600, fontSize: 13, cursor: 'pointer', border: 'none' },
   btnPrimary: { background: t.brandSolid, color: '#fff' },

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { commentAPI, spotAPI } from '../api/api';
+import { commentAPI, spotAPI, accountActionAPI } from '../api/api';
 import { theme as t } from '../theme';
 
 const STATUS_PILL = {
@@ -7,6 +7,8 @@ const STATUS_PILL = {
   approved: { background: t.successBg, color: t.success, label: 'Approved' },
   rejected: { background: t.dangerBg,  color: t.danger,  label: 'Rejected' },
 };
+
+const ACTION_LABELS = { warn: 'Warn (mute)', suspend: 'Suspend' };
 
 const FIELD_LABELS = {
   name: 'Name', location: 'Location', category: 'Category', description: 'Description',
@@ -24,6 +26,7 @@ function toArray(data) {
   if (Array.isArray(data))         return data;
   if (Array.isArray(data.reviews)) return data.reviews;
   if (Array.isArray(data.spots))   return data.spots;
+  if (Array.isArray(data.actions)) return data.actions;
   if (Array.isArray(data.data))    return data.data;
   return [];
 }
@@ -147,9 +150,10 @@ export default function MyReviewRequests() {
     setLoading(true);
     setError(null);
     try {
-      const [commentsData, mySpotsData] = await Promise.all([
+      const [commentsData, mySpotsData, myAccountActionsData] = await Promise.all([
         commentAPI.getMine(),
         spotAPI.getMine(),
+        accountActionAPI.getMine(),
       ]);
 
       const commentReqs = toArray(commentsData)
@@ -174,7 +178,17 @@ export default function MyReviewRequests() {
           body: spot,
         }));
 
-      const all = [...commentReqs, ...spotItems].sort((a, b) => new Date(b.date) - new Date(a.date));
+      const accountItems = toArray(myAccountActionsData)
+        .map(a => ({
+          kind: 'account',
+          id: a._id,
+          status: a.status,
+          subtitle: a.targetName || a.clerkUserId,
+          date: a.proposedAt || a.createdAt,
+          body: a,
+        }));
+
+      const all = [...commentReqs, ...spotItems, ...accountItems].sort((a, b) => new Date(b.date) - new Date(a.date));
       setRequests(all);
     } catch {
       setError('Failed to load your review requests.');
@@ -193,7 +207,7 @@ export default function MyReviewRequests() {
       <div style={s.pageHeader}>
         <div>
           <h1 style={s.pageTitle}>My Review Requests</h1>
-          <p style={s.pageSub}>Spot edits and comment flags you've submitted</p>
+          <p style={s.pageSub}>Spot edits, comment flags, and account actions you've submitted</p>
         </div>
       </div>
 
@@ -221,9 +235,12 @@ export default function MyReviewRequests() {
 
             const image = r.kind === 'spot'
               ? r.body.image
-              : (r.body.spotId && typeof r.body.spotId === 'object' ? r.body.spotId.image : null);
+              : r.kind === 'comment'
+                ? (r.body.spotId && typeof r.body.spotId === 'object' ? r.body.spotId.image : null)
+                : null;
 
             const changedFields = r.kind === 'spot' ? changedFieldSummary(r.body) : [];
+            const kindLabel = r.kind === 'spot' ? 'Spot edit' : r.kind === 'account' ? 'Account action' : 'Comment flag';
 
             const dateStr = r.date
               ? new Date(r.date).toLocaleString('en-PH', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
@@ -236,18 +253,24 @@ export default function MyReviewRequests() {
                     ? <img src={image} alt={r.subtitle} style={s.cardImg} />
                     : <div style={s.cardImgPh}>{r.subtitle?.[0] || '?'}</div>
                   }
-                  <span style={s.kindBadge}>{r.kind === 'spot' ? 'Spot edit' : 'Comment flag'}</span>
+                  <span style={s.kindBadge}>{kindLabel}</span>
                   <span style={{ ...s.statusBadge, background: pill.background, color: pill.color }}>{pill.label}</span>
                 </div>
 
                 <div style={s.cardBody}>
                   <div style={s.cardName} title={r.subtitle}>{r.subtitle}</div>
 
-                  {r.kind === 'comment' ? (
+                  {r.kind === 'comment' && (
                     <div style={s.cardDesc} title={r.body.comment}>
                       "{r.body.comment || ''}"
                     </div>
-                  ) : (
+                  )}
+                  {r.kind === 'account' && (
+                    <div style={s.cardDesc} title={r.body.reason}>
+                      {ACTION_LABELS[r.body.actionType] || r.body.actionType}: {r.body.reason}
+                    </div>
+                  )}
+                  {r.kind === 'spot' && (
                     <div style={s.cardDesc}>
                       {changedFields.length ? `${changedFields.join(', ')} changed` : 'No field changes'}
                     </div>
@@ -270,22 +293,28 @@ export default function MyReviewRequests() {
                         <span style={s.detailText}>{r.body.flagReason}</span>
                       </div>
                     )}
+                    {r.kind === 'account' && r.status !== 'pending' && r.body.resultSummary && (
+                      <div style={s.detailRow}>
+                        <span style={s.detailIcon}>✅</span>
+                        <span style={s.detailText}>{r.body.resultSummary}</span>
+                      </div>
+                    )}
                   </div>
 
-                  {isOpen && (
-                    r.kind === 'comment' ? null : (
-                      <div style={s.fieldList}>
-                        {Object.entries(r.body.pendingChange)
-                          .filter(([k]) => k !== 'submittedBy' && k !== 'submittedAt' && k !== 'status')
-                          .map(([k, newVal]) => (
-                            <DiffField key={k} fieldKey={k} oldVal={r.body[k]} newVal={newVal} />
-                          ))}
-                      </div>
-                    )
+                  {isOpen && r.kind === 'spot' && (
+                    <div style={s.fieldList}>
+                      {Object.entries(r.body.pendingChange)
+                        .filter(([k]) => k !== 'submittedBy' && k !== 'submittedAt' && k !== 'status')
+                        .map(([k, newVal]) => (
+                          <DiffField key={k} fieldKey={k} oldVal={r.body[k]} newVal={newVal} />
+                        ))}
+                    </div>
                   )}
 
                   <div style={s.cardFooter}>
-                    <span style={s.cardVisits}>{r.kind === 'spot' ? 'Proposed edit' : 'Flagged review'}</span>
+                    <span style={s.cardVisits}>
+                      {r.kind === 'spot' ? 'Proposed edit' : r.kind === 'account' ? 'Proposed action' : 'Flagged review'}
+                    </span>
                     {r.kind === 'spot' && (
                       <button onClick={() => setExpanded(isOpen ? null : key)} style={s.btnView}>
                         {isOpen ? 'Hide Changes' : 'View Changes'}

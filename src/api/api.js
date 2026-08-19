@@ -28,10 +28,10 @@ export const commentAPI = {
     return api.get(`/api/reviews/admin/all${query ? '?' + query : ''}`).then(r => r.data);
   },
   getMine: ()                  => api.get('/api/reviews/admin/mine').then(r => r.data),
-  requestReview: (id, reason)  =>
-    api.patch(`/api/reviews/${id}/flag`, { reason }).then(r => r.data),
-  decide: (id, decision)       =>
-    api.patch(`/api/reviews/${id}/flag-decision`, { decision }).then(r => r.data),
+  requestReview: (id, reason, proposedAction) =>
+    api.patch(`/api/reviews/${id}/flag`, { reason, proposedAction }).then(r => r.data),
+  decide: (id, decision, actionType) =>
+    api.patch(`/api/reviews/${id}/flag-decision`, { decision, actionType }).then(r => r.data),
   delete: (id)                 => api.delete(`/api/reviews/admin/${id}`).then(r => r.data),
   banUser: (id, banReason)     =>
     api.patch(`/api/reviews/${id}/ban-user`, { banReason }).then(r => r.data),
@@ -40,6 +40,18 @@ export const commentAPI = {
 export const inactiveUsersAPI = {
   getAll:  ()             => api.get('/api/admin/inactive-users').then(r => r.data),
   archive: (clerkUserId)  => api.patch(`/api/admin/inactive-users/${clerkUserId}/archive`).then(r => r.data),
+};
+
+// Mod-proposed / admin-decided account actions (warnings & suspensions)
+// that aren't tied to a specific flagged comment — currently just
+// inactivity-based suspension proposals.
+export const accountActionAPI = {
+  getAll:  ()                          => api.get('/api/account-actions').then(r => r.data),
+  getMine: ()                          => api.get('/api/account-actions/mine').then(r => r.data),
+  propose: (clerkUserId, reason)       =>
+    api.post('/api/account-actions', { clerkUserId, reason }).then(r => r.data),
+  decide:  (id, decision)              =>
+    api.patch(`/api/account-actions/${id}/decision`, { decision }).then(r => r.data),
 };
 
 export const authAPI = {
