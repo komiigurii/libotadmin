@@ -6,7 +6,6 @@ import ReportedComments from './pages/ReportedComments';
 import ModRequests    from './pages/ModRequests';
 import MyReviewRequests from './pages/MyReviewRequests';
 import InactiveUsers  from './pages/InactiveUsers';
-import Notifications  from './pages/Notifications';
 import Navbar         from './components/Navbar';
 import { theme as t } from './theme';
 import './App.css';
