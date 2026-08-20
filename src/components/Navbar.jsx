@@ -22,7 +22,7 @@ export default function Navbar() {
         { label: 'Spots',              path: '/spots' },
       ]
     : [
-        { label: 'All Comments',    path: '/comments' },
+        { label: 'Review Reports',    path: '/comments' },
         { label: 'Mod Requests',    path: '/mod-requests'},
         { label: 'Inactive Users',  path: '/inactive-users' },
         { label: 'Spots',           path: '/spots' },
