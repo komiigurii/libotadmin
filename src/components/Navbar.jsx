@@ -24,10 +24,10 @@ export default function Navbar() {
     : [
         //Admin
         { label: 'Review Proposed Spot Changes',      path: '/mod-requests' },
-        { label: 'All Comments',    path: '/comments' },
-        { label: 'Reported Comments',       path: '/reported-comments' },
-        { label: 'Banned Accounts',  path: '/banned-accounts' },
-        { label: 'Inactive Users',  path: '/inactive-users' }
+        { label: 'All Comments',                      path: '/comments' },
+        { label: 'Reported Comments',                 path: '/reported-comments' },
+        { label: 'Banned Accounts',                   path: '/banned-accounts' },
+        { label: 'Inactive Users',                    path: '/inactive-users' }
       ];
 
   const home = isModerator ? '/my-review-requests' : '/comments';
