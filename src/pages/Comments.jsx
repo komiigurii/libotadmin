@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { commentAPI } from '../api/api';
+import { commentAPI, bannedAccountsAPI } from '../api/api';
 import { theme as t } from '../theme';
 
 const role = () => localStorage.getItem('role');
@@ -110,6 +110,7 @@ function CommentRow({ comment, isModerator, expanded, onToggle, onUpdated }) {
   const [reason,         setReason]         = useState('');
   const [proposedAction, setProposedAction] = useState('');
   const [banReason,      setBanReason]      = useState('');
+  const [banDuration,    setBanDuration]    = useState('permanent'); // '7' | '30' | 'permanent'
   const [saving,         setSaving]         = useState(false);
 
   const userName  = (comment.userId && typeof comment.userId === 'object' ? comment.userId.name : comment.userName) || 'Anonymous';
@@ -118,6 +119,11 @@ function CommentRow({ comment, isModerator, expanded, onToggle, onUpdated }) {
   const flagStatus = comment.flagStatus || 'none';
   const pill = STATUS_PILL[flagStatus] || STATUS_PILL.none;
   const canRequest = isModerator && flagStatus === 'none';
+
+  // clerkUserId lives directly on the review doc; fall back to a populated
+  // userId object just in case the endpoint ever starts populating it.
+  const clerkUserId = comment.clerkUserId
+    || (comment.userId && typeof comment.userId === 'object' ? comment.userId.clerkUserId : null);
 
   const requestReview = async () => {
     if (!reason.trim()) { alert('Add a short reason for admin'); return; }
@@ -143,10 +149,18 @@ function CommentRow({ comment, isModerator, expanded, onToggle, onUpdated }) {
 
   const banUser = async () => {
     if (!banReason.trim()) { alert('Add a reason for banning this user'); return; }
-    if (!confirm(`Ban ${userName}? This archives their account for 30 days before permanent deletion.`)) return;
+    if (!clerkUserId) { alert('Could not identify this user (missing clerkUserId).'); return; }
+
+    const durationDays = banDuration === 'permanent' ? undefined : Number(banDuration);
+    const confirmMsg = durationDays
+      ? `Suspend ${userName} for ${durationDays} day${durationDays === 1 ? '' : 's'}?`
+      : `Permanently ban ${userName}? This archives their account for 30 days before permanent deletion, with a chance to appeal.`;
+
+    if (!confirm(confirmMsg)) return;
+
     setSaving(true);
     try {
-      const data = await commentAPI.banUser(comment._id, banReason.trim());
+      const data = await bannedAccountsAPI.ban(clerkUserId, banReason.trim(), durationDays);
       if (data?.success !== false) onUpdated();
       else alert('Failed: ' + (data?.message || 'Unknown error'));
     } catch (err) {
@@ -229,6 +243,19 @@ function CommentRow({ comment, isModerator, expanded, onToggle, onUpdated }) {
             style={s.textarea}
             rows={2}
           />
+
+          <p style={{ ...s.panelLabel, marginTop: 10 }}>Duration</p>
+          <select
+            value={banDuration}
+            onChange={e => setBanDuration(e.target.value)}
+            style={s.select}
+          >
+            <option value="7">7 days (Comment Suspension)</option>
+            <option value="14">14 days (Comment Suspension)</option>
+            <option value="30">30 days (Account Ban)</option>
+            <option value="permanent">Permanent (archive + appeal window)</option>
+          </select>
+
           <div style={s.actions}>
             <button disabled={saving} onClick={banUser} style={{ ...s.btn, ...s.btnDanger, opacity: saving ? 0.6 : 1 }}>
               🚫 Confirm Ban

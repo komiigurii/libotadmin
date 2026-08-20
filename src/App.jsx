@@ -7,6 +7,7 @@ import ModRequests    from './pages/ModRequests';
 import MyReviewRequests from './pages/MyReviewRequests';
 import InactiveUsers  from './pages/InactiveUsers';
 import Navbar         from './components/Navbar';
+import BannedAccounts from './pages/BannedAccounts';
 import { theme as t } from './theme';
 import './App.css';
 
@@ -44,6 +45,7 @@ export default function App() {
                     <Route path="/mod-requests"       element={<AdminRoute><ModRequests /></AdminRoute>} />
                     <Route path="/reported-comments"  element={<AdminRoute><ReportedComments /></AdminRoute>} />
                     <Route path="/inactive-users"     element={<AdminRoute><InactiveUsers /></AdminRoute>} />
+                    <Route path="/banned-accounts"    element={<AdminRoute><BannedAccounts /></AdminRoute>} />
 
                     <Route path="/spots"     element={<Spots />} />
                     <Route path="/Comments"  element={<Comments />} />

@@ -37,6 +37,14 @@ export const commentAPI = {
     api.patch(`/api/reviews/${id}/ban-user`, { banReason }).then(r => r.data),
 };
 
+export const bannedAccountsAPI = {
+  getAll: () => api.get('/api/admin/banned-users').then(r => r.data.users),
+  ban:    (clerkUserId, reason, durationDays) =>
+    api.patch(`/api/admin/users/${clerkUserId}/ban`, { reason, durationDays }).then(r => r.data),
+  unban:  (clerkUserId) =>
+    api.patch(`/api/admin/users/${clerkUserId}/unban`).then(r => r.data),
+};
+
 export const inactiveUsersAPI = {
   getAll:  ()             => api.get('/api/admin/inactive-users').then(r => r.data),
   archive: (clerkUserId)  => api.patch(`/api/admin/inactive-users/${clerkUserId}/archive`).then(r => r.data),
