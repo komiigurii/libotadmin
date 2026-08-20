@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { commentAPI, spotAPI, accountActionAPI } from '../api/api';
+import { spotAPI, accountActionAPI } from '../api/api';
 import { theme as t } from '../theme';
 
 const STATUS_PILL = {
@@ -24,7 +24,6 @@ const FILE_LINK_FIELDS = new Set(['modelUrl', 'AR3DModelURL']);
 function toArray(data) {
   if (!data) return [];
   if (Array.isArray(data))         return data;
-  if (Array.isArray(data.reviews)) return data.reviews;
   if (Array.isArray(data.spots))   return data.spots;
   if (Array.isArray(data.actions)) return data.actions;
   if (Array.isArray(data.data))    return data.data;
@@ -150,22 +149,10 @@ export default function MyReviewRequests() {
     setLoading(true);
     setError(null);
     try {
-      const [commentsData, mySpotsData, myAccountActionsData] = await Promise.all([
-        commentAPI.getMine(),
+      const [mySpotsData, myAccountActionsData] = await Promise.all([
         spotAPI.getMine(),
         accountActionAPI.getMine(),
       ]);
-
-      const commentReqs = toArray(commentsData)
-        .filter(c => (c.flagStatus || 'none') !== 'none')
-        .map(c => ({
-          kind: 'comment',
-          id: c._id,
-          status: c.flagStatus,
-          subtitle: (c.spotId && typeof c.spotId === 'object' ? c.spotId.name : '') || '—',
-          date: c.flaggedAt || c.createdAt,
-          body: c,
-        }));
 
       const spotItems = toArray(mySpotsData)
         .filter(spot => spot.pendingChange)
@@ -188,7 +175,7 @@ export default function MyReviewRequests() {
           body: a,
         }));
 
-      const all = [...commentReqs, ...spotItems, ...accountItems].sort((a, b) => new Date(b.date) - new Date(a.date));
+      const all = [...spotItems, ...accountItems].sort((a, b) => new Date(b.date) - new Date(a.date));
       setRequests(all);
     } catch {
       setError('Failed to load your review requests.');
@@ -207,7 +194,7 @@ export default function MyReviewRequests() {
       <div style={s.pageHeader}>
         <div>
           <h1 style={s.pageTitle}>My Review Requests</h1>
-          <p style={s.pageSub}>Spot edits, comment flags, and account actions you've submitted</p>
+          <p style={s.pageSub}>Spot edits and account actions you've submitted</p>
         </div>
       </div>
 
@@ -233,14 +220,10 @@ export default function MyReviewRequests() {
             const key = `${r.kind}-${r.id}`;
             const isOpen = expanded === key;
 
-            const image = r.kind === 'spot'
-              ? r.body.image
-              : r.kind === 'comment'
-                ? (r.body.spotId && typeof r.body.spotId === 'object' ? r.body.spotId.image : null)
-                : null;
+            const image = r.kind === 'spot' ? r.body.image : null;
 
             const changedFields = r.kind === 'spot' ? changedFieldSummary(r.body) : [];
-            const kindLabel = r.kind === 'spot' ? 'Spot edit' : r.kind === 'account' ? 'Account action' : 'Comment flag';
+            const kindLabel = r.kind === 'spot' ? 'Spot edit' : 'Account action';
 
             const dateStr = r.date
               ? new Date(r.date).toLocaleString('en-PH', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
@@ -260,11 +243,6 @@ export default function MyReviewRequests() {
                 <div style={s.cardBody}>
                   <div style={s.cardName} title={r.subtitle}>{r.subtitle}</div>
 
-                  {r.kind === 'comment' && (
-                    <div style={s.cardDesc} title={r.body.comment}>
-                      "{r.body.comment || ''}"
-                    </div>
-                  )}
                   {r.kind === 'account' && (
                     <div style={s.cardDesc} title={r.body.reason}>
                       {ACTION_LABELS[r.body.actionType] || r.body.actionType}: {r.body.reason}
@@ -287,12 +265,6 @@ export default function MyReviewRequests() {
                         <span style={s.detailText}>{changedFields.length} field{changedFields.length === 1 ? '' : 's'} changed</span>
                       </div>
                     )}
-                    {r.kind === 'comment' && r.body.flagReason && (
-                      <div style={s.detailRow}>
-                        <span style={s.detailIcon}>📝</span>
-                        <span style={s.detailText}>{r.body.flagReason}</span>
-                      </div>
-                    )}
                     {r.kind === 'account' && r.status !== 'pending' && r.body.resultSummary && (
                       <div style={s.detailRow}>
                         <span style={s.detailIcon}>✅</span>
@@ -313,7 +285,7 @@ export default function MyReviewRequests() {
 
                   <div style={s.cardFooter}>
                     <span style={s.cardVisits}>
-                      {r.kind === 'spot' ? 'Proposed edit' : r.kind === 'account' ? 'Proposed action' : 'Flagged review'}
+                      {r.kind === 'spot' ? 'Proposed edit' : 'Proposed action'}
                     </span>
                     {r.kind === 'spot' && (
                       <button onClick={() => setExpanded(isOpen ? null : key)} style={s.btnView}>
