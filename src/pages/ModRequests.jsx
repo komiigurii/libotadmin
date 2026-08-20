@@ -3,11 +3,12 @@ import { commentAPI, spotAPI, accountActionAPI } from '../api/api';
 import { theme as t } from '../theme';
 
 const STATUS_PILL = {
-  pending:  { background: t.warningBg, color: t.warning, label: 'Pending' },
-  approved: { background: t.successBg, color: t.success, label: 'Approved' },
-  rejected: { background: t.dangerBg,  color: t.danger,  label: 'Rejected' },
+  pending:  { background: t.purpleBg,  color: t.purple,  label: 'PENDING' },
+  approved: { background: t.successBg, color: t.success, label: 'APPROVED' },
+  rejected: { background: t.dangerBg,  color: t.danger,  label: 'REJECTED' },
 };
 
+const KIND_LABELS = { comment: 'Comment flag', spot: 'Spot edit', account: 'Account action' };
 const ACTION_LABELS = { warn: 'Warn (mute)', suspend: 'Suspend' };
 
 const FIELD_LABELS = {
@@ -32,6 +33,9 @@ function toArray(data) {
   if (Array.isArray(data.data))    return data.data;
   return [];
 }
+
+const initialsOf = (name) =>
+  (name || '?').trim().split(/\s+/).slice(0, 2).map(w => w[0]?.toUpperCase()).join('');
 
 function fmtCoord(c) {
   if (!c || c.lat == null || c.lng == null) return '—';
@@ -137,6 +141,7 @@ export default function ModRequests() {
   const [error,    setError]    = useState(null);
   const [statusFilter, setStatusFilter] = useState('');
   const [acting, setActing] = useState(null);
+  const [expandedKey, setExpandedKey] = useState(null);
   // Per-request admin override for the account action to apply on approval.
   // Keyed by `${kind}-${id}`. Defaults to the mod's proposedAction if present.
   const [actionOverrides, setActionOverrides] = useState({});
@@ -237,10 +242,11 @@ export default function ModRequests() {
           <h1 style={s.pageTitle}>Mod Requests</h1>
           <p style={s.pageSub}>Comment flags, account actions, and spot edit proposals submitted by moderators</p>
         </div>
+        <span style={s.totalBadge}>{requests.length} total</span>
       </div>
 
       <div style={s.filterRow}>
-        <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} style={s.select}>
+        <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} style={s.filterSelect}>
           <option value="">All ({requests.length})</option>
           <option value="pending">Pending ({pendingCount})</option>
           <option value="approved">Approved</option>
@@ -263,52 +269,57 @@ export default function ModRequests() {
           const pill = STATUS_PILL[r.status] || STATUS_PILL.pending;
           const isPending = r.status === 'pending';
           const isActing = acting === r.id;
-          const overrideKey = `${r.kind}-${r.id}`;
-          const kindLabel = r.kind === 'spot' ? 'Spot edit' : r.kind === 'account' ? 'Account action' : 'Comment flag';
+          const key = `${r.kind}-${r.id}`;
+          const isExpanded = expandedKey === key;
+
+          const avatarName = r.kind === 'spot' ? r.subtitle : r.kind === 'account' ? r.subtitle : (r.body.userName || 'Anonymous');
+          const primaryName = avatarName || '—';
+          const byLine = r.kind === 'spot' ? null : r.title; // who flagged / proposed this
 
           return (
-            <div key={`${r.kind}-${r.id}`} style={s.card}>
+            <div key={key} style={s.card}>
+              <div style={s.cardTop} onClick={() => setExpandedKey(isExpanded ? null : key)}>
+                <div style={s.avatar}>{initialsOf(avatarName)}</div>
 
-              {/* Header: eyebrow + status on one line, heading below, date pinned top-right */}
-              <div style={s.cardHead}>
-                <div style={{ minWidth: 0 }}>
-                  <div style={s.eyebrowRow}>
-                    <span style={s.eyebrow}>{kindLabel}</span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={s.metaRow}>
+                    <span style={s.userName}>{primaryName}</span>
+                    <span style={s.dateText}>
+                      {r.date ? new Date(r.date).toLocaleString('en-PH', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}
+                    </span>
+                    <span style={s.locPill}>{KIND_LABELS[r.kind]}{r.kind === 'comment' && r.subtitle ? ` · ${r.subtitle}` : ''}</span>
                     <span style={{ ...s.statusPill, background: pill.background, color: pill.color }}>{pill.label}</span>
                   </div>
-                  <div style={s.heading}>
-                    {r.kind === 'spot' && r.subtitle}
-                    {r.kind === 'comment' && (
-                      <>{r.title} <span style={s.headingMuted}>flagged a review on</span> {r.subtitle}</>
+
+                  {byLine && (
+                    <p style={s.byLine}><span style={s.byLineLabel}>{r.kind === 'account' ? 'Proposed by ' : 'Flagged by '}</span>{byLine}</p>
+                  )}
+
+                  {r.kind === 'comment' && (
+                    <p style={s.commentText}>"{(r.body.comment || '').slice(0, 140)}{(r.body.comment || '').length > 140 ? '…' : ''}"</p>
+                  )}
+                  {r.kind === 'account' && (
+                    <p style={s.commentText}>{r.body.reason}</p>
+                  )}
+                  {r.kind === 'spot' && (
+                    <p style={s.commentText}>Proposed changes to this spot's details.</p>
+                  )}
+
+                  <div style={s.reactRow}>
+                    {r.kind === 'comment' && r.body.flagReason && (
+                      <span style={s.react}>📝 {r.body.flagReason}</span>
                     )}
                     {r.kind === 'account' && (
-                      <>{r.title} <span style={s.headingMuted}>proposed suspending</span> {r.subtitle}</>
+                      <span style={s.react}>{r.body.sourceType === 'inactivity' ? '⏱ Account inactivity' : '✋ Manual'}</span>
+                    )}
+                    {r.status !== 'pending' && r.body.resultSummary && (
+                      <span style={s.react}>✅ {r.body.resultSummary}</span>
                     )}
                   </div>
                 </div>
-                <span style={s.dateText}>
-                  {r.date ? new Date(r.date).toLocaleString('en-PH', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}
-                </span>
               </div>
 
-              {r.kind === 'comment' && (
-                <div style={s.commentBody}>
-                  <p style={s.quote}>"{(r.body.comment || '').slice(0, 140)}{(r.body.comment || '').length > 140 ? '…' : ''}"</p>
-                  {r.body.flagReason && <p style={s.modNote}><span style={s.modNoteLabel}>Mod's note </span>{r.body.flagReason}</p>}
-                </div>
-              )}
-
-              {r.kind === 'account' && (
-                <div style={s.commentBody}>
-                  <p style={s.modNote}><span style={s.modNoteLabel}>Reason </span>{r.body.reason}</p>
-                  <p style={s.modNote}><span style={s.modNoteLabel}>Source </span>{r.body.sourceType === 'inactivity' ? 'Account inactivity' : 'Manual'}</p>
-                  {r.status !== 'pending' && r.body.resultSummary && (
-                    <p style={s.modNote}><span style={s.modNoteLabel}>Result </span>{r.body.resultSummary}</p>
-                  )}
-                </div>
-              )}
-
-              {r.kind === 'spot' && (
+              {isExpanded && r.kind === 'spot' && (
                 <div style={s.fieldList}>
                   {Object.entries(r.body.pendingChange)
                     .filter(([k]) => k !== 'submittedBy' && k !== 'submittedAt')
@@ -318,48 +329,49 @@ export default function ModRequests() {
                 </div>
               )}
 
-              {isPending && r.kind === 'comment' && (
-                <div style={s.actionRow}>
-                  <span style={s.actionRowLabel}>Account action on approve</span>
-                  <select
-                    value={actionOverrides[overrideKey] ?? (r.body.proposedAction || '')}
-                    onChange={e => setActionOverrides(prev => ({ ...prev, [overrideKey]: e.target.value }))}
-                    style={s.actionSelect}
-                  >
-                    <option value="">No account action</option>
-                    <option value="warn">Warn (mute)</option>
-                    <option value="suspend">Suspend</option>
-                  </select>
-                  {r.body.proposedAction && (
-                    <span style={s.suggestedTag}>Mod suggested: {ACTION_LABELS[r.body.proposedAction]}</span>
-                  )}
-                </div>
-              )}
-
               {isPending && (
-                <div style={s.actions}>
-                  <button
-                    disabled={isActing}
-                    onClick={() => {
-                      if (r.kind === 'comment') decideComment(r.id, 'approved', actionOverrides[overrideKey] ?? r.body.proposedAction);
-                      else if (r.kind === 'account') decideAccount(r.id, 'approved');
-                      else decideSpot(r.id, 'approve');
-                    }}
-                    style={{ ...s.btn, ...s.btnApprove, opacity: isActing ? 0.6 : 1 }}
-                  >
-                    Approve
-                  </button>
-                  <button
-                    disabled={isActing}
-                    onClick={() => {
-                      if (r.kind === 'comment') decideComment(r.id, 'rejected');
-                      else if (r.kind === 'account') decideAccount(r.id, 'rejected');
-                      else decideSpot(r.id, 'reject');
-                    }}
-                    style={{ ...s.btn, ...s.btnDisapprove, opacity: isActing ? 0.6 : 1 }}
-                  >
-                    Disapprove
-                  </button>
+                <div style={s.panel}>
+                  {r.kind === 'comment' && (
+                    <>
+                      <p style={s.panelLabel}>Account action on approve</p>
+                      <select
+                        value={actionOverrides[key] ?? (r.body.proposedAction || '')}
+                        onChange={e => setActionOverrides(prev => ({ ...prev, [key]: e.target.value }))}
+                        style={s.select}
+                      >
+                        <option value="">No account action</option>
+                        <option value="warn">Warn (mute)</option>
+                        <option value="suspend">Suspend</option>
+                      </select>
+                      {r.body.proposedAction && (
+                        <p style={s.suggestedNote}>Mod suggested: {ACTION_LABELS[r.body.proposedAction]}</p>
+                      )}
+                    </>
+                  )}
+                  <div style={s.actions}>
+                    <button
+                      disabled={isActing}
+                      onClick={() => {
+                        if (r.kind === 'comment') decideComment(r.id, 'approved', actionOverrides[key] ?? r.body.proposedAction);
+                        else if (r.kind === 'account') decideAccount(r.id, 'approved');
+                        else decideSpot(r.id, 'approve');
+                      }}
+                      style={{ ...s.btn, ...s.btnApprove, opacity: isActing ? 0.6 : 1 }}
+                    >
+                      Approve
+                    </button>
+                    <button
+                      disabled={isActing}
+                      onClick={() => {
+                        if (r.kind === 'comment') decideComment(r.id, 'rejected');
+                        else if (r.kind === 'account') decideAccount(r.id, 'rejected');
+                        else decideSpot(r.id, 'reject');
+                      }}
+                      style={{ ...s.btn, ...s.btnDisapprove, opacity: isActing ? 0.6 : 1 }}
+                    >
+                      Disapprove
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
@@ -371,36 +383,43 @@ export default function ModRequests() {
 }
 
 const s = {
-  page:       { padding: '16px 20px', maxWidth: 900, margin: '0 auto' },
-  pageHeader: { marginBottom: 14 },
-  pageTitle:  { fontSize: 17, fontWeight: 600, color: t.textPrimary, marginBottom: 2 },
-  pageSub:    { fontSize: 11.5, color: t.textSecondary },
+  page:       { padding: '28px 32px', maxWidth: 1100, margin: '0 auto' },
+  pageHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 },
+  pageTitle:  { fontSize: 22, fontWeight: 600, color: t.textPrimary, marginBottom: 4 },
+  pageSub:    { fontSize: 13, color: t.textSecondary },
+  totalBadge: { fontSize: 13, color: t.textMuted, fontWeight: 500, paddingTop: 4 },
 
-  filterRow:  { marginBottom: 12 },
-  select:     { padding: '6px 10px', borderRadius: 7, border: `1px solid ${t.border}`, fontSize: 11.5, color: t.textPrimary, background: t.cardBg, outline: 'none', cursor: 'pointer' },
+  filterRow:    { marginBottom: 18 },
+  filterSelect: { padding: '10px 14px', borderRadius: 10, border: `1px solid ${t.border}`, fontSize: 13, color: t.textPrimary, background: t.cardBg, outline: 'none', cursor: 'pointer' },
 
-  card: { background: t.cardBg, border: `1px solid ${t.border}`, borderRadius: 10, padding: '14px 16px', marginBottom: 10 },
+  card:       { background: t.cardBg, border: `1px solid ${t.border}`, borderRadius: 14, marginBottom: 10, overflow: 'hidden' },
+  cardTop:    { display: 'flex', alignItems: 'flex-start', gap: 14, padding: '16px 18px', cursor: 'pointer' },
+  avatar:     { width: 38, height: 38, borderRadius: '50%', background: t.brandSoft, color: t.brand, fontWeight: 700, fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  metaRow:    { display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 4 },
+  userName:   { fontSize: 14, fontWeight: 700, color: t.textPrimary },
+  dateText:   { fontSize: 12, color: t.textMuted },
+  locPill:    { padding: '3px 10px', background: t.sidebarBg, border: `1px solid ${t.border}`, borderRadius: 20, fontSize: 11, fontWeight: 500, color: t.textSecondary },
+  statusPill: { padding: '3px 10px', borderRadius: 6, fontSize: 10, fontWeight: 700, letterSpacing: '0.03em' },
 
-  cardHead:   { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10, marginBottom: 10 },
-  eyebrowRow: { display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 },
-  eyebrow:    { fontSize: 10, fontWeight: 700, color: t.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em' },
-  statusPill: { padding: '2px 8px', borderRadius: 20, fontSize: 9.5, fontWeight: 700 },
-  heading:      { fontSize: 14, fontWeight: 700, color: t.textPrimary, lineHeight: 1.3 },
-  headingMuted: { fontWeight: 400, color: t.textSecondary },
-  dateText:   { fontSize: 10.5, color: t.textMuted, flexShrink: 0, whiteSpace: 'nowrap', paddingTop: 2 },
+  byLine:      { fontSize: 11.5, color: t.textMuted, margin: '0 0 4px' },
+  byLineLabel: { fontWeight: 600, color: t.textSecondary },
 
-  commentBody: { borderTop: `1px solid ${t.divider}`, paddingTop: 10 },
-  quote:      { fontSize: 12, color: t.textSecondary, fontStyle: 'italic', margin: '0 0 4px', lineHeight: 1.4 },
-  modNote:    { fontSize: 10.5, color: t.textMuted, margin: '0 0 2px' },
-  modNoteLabel: { fontWeight: 600, color: t.textSecondary },
+  commentText:{ fontSize: 14, color: t.textSecondary, lineHeight: 1.5, margin: '2px 0 8px' },
+  reactRow:   { display: 'flex', gap: 14, flexWrap: 'wrap' },
+  react:      { fontSize: 12, color: t.textMuted },
 
-  actionRow:   { display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginTop: 10, paddingTop: 10, borderTop: `1px solid ${t.divider}` },
-  actionRowLabel: { fontSize: 10.5, fontWeight: 600, color: t.textSecondary },
-  actionSelect: { padding: '5px 9px', borderRadius: 6, border: `1px solid ${t.border}`, fontSize: 11, color: t.textPrimary, background: t.sidebarBg, outline: 'none', cursor: 'pointer' },
-  suggestedTag: { fontSize: 10, fontWeight: 600, color: t.warning, background: t.warningBg, padding: '3px 8px', borderRadius: 6 },
+  panel:      { borderTop: `1px solid ${t.divider}`, padding: '14px 18px 18px', background: t.sidebarBg },
+  panelLabel: { fontSize: 12, fontWeight: 600, color: t.textPrimary, margin: '0 0 6px' },
+  select:     { width: '100%', padding: '9px 12px', borderRadius: 8, border: `1.5px solid ${t.border}`, fontSize: 13, color: t.textPrimary, background: t.cardBg, outline: 'none', boxSizing: 'border-box', cursor: 'pointer' },
+  suggestedNote: { fontSize: 11, fontWeight: 600, color: t.warning, margin: '8px 0 0' },
 
-  // ── Field diff list ─────────────────────────────────────────
-  fieldList: { display: 'flex', flexDirection: 'column', borderTop: `1px solid ${t.divider}` },
+  actions:    { display: 'flex', gap: 8, marginTop: 10 },
+  btn:        { padding: '8px 18px', borderRadius: 8, fontWeight: 600, fontSize: 13, cursor: 'pointer', border: 'none' },
+  btnApprove: { background: t.successBg, color: t.success },
+  btnDisapprove: { background: t.dangerBg, color: t.danger },
+
+  // ── Field diff list (spot edits, expanded) ─────────────────
+  fieldList: { display: 'flex', flexDirection: 'column', borderTop: `1px solid ${t.divider}`, padding: '4px 18px' },
 
   fieldRow: { display: 'flex', alignItems: 'center', gap: 10, padding: '7px 0', borderBottom: `1px solid ${t.divider}`, fontSize: 12, flexWrap: 'wrap' },
   fieldLabel: { fontSize: 10, fontWeight: 700, color: t.textMuted, textTransform: 'uppercase', letterSpacing: '0.04em', width: 92, flexShrink: 0 },
@@ -423,14 +442,9 @@ const s = {
   longOldBox: { fontSize: 11.5, color: t.textMuted, textDecoration: 'line-through', lineHeight: 1.5, marginTop: 4, whiteSpace: 'pre-wrap' },
   longNewBox: { fontSize: 11.5, color: t.brand, lineHeight: 1.5, marginTop: 4, whiteSpace: 'pre-wrap', fontWeight: 500 },
 
-  actions:    { display: 'flex', gap: 8, marginTop: 12, paddingTop: 10, borderTop: `1px solid ${t.divider}` },
-  btn:        { padding: '7px 16px', borderRadius: 7, fontWeight: 600, fontSize: 11.5, cursor: 'pointer', border: 'none' },
-  btnApprove: { background: t.successBg, color: t.success },
-  btnDisapprove: { background: t.dangerBg, color: t.danger },
-
-  empty:      { padding: 40, textAlign: 'center', color: t.textSecondary },
-  emptyState: { textAlign: 'center', padding: '50px 16px' },
-  emptyIcon:  { width: 42, height: 42, borderRadius: '50%', background: t.brandSoft, color: t.brand, fontSize: 18, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 10px' },
-  emptyText:  { fontSize: 14, fontWeight: 600, color: t.textPrimary, marginBottom: 4 },
-  emptySub:   { fontSize: 11.5, color: t.textSecondary },
+  empty:      { padding: 60, textAlign: 'center', color: t.textSecondary },
+  emptyState: { textAlign: 'center', padding: '70px 20px' },
+  emptyIcon:  { width: 52, height: 52, borderRadius: '50%', background: t.brandSoft, color: t.brand, fontSize: 22, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 14px' },
+  emptyText:  { fontSize: 16, fontWeight: 600, color: t.textPrimary, marginBottom: 6 },
+  emptySub:   { fontSize: 13, color: t.textSecondary },
 };
