@@ -39,12 +39,25 @@ export default function Spots() {
     }
   };
 
+  const handleEditClick = (spot) => {
+    if (isModerator && spot.pendingChange) {
+      alert('This spot already has a pending change awaiting admin review. You can submit a new edit once that one is resolved.');
+      return;
+    }
+    setEditing(spot);
+    setShowForm(true);
+  };
+
   const handleSave = async (formData) => {
     setSaving(true);
     setError('');
     try {
       if (editing) {
-        await spotAPI.update(editing._id, formData);
+        if (isModerator) {
+          await spotAPI.proposeChange(editing._id, formData);
+        } else {
+          await spotAPI.update(editing._id, formData);
+        }
       } else {
         await spotAPI.create(formData);
       }
@@ -132,6 +145,10 @@ export default function Spots() {
               <div style={s.cardBody}>
                 <div style={s.cardName} title={spot.name}>{spot.name}</div>
 
+                {spot.pendingChange && (
+                  <span style={s.pendingBadge}>⏳ Pending review</span>
+                )}
+
                 {spot.description && (
                   <div style={s.cardDesc} title={spot.description}>{spot.description}</div>
                 )}
@@ -157,7 +174,7 @@ export default function Spots() {
                   </span>
                   <div style={s.actions}>
                     <button
-                      onClick={() => { setEditing(spot); setShowForm(true); }}
+                      onClick={() => handleEditClick(spot)}
                       style={s.btnEdit}
                     >
                       Edit
@@ -203,6 +220,15 @@ const s = {
     fontWeight: 600, fontSize: 14, color: t.textPrimary, lineHeight: 1.3,
     display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
     overflow: 'hidden', textOverflow: 'ellipsis', minHeight: '2.6em',
+  },
+  pendingBadge: {
+    alignSelf: 'flex-start',
+    fontSize: 11,
+    fontWeight: 700,
+    color: '#a9722c',
+    background: '#a9722c1a',
+    borderRadius: 6,
+    padding: '3px 8px',
   },
   cardDesc:    {
     fontSize: 12, color: t.textSecondary, lineHeight: 1.4,
