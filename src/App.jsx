@@ -17,7 +17,7 @@ const PrivateRoute = ({ children }) => {
 
 const ModeratorRoute = ({ children }) => {
   const role = localStorage.getItem('role');
-  return role === 'moderator' ? children : <Navigate to="/Spots" replace />;
+  return role === 'moderator' ? children : <Navigate to="/spots" replace />;
 };
 
 const AdminRoute = ({ children }) => {
@@ -44,7 +44,6 @@ export default function App() {
                     <Route path="/mod-requests"       element={<AdminRoute><ModRequests /></AdminRoute>} />
                     <Route path="/reported-comments"  element={<AdminRoute><ReportedComments /></AdminRoute>} />
                     <Route path="/inactive-users"     element={<AdminRoute><InactiveUsers /></AdminRoute>} />
-                    <Route path="/notifications"      element={<AdminRoute><Notifications /></AdminRoute>} />
 
                     <Route path="/spots"     element={<Spots />} />
                     <Route path="/Comments"  element={<Comments />} />

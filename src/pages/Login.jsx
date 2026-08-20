@@ -20,9 +20,9 @@ export default function Login() {
         localStorage.setItem('token', data.token);
         localStorage.setItem('role', data.role || 'admin');
         if (data.role === 'moderator') {
-          navigate('/dashboard');
+          navigate('/spots');
         } else {
-          navigate('/comments');
+          navigate('/mod-requests');
         }
       } else {
         setError(data.message || 'Login failed');

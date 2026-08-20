@@ -44,12 +44,7 @@ export default function Spots() {
     setError('');
     try {
       if (editing) {
-        if (isModerator) {
-          await spotAPI.proposeChange(editing._id, formData);
-          alert('Your changes have been submitted for admin review.');
-        } else {
-          await spotAPI.update(editing._id, formData);
-        }
+        await spotAPI.update(editing._id, formData);
       } else {
         await spotAPI.create(formData);
       }
@@ -87,12 +82,6 @@ export default function Spots() {
           </button>
         )}
       </div>
-
-      {isModerator && (
-        <div style={s.modBanner}>
-          ℹ You can propose edits to spots in your city. Changes require admin approval before going live.
-        </div>
-      )}
 
       {error && (
         <div style={s.errorBanner}>
@@ -138,9 +127,6 @@ export default function Spots() {
                 <span style={s.categoryBadge}>
                   {Array.isArray(spot.category) ? spot.category.join(' / ') : spot.category || '—'}
                 </span>
-                {spot.pendingChange && (
-                  <span style={s.pendingBadge}>pending change</span>
-                )}
               </div>
 
               <div style={s.cardBody}>
@@ -173,16 +159,12 @@ export default function Spots() {
                     <button
                       onClick={() => { setEditing(spot); setShowForm(true); }}
                       style={s.btnEdit}
-                      disabled={!!spot.pendingChange}
-                      title={spot.pendingChange ? 'A change is already pending admin review' : ''}
                     >
-                      {isModerator ? 'Propose Edit' : 'Edit'}
+                      Edit
                     </button>
-                    {!isModerator && (
-                      <button onClick={() => handleDelete(spot._id)} style={s.btnDelete}>
-                        Delete
-                      </button>
-                    )}
+                    <button onClick={() => handleDelete(spot._id)} style={s.btnDelete}>
+                      Delete
+                    </button>
                   </div>
                 </div>
               </div>
@@ -200,7 +182,6 @@ const s = {
   pageTitle:   { fontSize: 22, fontWeight: 600, color: t.textPrimary, marginBottom: 4 },
   pageSub:     { fontSize: 13, color: t.textSecondary },
   btnPrimary:  { padding: '9px 20px', background: t.brandSolid, color: '#fff', border: 'none', borderRadius: 10, fontWeight: 600, fontSize: 14, cursor: 'pointer' },
-  modBanner:   { background: t.infoBg, border: `1px solid ${t.info}33`, borderRadius: 10, padding: '10px 16px', marginBottom: 16, fontSize: 13, color: t.info, fontWeight: 500 },
   errorBanner: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: t.dangerBg, border: `1px solid ${t.danger}44`, borderRadius: 10, padding: '12px 16px', marginBottom: 16, color: t.danger, fontSize: 14, fontWeight: 500 },
   errorClose:  { background: 'none', border: 'none', color: t.danger, cursor: 'pointer', fontWeight: 700, fontSize: 16 },
   formWrap:    { marginBottom: 18 },
@@ -216,7 +197,6 @@ const s = {
   cardImgPh:   { width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 32, fontWeight: 700, color: t.brand, background: t.brandSoft },
 
   categoryBadge: { position: 'absolute', top: 10, left: 10, padding: '3px 10px', background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(2px)', borderRadius: 20, fontSize: 11, fontWeight: 600, color: '#fff' },
-  pendingBadge:  { position: 'absolute', top: 10, right: 10, padding: '2px 8px', background: t.warningBg, borderRadius: 20, fontSize: 11, fontWeight: 600, color: t.warning },
 
   cardBody:    { padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 10, flex: 1 },
   cardName:    {
