@@ -18,15 +18,14 @@ export default function Navbar() {
   const navItems = isModerator
     ? [
         { label: 'My Review Requests', path: '/my-review-requests' },
-        { label: 'Comments',           path: '/comments' },
         { label: 'Spots',              path: '/spots' },
       ]
     : [
-        { label: 'Review Reports',    path: '/comments' },
+        { label: 'All Spots',           path: '/spots' },
+        { label: 'All Comments',    path: '/comments' },
         { label: 'Mod Requests',    path: '/mod-requests'},
+        { label: 'Reported Comments', path: '/reported-comments' },
         { label: 'Inactive Users',  path: '/inactive-users' },
-        { label: 'Spots',           path: '/spots' },
-        { label: 'Notifications',  path: '/notifications' },
       ];
 
   const home = isModerator ? '/my-review-requests' : '/comments';

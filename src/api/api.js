@@ -54,6 +54,16 @@ export const accountActionAPI = {
     api.patch(`/api/account-actions/${id}/decision`, { decision }).then(r => r.data),
 };
 
+// User-submitted reports (mobile app users flagging a spot or a comment).
+// Admin-only — moderators have no access to this queue.
+export const reportAPI = {
+  getAll: (params = {}) => {
+    const query = new URLSearchParams(params).toString();
+    return api.get(`/api/reports${query ? '?' + query : ''}`).then(r => r.data.reports);
+  },
+  update: (id, data) => api.patch(`/api/reports/${id}`, data).then(r => r.data),
+};
+
 export const authAPI = {
   login: (email, password) =>
     api.post('/api/auth/admin-login', { email, password }).then(r => r.data),
