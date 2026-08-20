@@ -8,7 +8,11 @@ const STATUS_PILL = {
   rejected: { background: t.dangerBg,  color: t.danger,  label: 'REJECTED' },
 };
 
-const KIND_LABELS = { spot: 'Spot edit', account: 'Account action' };
+const KIND_LABELS = {
+  spot:        'Spot edit',
+  'spot-delete': 'Spot deletion',
+  account:     'Account action',
+};
 
 const FIELD_LABELS = {
   name: 'Name', location: 'Location', category: 'Category', description: 'Description',
@@ -150,7 +154,9 @@ export default function ModRequests() {
         accountActionAPI.getAll(),
       ]);
 
-      const spotItems = toArray(pendingSpotsData.items || pendingSpotsData)
+      const pendingSpots = toArray(pendingSpotsData.items || pendingSpotsData);
+
+      const editItems = pendingSpots
         .filter(spot => spot.pendingChange)
         .map(spot => ({
           kind: 'spot',
@@ -159,6 +165,18 @@ export default function ModRequests() {
           title: 'Spot edit request',
           subtitle: spot.name || '—',
           date: spot.pendingChange.submittedAt,
+          body: spot,
+        }));
+
+      const deleteItems = pendingSpots
+        .filter(spot => spot.pendingDelete)
+        .map(spot => ({
+          kind: 'spot-delete',
+          id: spot._id,
+          status: 'pending',
+          title: 'Spot deletion request',
+          subtitle: spot.name || '—',
+          date: spot.pendingDeleteAt,
           body: spot,
         }));
 
@@ -173,7 +191,7 @@ export default function ModRequests() {
           body: a,
         }));
 
-      const all = [...spotItems, ...accountItems].sort((a, b) => new Date(b.date) - new Date(a.date));
+      const all = [...editItems, ...deleteItems, ...accountItems].sort((a, b) => new Date(b.date) - new Date(a.date));
       setRequests(all);
     } catch {
       setError('Failed to load mod requests.');
@@ -212,7 +230,7 @@ export default function ModRequests() {
       <div style={s.pageHeader}>
         <div>
           <h1 style={s.pageTitle}>Mod Requests</h1>
-          <p style={s.pageSub}>Account actions and spot edit proposals submitted by moderators</p>
+          <p style={s.pageSub}>Account actions and spot edit/deletion proposals submitted by moderators</p>
         </div>
         <span style={s.totalBadge}>{requests.length} total</span>
       </div>
@@ -243,15 +261,18 @@ export default function ModRequests() {
           const isActing = acting === r.id;
           const key = `${r.kind}-${r.id}`;
           const isExpanded = expandedKey === key;
+          const isDeleteRequest = r.kind === 'spot-delete';
 
           const avatarName = r.subtitle;
           const primaryName = avatarName || '—';
-          const byLine = r.kind === 'spot' ? null : r.title; // who proposed this
+          const byLine = r.kind === 'spot' || r.kind === 'spot-delete' ? null : r.title; // who proposed this
 
           return (
             <div key={key} style={s.card}>
               <div style={s.cardTop} onClick={() => setExpandedKey(isExpanded ? null : key)}>
-                <div style={s.avatar}>{initialsOf(avatarName)}</div>
+                <div style={{ ...s.avatar, ...(isDeleteRequest ? s.avatarDanger : {}) }}>
+                  {isDeleteRequest ? '🗑️' : initialsOf(avatarName)}
+                </div>
 
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={s.metaRow}>
@@ -259,7 +280,7 @@ export default function ModRequests() {
                     <span style={s.dateText}>
                       {r.date ? new Date(r.date).toLocaleString('en-PH', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}
                     </span>
-                    <span style={s.locPill}>{KIND_LABELS[r.kind]}</span>
+                    <span style={{ ...s.locPill, ...(isDeleteRequest ? s.locPillDanger : {}) }}>{KIND_LABELS[r.kind]}</span>
                     <span style={{ ...s.statusPill, background: pill.background, color: pill.color }}>{pill.label}</span>
                   </div>
 
@@ -272,6 +293,13 @@ export default function ModRequests() {
                   )}
                   {r.kind === 'spot' && (
                     <p style={s.commentText}>Proposed changes to this spot's details.</p>
+                  )}
+                  {r.kind === 'spot-delete' && (
+                    <p style={s.commentText}>
+                      {r.body.pendingDeleteReason
+                        ? `Reason: ${r.body.pendingDeleteReason}`
+                        : 'No reason provided.'}
+                    </p>
                   )}
 
                   <div style={s.reactRow}>
@@ -295,6 +323,14 @@ export default function ModRequests() {
                 </div>
               )}
 
+              {isExpanded && r.kind === 'spot-delete' && (
+                <div style={s.fieldList}>
+                  <div style={s.deleteNotice}>
+                    Approving this will permanently delete <strong>{r.body.name}</strong> and cannot be undone.
+                  </div>
+                </div>
+              )}
+
               {isPending && (
                 <div style={s.panel}>
                   <div style={s.actions}>
@@ -304,9 +340,9 @@ export default function ModRequests() {
                         if (r.kind === 'account') decideAccount(r.id, 'approved');
                         else decideSpot(r.id, 'approve');
                       }}
-                      style={{ ...s.btn, ...s.btnApprove, opacity: isActing ? 0.6 : 1 }}
+                      style={{ ...s.btn, ...(isDeleteRequest ? s.btnApproveDelete : s.btnApprove), opacity: isActing ? 0.6 : 1 }}
                     >
-                      Approve
+                      {isDeleteRequest ? 'Approve & Delete' : 'Approve'}
                     </button>
                     <button
                       disabled={isActing}
@@ -342,10 +378,12 @@ const s = {
   card:       { background: t.cardBg, border: `1px solid ${t.border}`, borderRadius: 14, marginBottom: 10, overflow: 'hidden' },
   cardTop:    { display: 'flex', alignItems: 'flex-start', gap: 14, padding: '16px 18px', cursor: 'pointer' },
   avatar:     { width: 38, height: 38, borderRadius: '50%', background: t.brandSoft, color: t.brand, fontWeight: 700, fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  avatarDanger: { background: t.dangerBg, color: t.danger, fontSize: 16 },
   metaRow:    { display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 4 },
   userName:   { fontSize: 14, fontWeight: 700, color: t.textPrimary },
   dateText:   { fontSize: 12, color: t.textMuted },
   locPill:    { padding: '3px 10px', background: t.sidebarBg, border: `1px solid ${t.border}`, borderRadius: 20, fontSize: 11, fontWeight: 500, color: t.textSecondary },
+  locPillDanger: { background: t.dangerBg, border: `1px solid ${t.danger}44`, color: t.danger },
   statusPill: { padding: '3px 10px', borderRadius: 6, fontSize: 10, fontWeight: 700, letterSpacing: '0.03em' },
 
   byLine:      { fontSize: 11.5, color: t.textMuted, margin: '0 0 4px' },
@@ -363,10 +401,12 @@ const s = {
   actions:    { display: 'flex', gap: 8, marginTop: 10 },
   btn:        { padding: '8px 18px', borderRadius: 8, fontWeight: 600, fontSize: 13, cursor: 'pointer', border: 'none' },
   btnApprove: { background: t.successBg, color: t.success },
+  btnApproveDelete: { background: t.dangerBg, color: t.danger },
   btnDisapprove: { background: t.dangerBg, color: t.danger },
 
   // ── Field diff list (spot edits, expanded) ─────────────────
   fieldList: { display: 'flex', flexDirection: 'column', borderTop: `1px solid ${t.divider}`, padding: '4px 18px' },
+  deleteNotice: { padding: '12px 0', fontSize: 13, color: t.danger, lineHeight: 1.5 },
 
   fieldRow: { display: 'flex', alignItems: 'center', gap: 10, padding: '7px 0', borderBottom: `1px solid ${t.divider}`, fontSize: 12, flexWrap: 'wrap' },
   fieldLabel: { fontSize: 10, fontWeight: 700, color: t.textMuted, textTransform: 'uppercase', letterSpacing: '0.04em', width: 92, flexShrink: 0 },
