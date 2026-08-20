@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { commentAPI, spotAPI, accountActionAPI } from '../api/api';
+import { spotAPI, accountActionAPI } from '../api/api';
 import { theme as t } from '../theme';
 
 const STATUS_PILL = {
@@ -8,8 +8,7 @@ const STATUS_PILL = {
   rejected: { background: t.dangerBg,  color: t.danger,  label: 'REJECTED' },
 };
 
-const KIND_LABELS = { comment: 'Comment flag', spot: 'Spot edit', account: 'Account action' };
-const ACTION_LABELS = { warn: 'Warn (mute)', suspend: 'Suspend' };
+const KIND_LABELS = { spot: 'Spot edit', account: 'Account action' };
 
 const FIELD_LABELS = {
   name: 'Name', location: 'Location', category: 'Category', description: 'Description',
@@ -28,7 +27,6 @@ const FILE_LINK_FIELDS = new Set(['modelUrl', 'AR3DModelURL']);
 function toArray(data) {
   if (!data) return [];
   if (Array.isArray(data))         return data;
-  if (Array.isArray(data.reviews)) return data.reviews;
   if (Array.isArray(data.actions)) return data.actions;
   if (Array.isArray(data.data))    return data.data;
   return [];
@@ -142,31 +140,15 @@ export default function ModRequests() {
   const [statusFilter, setStatusFilter] = useState('');
   const [acting, setActing] = useState(null);
   const [expandedKey, setExpandedKey] = useState(null);
-  // Per-request admin override for the account action to apply on approval.
-  // Keyed by `${kind}-${id}`. Defaults to the mod's proposedAction if present.
-  const [actionOverrides, setActionOverrides] = useState({});
 
   const load = async () => {
     setLoading(true);
     setError(null);
     try {
-      const [commentsData, pendingSpotsData, accountActionsData] = await Promise.all([
-        commentAPI.getAll(),
+      const [pendingSpotsData, accountActionsData] = await Promise.all([
         spotAPI.getPending(),
         accountActionAPI.getAll(),
       ]);
-
-      const commentReqs = toArray(commentsData)
-        .filter(c => (c.flagStatus || 'none') !== 'none')
-        .map(c => ({
-          kind: 'comment',
-          id: c._id,
-          status: c.flagStatus,
-          title: c.flaggedByName || 'Moderator',
-          subtitle: (c.spotId && typeof c.spotId === 'object' ? c.spotId.name : '') || '—',
-          date: c.flaggedAt || c.createdAt,
-          body: c,
-        }));
 
       const spotItems = toArray(pendingSpotsData.items || pendingSpotsData)
         .filter(spot => spot.pendingChange)
@@ -191,7 +173,7 @@ export default function ModRequests() {
           body: a,
         }));
 
-      const all = [...commentReqs, ...spotItems, ...accountItems].sort((a, b) => new Date(b.date) - new Date(a.date));
+      const all = [...spotItems, ...accountItems].sort((a, b) => new Date(b.date) - new Date(a.date));
       setRequests(all);
     } catch {
       setError('Failed to load mod requests.');
@@ -204,16 +186,6 @@ export default function ModRequests() {
 
   const visible = requests.filter(r => !statusFilter || r.status === statusFilter);
   const pendingCount = requests.filter(r => r.status === 'pending').length;
-
-  const decideComment = async (id, decision, actionType) => {
-    setActing(id);
-    try {
-      const data = await commentAPI.decide(id, decision, actionType || 'none');
-      if (data?.success !== false) load();
-      else alert('Failed: ' + (data?.message || 'Unknown error'));
-    } catch { alert('Network error'); }
-    setActing(null);
-  };
 
   const decideSpot = async (id, action) => {
     setActing(id);
@@ -240,7 +212,7 @@ export default function ModRequests() {
       <div style={s.pageHeader}>
         <div>
           <h1 style={s.pageTitle}>Mod Requests</h1>
-          <p style={s.pageSub}>Comment flags, account actions, and spot edit proposals submitted by moderators</p>
+          <p style={s.pageSub}>Account actions and spot edit proposals submitted by moderators</p>
         </div>
         <span style={s.totalBadge}>{requests.length} total</span>
       </div>
@@ -272,9 +244,9 @@ export default function ModRequests() {
           const key = `${r.kind}-${r.id}`;
           const isExpanded = expandedKey === key;
 
-          const avatarName = r.kind === 'spot' ? r.subtitle : r.kind === 'account' ? r.subtitle : (r.body.userName || 'Anonymous');
+          const avatarName = r.subtitle;
           const primaryName = avatarName || '—';
-          const byLine = r.kind === 'spot' ? null : r.title; // who flagged / proposed this
+          const byLine = r.kind === 'spot' ? null : r.title; // who proposed this
 
           return (
             <div key={key} style={s.card}>
@@ -287,17 +259,14 @@ export default function ModRequests() {
                     <span style={s.dateText}>
                       {r.date ? new Date(r.date).toLocaleString('en-PH', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}
                     </span>
-                    <span style={s.locPill}>{KIND_LABELS[r.kind]}{r.kind === 'comment' && r.subtitle ? ` · ${r.subtitle}` : ''}</span>
+                    <span style={s.locPill}>{KIND_LABELS[r.kind]}</span>
                     <span style={{ ...s.statusPill, background: pill.background, color: pill.color }}>{pill.label}</span>
                   </div>
 
                   {byLine && (
-                    <p style={s.byLine}><span style={s.byLineLabel}>{r.kind === 'account' ? 'Proposed by ' : 'Flagged by '}</span>{byLine}</p>
+                    <p style={s.byLine}><span style={s.byLineLabel}>Proposed by </span>{byLine}</p>
                   )}
 
-                  {r.kind === 'comment' && (
-                    <p style={s.commentText}>"{(r.body.comment || '').slice(0, 140)}{(r.body.comment || '').length > 140 ? '…' : ''}"</p>
-                  )}
                   {r.kind === 'account' && (
                     <p style={s.commentText}>{r.body.reason}</p>
                   )}
@@ -306,9 +275,6 @@ export default function ModRequests() {
                   )}
 
                   <div style={s.reactRow}>
-                    {r.kind === 'comment' && r.body.flagReason && (
-                      <span style={s.react}>📝 {r.body.flagReason}</span>
-                    )}
                     {r.kind === 'account' && (
                       <span style={s.react}>{r.body.sourceType === 'inactivity' ? '⏱ Account inactivity' : '✋ Manual'}</span>
                     )}
@@ -331,29 +297,11 @@ export default function ModRequests() {
 
               {isPending && (
                 <div style={s.panel}>
-                  {r.kind === 'comment' && (
-                    <>
-                      <p style={s.panelLabel}>Account action on approve</p>
-                      <select
-                        value={actionOverrides[key] ?? (r.body.proposedAction || '')}
-                        onChange={e => setActionOverrides(prev => ({ ...prev, [key]: e.target.value }))}
-                        style={s.select}
-                      >
-                        <option value="">No account action</option>
-                        <option value="warn">Warn (mute)</option>
-                        <option value="suspend">Suspend</option>
-                      </select>
-                      {r.body.proposedAction && (
-                        <p style={s.suggestedNote}>Mod suggested: {ACTION_LABELS[r.body.proposedAction]}</p>
-                      )}
-                    </>
-                  )}
                   <div style={s.actions}>
                     <button
                       disabled={isActing}
                       onClick={() => {
-                        if (r.kind === 'comment') decideComment(r.id, 'approved', actionOverrides[key] ?? r.body.proposedAction);
-                        else if (r.kind === 'account') decideAccount(r.id, 'approved');
+                        if (r.kind === 'account') decideAccount(r.id, 'approved');
                         else decideSpot(r.id, 'approve');
                       }}
                       style={{ ...s.btn, ...s.btnApprove, opacity: isActing ? 0.6 : 1 }}
@@ -363,8 +311,7 @@ export default function ModRequests() {
                     <button
                       disabled={isActing}
                       onClick={() => {
-                        if (r.kind === 'comment') decideComment(r.id, 'rejected');
-                        else if (r.kind === 'account') decideAccount(r.id, 'rejected');
+                        if (r.kind === 'account') decideAccount(r.id, 'rejected');
                         else decideSpot(r.id, 'reject');
                       }}
                       style={{ ...s.btn, ...s.btnDisapprove, opacity: isActing ? 0.6 : 1 }}

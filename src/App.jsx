@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Login          from './pages/Login';
 import Spots          from './pages/Spots';
 import Comments       from './pages/Comments';
+import ReportedComments from './pages/ReportedComments';
 import ModRequests    from './pages/ModRequests';
 import MyReviewRequests from './pages/MyReviewRequests';
 import InactiveUsers  from './pages/InactiveUsers';
@@ -41,9 +42,10 @@ export default function App() {
                   <Routes>
                     <Route path="/my-review-requests" element={<ModeratorRoute><MyReviewRequests /></ModeratorRoute>} />
 
-                    <Route path="/mod-requests"   element={<AdminRoute><ModRequests /></AdminRoute>} />
-                    <Route path="/inactive-users" element={<AdminRoute><InactiveUsers /></AdminRoute>} />
-                    <Route path="/notifications"  element={<AdminRoute><Notifications /></AdminRoute>} />
+                    <Route path="/mod-requests"       element={<AdminRoute><ModRequests /></AdminRoute>} />
+                    <Route path="/reported-comments"  element={<AdminRoute><ReportedComments /></AdminRoute>} />
+                    <Route path="/inactive-users"     element={<AdminRoute><InactiveUsers /></AdminRoute>} />
+                    <Route path="/notifications"      element={<AdminRoute><Notifications /></AdminRoute>} />
 
                     <Route path="/spots"     element={<Spots />} />
                     <Route path="/Comments"  element={<Comments />} />
@@ -52,7 +54,7 @@ export default function App() {
                       path="*"
                       element={
                         <Navigate
-                          to={localStorage.getItem('role') === 'admin' ? '/Comments' : '/My-review-requests'}
+                          to={localStorage.getItem('role') === 'admin' ? '/Comments' : '/my-review-requests'}
                           replace
                         />
                       }
