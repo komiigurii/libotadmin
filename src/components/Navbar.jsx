@@ -17,16 +17,16 @@ export default function Navbar() {
 
   const navItems = isModerator
     ? [
-        //admin
+        //Moderator
+        { label: 'Spots',           path: '/spots' },
+        { label: 'Review Requests', path: '/my-review-requests' },
+      ]
+    : [
+        //Admin
         { label: 'Review Proposed Spot Changes',      path: '/mod-requests' },
         { label: 'All Comments',    path: '/comments' },
         { label: 'Reported Comments',       path: '/dashboard' },
         { label: 'Inactive Users',  path: '/inactive-users' }
-      ]
-    : [
-        //moderator
-        { label: 'Spots',           path: '/spots' },
-        { label: 'Notifications',  path: '/notifications' },
       ];
 
   const home = isModerator ? '/my-review-requests' : '/comments';
