@@ -4,6 +4,7 @@ import SpotForm from '../components/SpotForm';
 import { theme as t } from '../theme';
 
 const role = () => localStorage.getItem('role');
+const modCity = () => localStorage.getItem('city') || '';
 
 export default function Spots() {
   const [spots,    setSpots]    = useState([]);
@@ -15,6 +16,7 @@ export default function Spots() {
   const [error,    setError]    = useState('');
 
   const isModerator = role() === 'moderator';
+  const lockedCity = isModerator ? modCity() : '';
 
   const load = async () => {
     setLoading(true);
@@ -98,6 +100,7 @@ export default function Spots() {
             onCancel={() => { setShowForm(false); setEditing(null); setError(''); }}
             saving={saving}
             isModerator={isModerator}
+            lockedCity={lockedCity}
           />
         </div>
       )}
