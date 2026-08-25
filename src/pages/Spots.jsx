@@ -5,39 +5,6 @@ import { theme as t } from '../theme';
 
 const role = () => localStorage.getItem('role');
 
-// Simple confirm/prompt replacement — native window.confirm/prompt aren't
-// supported in this environment, so we render our own lightweight modal.
-function ConfirmModal({ title, message, showReasonInput, confirmLabel = 'Confirm', danger, onConfirm, onCancel }) {
-  const [reason, setReason] = useState('');
-  return (
-    <div style={ms.overlay}>
-      <div style={ms.modal}>
-        <h3 style={ms.title}>{title}</h3>
-        {message && <p style={ms.message}>{message}</p>}
-        {showReasonInput && (
-          <textarea
-            autoFocus
-            value={reason}
-            onChange={e => setReason(e.target.value)}
-            placeholder="Reason (optional)…"
-            style={ms.textarea}
-            rows={3}
-          />
-        )}
-        <div style={ms.actions}>
-          <button onClick={onCancel} style={ms.cancelBtn}>Cancel</button>
-          <button
-            onClick={() => onConfirm(reason)}
-            style={{ ...ms.confirmBtn, ...(danger ? ms.confirmBtnDanger : {}) }}
-          >
-            {confirmLabel}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 export default function Spots() {
   const [spots,    setSpots]    = useState([]);
   const [loading,  setLoading]  = useState(true);
@@ -46,10 +13,6 @@ export default function Spots() {
   const [search,   setSearch]   = useState('');
   const [saving,   setSaving]   = useState(false);
   const [error,    setError]    = useState('');
-  const [deletingId, setDeletingId] = useState(null); // spot._id currently being requested/deleted
-
-  // Holds the pending confirm-modal config: { spot, mode: 'request'|'withdraw'|'delete' }
-  const [confirmState, setConfirmState] = useState(null);
 
   const isModerator = role() === 'moderator';
 
@@ -66,61 +29,14 @@ export default function Spots() {
 
   useEffect(() => { load(); }, []);
 
-  const openDeleteFlow = (spot) => {
-    if (isModerator) {
-      if (spot.pendingDelete) {
-        setConfirmState({ spot, mode: 'withdraw' });
-        return;
-      }
-      if (spot.pendingChange) {
-        alert('This spot has a pending edit awaiting review. Resolve that first before requesting deletion.');
-        return;
-      }
-      setConfirmState({ spot, mode: 'request' });
-      return;
-    }
-    setConfirmState({ spot, mode: 'delete' });
-  };
-
-  const closeConfirm = () => setConfirmState(null);
-
-  const runConfirm = async (reason) => {
-    if (!confirmState) return;
-    const { spot, mode } = confirmState;
-    setDeletingId(spot._id);
-    closeConfirm();
+  const handleDelete = async (id) => {
+    if (!confirm('Delete this spot?')) return;
     try {
-      if (mode === 'request') {
-        await spotAPI.proposeDelete(spot._id, reason);
-      } else if (mode === 'withdraw') {
-        await spotAPI.cancelDelete(spot._id);
-      } else if (mode === 'delete') {
-        await spotAPI.delete(spot._id);
-      }
+      await spotAPI.delete(id);
       load();
     } catch (err) {
-      const msg = err.response?.data?.message || err.message || 'Unknown error';
-      alert(
-        mode === 'request'   ? 'Failed to submit deletion request: ' + msg :
-        mode === 'withdraw'  ? 'Failed to withdraw request: ' + msg :
-        'Failed to delete: ' + msg
-      );
-    } finally {
-      setDeletingId(null);
+      alert('Failed to delete: ' + (err.message || 'Unknown error'));
     }
-  };
-
-  const handleEditClick = (spot) => {
-    if (isModerator && spot.pendingChange) {
-      alert('This spot already has a pending change awaiting admin review. You can submit a new edit once that one is resolved.');
-      return;
-    }
-    if (isModerator && spot.pendingDelete) {
-      alert('This spot has a pending deletion request awaiting admin review. Withdraw it first if you want to edit instead.');
-      return;
-    }
-    setEditing(spot);
-    setShowForm(true);
   };
 
   const handleSave = async (formData) => {
@@ -128,11 +44,7 @@ export default function Spots() {
     setError('');
     try {
       if (editing) {
-        if (isModerator) {
-          await spotAPI.proposeChange(editing._id, formData);
-        } else {
-          await spotAPI.update(editing._id, formData);
-        }
+        await spotAPI.update(editing._id, formData);
       } else {
         await spotAPI.create(formData);
       }
@@ -164,7 +76,7 @@ export default function Spots() {
           <h1 style={s.pageTitle}>Spots</h1>
           <p style={s.pageSub}>{spots.length} spots total</p>
         </div>
-        {!isModerator && (
+        {isModerator && (
           <button onClick={() => { setEditing(null); setShowForm(true); }} style={s.btnPrimary}>
             + Add Spot
           </button>
@@ -188,36 +100,6 @@ export default function Spots() {
             isModerator={isModerator}
           />
         </div>
-      )}
-
-      {confirmState && confirmState.mode === 'request' && (
-        <ConfirmModal
-          title="Request deletion"
-          message={`Submit a request to delete "${confirmState.spot.name}"? An admin will review this before anything is removed.`}
-          showReasonInput
-          confirmLabel="Submit request"
-          onConfirm={runConfirm}
-          onCancel={closeConfirm}
-        />
-      )}
-      {confirmState && confirmState.mode === 'withdraw' && (
-        <ConfirmModal
-          title="Withdraw request"
-          message={`Withdraw your deletion request for "${confirmState.spot.name}"?`}
-          confirmLabel="Withdraw"
-          onConfirm={runConfirm}
-          onCancel={closeConfirm}
-        />
-      )}
-      {confirmState && confirmState.mode === 'delete' && (
-        <ConfirmModal
-          title="Delete spot"
-          message={`Delete "${confirmState.spot.name}"? This cannot be undone.`}
-          confirmLabel="Delete"
-          danger
-          onConfirm={runConfirm}
-          onCancel={closeConfirm}
-        />
       )}
 
       <div style={s.filterRow}>
@@ -250,13 +132,6 @@ export default function Spots() {
               <div style={s.cardBody}>
                 <div style={s.cardName} title={spot.name}>{spot.name}</div>
 
-                {spot.pendingChange && (
-                  <span style={s.pendingBadge}>⏳ Edit pending review</span>
-                )}
-                {spot.pendingDelete && (
-                  <span style={s.pendingDeleteBadge}>🗑️ Deletion pending review</span>
-                )}
-
                 {spot.description && (
                   <div style={s.cardDesc} title={spot.description}>{spot.description}</div>
                 )}
@@ -282,19 +157,13 @@ export default function Spots() {
                   </span>
                   <div style={s.actions}>
                     <button
-                      onClick={() => handleEditClick(spot)}
+                      onClick={() => { setEditing(spot); setShowForm(true); }}
                       style={s.btnEdit}
                     >
                       Edit
                     </button>
-                    <button
-                      onClick={() => openDeleteFlow(spot)}
-                      style={s.btnDelete}
-                      disabled={deletingId === spot._id}
-                    >
-                      {isModerator
-                        ? (spot.pendingDelete ? 'Withdraw request' : 'Request delete')
-                        : 'Delete'}
+                    <button onClick={() => handleDelete(spot._id)} style={s.btnDelete}>
+                      Delete
                     </button>
                   </div>
                 </div>
@@ -335,24 +204,6 @@ const s = {
     display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
     overflow: 'hidden', textOverflow: 'ellipsis', minHeight: '2.6em',
   },
-  pendingBadge: {
-    alignSelf: 'flex-start',
-    fontSize: 11,
-    fontWeight: 700,
-    color: '#a9722c',
-    background: '#a9722c1a',
-    borderRadius: 6,
-    padding: '3px 8px',
-  },
-  pendingDeleteBadge: {
-    alignSelf: 'flex-start',
-    fontSize: 11,
-    fontWeight: 700,
-    color: '#b3261e',
-    background: '#b3261e1a',
-    borderRadius: 6,
-    padding: '3px 8px',
-  },
   cardDesc:    {
     fontSize: 12, color: t.textSecondary, lineHeight: 1.4,
     display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
@@ -372,17 +223,4 @@ const s = {
   btnDelete:   { padding: '5px 13px', background: t.dangerBg, color: t.danger, border: 'none', borderRadius: 7, fontWeight: 600, fontSize: 12, cursor: 'pointer' },
 
   emptyCard:   { padding: 60, textAlign: 'center', color: t.textSecondary, background: t.cardBg, border: `1px solid ${t.border}`, borderRadius: 14 },
-};
-
-// ── Confirm/reason modal styles ──────────────────────────────
-const ms = {
-  overlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 300, padding: 20 },
-  modal:   { background: t.cardBg, borderRadius: 14, width: '100%', maxWidth: 400, padding: 22, boxShadow: '0 24px 60px rgba(0,0,0,0.5)', border: `1px solid ${t.border}`, display: 'flex', flexDirection: 'column', gap: 12 },
-  title:   { fontSize: 16, fontWeight: 700, color: t.textPrimary, margin: 0 },
-  message: { fontSize: 13.5, color: t.textSecondary, margin: 0, lineHeight: 1.5 },
-  textarea:{ width: '100%', padding: '9px 12px', borderRadius: 8, border: `1px solid ${t.border}`, fontSize: 13, color: t.textPrimary, outline: 'none', background: t.sidebarBg, resize: 'vertical', boxSizing: 'border-box', fontFamily: 'inherit' },
-  actions: { display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 4 },
-  cancelBtn: { padding: '8px 16px', borderRadius: 8, border: `1px solid ${t.border}`, background: 'transparent', color: t.textSecondary, fontWeight: 600, fontSize: 13, cursor: 'pointer' },
-  confirmBtn: { padding: '8px 16px', borderRadius: 8, border: 'none', background: t.brandSolid, color: '#fff', fontWeight: 600, fontSize: 13, cursor: 'pointer' },
-  confirmBtnDanger: { background: '#b3261e' },
 };
