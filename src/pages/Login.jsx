@@ -19,6 +19,7 @@ export default function Login() {
       if (data.success && data.token) {
         localStorage.setItem('token', data.token);
         localStorage.setItem('role', data.role || 'admin');
+        localStorage.setItem('city', data.city || '');
         if (data.role === 'moderator') {
           navigate('/spots');
         } else {

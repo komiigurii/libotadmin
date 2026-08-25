@@ -414,12 +414,12 @@ function SpotMapPicker({ spotLat, spotLng, onSpotChange, arModels, addingAr, onP
   );
 }
 
-export default function SpotForm({ initial, onSave, onCancel, saving = false, isModerator = false }) {
+export default function SpotForm({ initial, onSave, onCancel, saving = false, isModerator = false, lockedCity = '' }) {
   const [form, setForm] = useState({
     name:            initial?.name             || '',
     category:        (Array.isArray(initial?.category) ? initial.category : (initial?.category ? [initial.category] : [])).filter(c => CATEGORIES.includes(c)),
     description:     initial?.description      || '',
-    city:            initial?.city             || '',
+    city:            initial?.city             || lockedCity || '',
     entranceFee:     initial?.entranceFee      || '',
     visitingHours:   initial?.visitingHours    || '',
     image:           initial?.image            || '',
@@ -547,7 +547,16 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
 
             <div style={styles.field}>
               <label style={styles.label}>City <span style={styles.required}>*</span></label>
-              <input name="city" value={form.city} onChange={handleChange} style={styles.input} placeholder="e.g. Malolos City" />
+              {lockedCity ? (
+                <input
+                  name="city"
+                  value={form.city}
+                  readOnly
+                  style={{ ...styles.input, background: t.divider, cursor: 'not-allowed', color: t.textSecondary }}
+                />
+              ) : (
+                <input name="city" value={form.city} onChange={handleChange} style={styles.input} placeholder="e.g. Malolos City" />
+              )}
             </div>
 
             <div style={styles.field}>
