@@ -149,8 +149,9 @@ export default function MyReviewRequests() {
     setLoading(true);
     setError(null);
     try {
-      const [mySpotsData, myAccountActionsData] = await Promise.all([
+      const [mySpotsData, myProposalsData, myAccountActionsData] = await Promise.all([
         spotAPI.getMine(),
+        spotAPI.getMyProposals(),
         accountActionAPI.getMine(),
       ]);
 
@@ -165,6 +166,16 @@ export default function MyReviewRequests() {
           body: spot,
         }));
 
+      const proposalItems = toArray(myProposalsData.proposals || myProposalsData)
+        .map(p => ({
+          kind: 'proposal',
+          id: p._id,
+          status: p.status || 'pending',
+          subtitle: p.name || '—',
+          date: p.submittedAt || p.createdAt,
+          body: p,
+        }));
+
       const accountItems = toArray(myAccountActionsData)
         .map(a => ({
           kind: 'account',
@@ -175,9 +186,11 @@ export default function MyReviewRequests() {
           body: a,
         }));
 
-      const all = [...spotItems, ...accountItems].sort((a, b) => new Date(b.date) - new Date(a.date));
+      const all = [...spotItems, ...proposalItems, ...accountItems]
+        .sort((a, b) => new Date(b.date) - new Date(a.date));
       setRequests(all);
-    } catch {
+    } catch (err) {
+      console.error(err);
       setError('Failed to load your review requests.');
       setRequests([]);
     }
@@ -220,10 +233,10 @@ export default function MyReviewRequests() {
             const key = `${r.kind}-${r.id}`;
             const isOpen = expanded === key;
 
-            const image = r.kind === 'spot' ? r.body.image : null;
+            const image = r.kind === 'spot' ? r.body.image : r.kind === 'proposal' ? r.body.image : null;
 
             const changedFields = r.kind === 'spot' ? changedFieldSummary(r.body) : [];
-            const kindLabel = r.kind === 'spot' ? 'Spot edit' : 'Account action';
+            const kindLabel = r.kind === 'spot' ? 'Spot edit' : r.kind === 'proposal' ? 'New spot' : 'Account action';
 
             const dateStr = r.date
               ? new Date(r.date).toLocaleString('en-PH', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
@@ -251,6 +264,11 @@ export default function MyReviewRequests() {
                   {r.kind === 'spot' && (
                     <div style={s.cardDesc}>
                       {changedFields.length ? `${changedFields.join(', ')} changed` : 'No field changes'}
+                    </div>
+                  )}
+                  {r.kind === 'proposal' && (
+                    <div style={s.cardDesc}>
+                      {r.status === 'pending' ? 'Awaiting admin review' : r.status === 'approved' ? 'Live on the app' : 'Not approved'}
                     </div>
                   )}
 

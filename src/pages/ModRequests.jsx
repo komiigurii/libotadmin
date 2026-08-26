@@ -9,9 +9,10 @@ const STATUS_PILL = {
 };
 
 const KIND_LABELS = {
-  spot:        'Spot edit',
+  spot:          'Spot edit',
   'spot-delete': 'Spot deletion',
-  account:     'Account action',
+  'spot-proposal': 'New spot',
+  account:       'Account action',
 };
 
 const FIELD_LABELS = {
@@ -21,11 +22,8 @@ const FIELD_LABELS = {
   Badge: 'Badge', City: 'City', coordinates: 'Coordinates', modelsCoordinates: 'AR Positions', trivia: 'Trivia',
 };
 
-// Fields whose values are long/multi-line — get a full-width stacked block
 const LONG_FIELDS = new Set(['description', 'history', 'recommendations', 'trivia']);
-// Fields that are actual images — get a visual thumbnail comparison
 const THUMB_FIELDS = new Set(['image', 'Badge']);
-// Fields that are non-image asset URLs (.glb) — get a filename link, no thumbnail
 const FILE_LINK_FIELDS = new Set(['modelUrl', 'AR3DModelURL']);
 
 function toArray(data) {
@@ -82,9 +80,6 @@ function Thumb({ url, dimmed }) {
   );
 }
 
-// One changed field, rendered in whichever layout suits its content:
-// thumbnail pair (images), file link pair (.glb assets), stacked block
-// (long text), or a compact inline row (short text/numbers).
 function DiffField({ fieldKey, oldVal, newVal }) {
   const label = FIELD_LABELS[fieldKey] || fieldKey;
   const changed = fmtVal(fieldKey, oldVal) !== fmtVal(fieldKey, newVal);
@@ -137,6 +132,28 @@ function DiffField({ fieldKey, oldVal, newVal }) {
   );
 }
 
+// New-spot proposals have no "old" value to diff against — every
+// submitted field is just shown as-is.
+function ProposalFieldList({ proposal }) {
+  const keys = Object.keys(FIELD_LABELS).filter(k => {
+    const v = proposal[k];
+    return v !== null && v !== undefined && v !== '' && !(Array.isArray(v) && v.length === 0);
+  });
+
+  if (!keys.length) return null;
+
+  return (
+    <div style={s.fieldList}>
+      {keys.map(k => (
+        <div style={s.fieldRow} key={k}>
+          <span style={s.fieldLabel}>{FIELD_LABELS[k]}</span>
+          <span style={s.newText}>{fmtVal(k, proposal[k])}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function ModRequests() {
   const [requests, setRequests] = useState([]);
   const [loading,  setLoading]  = useState(true);
@@ -149,22 +166,34 @@ export default function ModRequests() {
     setLoading(true);
     setError(null);
     try {
-      const [pendingSpotsData, accountActionsData] = await Promise.all([
-        spotAPI.getPending(),
+      const [pendingProposalsData, pendingSpotsData, accountActionsData] = await Promise.all([
+        spotAPI.getPendingProposals(),  // { success, proposals }
+        spotAPI.getPending(),           // { success, items }
         accountActionAPI.getAll(),
       ]);
 
-      const pendingSpots = toArray(pendingSpotsData.items || pendingSpotsData);
+      const pendingProposals = toArray(pendingProposalsData.proposals || pendingProposalsData);
+      const pendingSpots     = toArray(pendingSpotsData.items || pendingSpotsData);
+
+      const proposalItems = pendingProposals.map(proposal => ({
+        kind: 'spot-proposal',
+        id: proposal._id,
+        status: proposal.status || 'pending',
+        title: 'New Spot Proposal',
+        subtitle: proposal.name || '—',
+        date: proposal.submittedAt || proposal.createdAt,
+        body: proposal,
+      }));
 
       const editItems = pendingSpots
-        .filter(spot => spot.pendingChange)
+        .filter(spot => spot.pendingChange && !spot.pendingDelete)
         .map(spot => ({
           kind: 'spot',
           id: spot._id,
           status: 'pending',
           title: 'Spot edit request',
           subtitle: spot.name || '—',
-          date: spot.pendingChange.submittedAt,
+          date: spot.pendingChange?.submittedAt,
           body: spot,
         }));
 
@@ -191,9 +220,11 @@ export default function ModRequests() {
           body: a,
         }));
 
-      const all = [...editItems, ...deleteItems, ...accountItems].sort((a, b) => new Date(b.date) - new Date(a.date));
+      const all = [...proposalItems, ...editItems, ...deleteItems, ...accountItems]
+        .sort((a, b) => new Date(b.date) - new Date(a.date));
       setRequests(all);
-    } catch {
+    } catch (err) {
+      console.error(err);
       setError('Failed to load mod requests.');
       setRequests([]);
     }
@@ -205,13 +236,31 @@ export default function ModRequests() {
   const visible = requests.filter(r => !statusFilter || r.status === statusFilter);
   const pendingCount = requests.filter(r => r.status === 'pending').length;
 
+  // Approve/reject a NEW spot proposal
+  const decideProposal = async (id, action) => {
+    setActing(id);
+    try {
+      const data = await spotAPI.reviewProposal(id, action);
+      if (data?.success !== false) await load();
+      else alert('Failed: ' + (data?.message || 'Unknown error'));
+    } catch (err) {
+      console.error(err);
+      alert('Network error');
+    }
+    setActing(null);
+  };
+
+  // Approve/reject an EXISTING spot's edit or deletion request
   const decideSpot = async (id, action) => {
     setActing(id);
     try {
       const data = await spotAPI.reviewChange(id, action);
-      if (data?.success !== false) load();
+      if (data?.success !== false) await load();
       else alert('Failed: ' + (data?.message || 'Unknown error'));
-    } catch { alert('Network error'); }
+    } catch (err) {
+      console.error(err);
+      alert('Network error');
+    }
     setActing(null);
   };
 
@@ -262,10 +311,23 @@ export default function ModRequests() {
           const key = `${r.kind}-${r.id}`;
           const isExpanded = expandedKey === key;
           const isDeleteRequest = r.kind === 'spot-delete';
+          const isNewProposal = r.kind === 'spot-proposal';
 
           const avatarName = r.subtitle;
           const primaryName = avatarName || '—';
-          const byLine = r.kind === 'spot' || r.kind === 'spot-delete' ? null : r.title; // who proposed this
+          const byLine = r.kind === 'spot' || r.kind === 'spot-delete' || r.kind === 'spot-proposal' ? null : r.title;
+
+          const handleApprove = () => {
+            if (r.kind === 'account') decideAccount(r.id, 'approved');
+            else if (isNewProposal) decideProposal(r.id, 'approve');
+            else decideSpot(r.id, 'approve');
+          };
+
+          const handleReject = () => {
+            if (r.kind === 'account') decideAccount(r.id, 'rejected');
+            else if (isNewProposal) decideProposal(r.id, 'reject');
+            else decideSpot(r.id, 'reject');
+          };
 
           return (
             <div key={key} style={s.card}>
@@ -290,6 +352,9 @@ export default function ModRequests() {
 
                   {r.kind === 'account' && (
                     <p style={s.commentText}>{r.body.reason}</p>
+                  )}
+                  {r.kind === 'spot-proposal' && (
+                    <p style={s.commentText}>New spot submitted for review — expand to see details.</p>
                   )}
                   {r.kind === 'spot' && (
                     <p style={s.commentText}>Proposed changes to this spot's details.</p>
@@ -323,6 +388,10 @@ export default function ModRequests() {
                 </div>
               )}
 
+              {isExpanded && r.kind === 'spot-proposal' && (
+                <ProposalFieldList proposal={r.body} />
+              )}
+
               {isExpanded && r.kind === 'spot-delete' && (
                 <div style={s.fieldList}>
                   <div style={s.deleteNotice}>
@@ -336,20 +405,14 @@ export default function ModRequests() {
                   <div style={s.actions}>
                     <button
                       disabled={isActing}
-                      onClick={() => {
-                        if (r.kind === 'account') decideAccount(r.id, 'approved');
-                        else decideSpot(r.id, 'approve');
-                      }}
+                      onClick={handleApprove}
                       style={{ ...s.btn, ...(isDeleteRequest ? s.btnApproveDelete : s.btnApprove), opacity: isActing ? 0.6 : 1 }}
                     >
                       {isDeleteRequest ? 'Approve & Delete' : 'Approve'}
                     </button>
                     <button
                       disabled={isActing}
-                      onClick={() => {
-                        if (r.kind === 'account') decideAccount(r.id, 'rejected');
-                        else decideSpot(r.id, 'reject');
-                      }}
+                      onClick={handleReject}
                       style={{ ...s.btn, ...s.btnDisapprove, opacity: isActing ? 0.6 : 1 }}
                     >
                       Disapprove
@@ -394,17 +457,12 @@ const s = {
   react:      { fontSize: 12, color: t.textMuted },
 
   panel:      { borderTop: `1px solid ${t.divider}`, padding: '14px 18px 18px', background: t.sidebarBg },
-  panelLabel: { fontSize: 12, fontWeight: 600, color: t.textPrimary, margin: '0 0 6px' },
-  select:     { width: '100%', padding: '9px 12px', borderRadius: 8, border: `1.5px solid ${t.border}`, fontSize: 13, color: t.textPrimary, background: t.cardBg, outline: 'none', boxSizing: 'border-box', cursor: 'pointer' },
-  suggestedNote: { fontSize: 11, fontWeight: 600, color: t.warning, margin: '8px 0 0' },
-
   actions:    { display: 'flex', gap: 8, marginTop: 10 },
   btn:        { padding: '8px 18px', borderRadius: 8, fontWeight: 600, fontSize: 13, cursor: 'pointer', border: 'none' },
   btnApprove: { background: t.successBg, color: t.success },
   btnApproveDelete: { background: t.dangerBg, color: t.danger },
   btnDisapprove: { background: t.dangerBg, color: t.danger },
 
-  // ── Field diff list (spot edits, expanded) ─────────────────
   fieldList: { display: 'flex', flexDirection: 'column', borderTop: `1px solid ${t.divider}`, padding: '4px 18px' },
   deleteNotice: { padding: '12px 0', fontSize: 13, color: t.danger, lineHeight: 1.5 },
 

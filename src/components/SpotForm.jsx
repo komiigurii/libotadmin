@@ -488,33 +488,56 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
   };
 
   const handleSave = () => {
-    if (!form.name)            return alert('Name is required');
-    if (!form.category.length) return alert('Select at least one category');
-    if (!form.city)             return alert('City is required');
-    if (!form.image)           return alert('Image is required');
-    if (!form.coordinates_lat || !form.coordinates_lng) return alert('Spot location is required');
+  if (!form.name.trim()) {
+    return alert('Name is required');
+  }
+  if (!form.category.length) {
+    return alert('Select at least one category');
+  }
+  if (!form.city.trim()) {
+    return alert('City is required');
+  }
+  if (!form.image) {
+    return alert('Image is required');
+  }
+  if (
+    form.coordinates_lat === '' ||
+    form.coordinates_lng === ''
+  ) {
+    return alert('Spot location is required');
+  }
 
-    const payload = {
-      name:          form.name,
-      category:      form.category,
-      description:   form.description,
-      city:          form.city,
-      entranceFee:   form.entranceFee,
-      visitingHours: form.visitingHours,
-      image:         form.image,
-      modelUrl:      form.modelUrl,
-      AR3DModelURL:  form.ARModelUrl,
-      Badge:         form.Badge,
-      coordinates: {
-        lat: parseFloat(form.coordinates_lat) || null,
-        lng: parseFloat(form.coordinates_lng) || null,
-      },
-      modelsCoordinates: arModels
-        .filter(m => m.lat && m.lng)
-        .map(m => ({ lat: parseFloat(m.lat), lng: parseFloat(m.lng) })),
-    };
-    onSave(payload);
+  const payload = {
+    name: form.name.trim(),
+    category: form.category,
+    description: form.description.trim(),
+    city: form.city.trim(),
+    entranceFee: form.entranceFee.trim(),
+    visitingHours: form.visitingHours.trim(),
+    image: form.image,
+    modelUrl: form.modelUrl || null,
+    AR3DModelURL: form.ARModelUrl || null,
+    Badge: form.Badge || null,
+    coordinates: {
+      lat: Number(form.coordinates_lat),
+      lng: Number(form.coordinates_lng),
+    },
+    modelsCoordinates: arModels
+      .filter(
+        model =>
+          model.lat !== '' &&
+          model.lat != null &&
+          model.lng !== '' &&
+          model.lng != null
+      )
+      .map(model => ({
+        label: model.label || 'Model',
+        lat: Number(model.lat),
+        lng: Number(model.lng),
+      })),
   };
+  onSave(payload);
+};
 
   const mapHint = addingAr
     ? `Click the map to drop AR ${arModels.length + 1}. Drag any AR pin to fine-tune it.`
