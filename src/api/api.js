@@ -12,14 +12,19 @@ api.interceptors.request.use((config) => {
 });
 
 export const spotAPI = {
-  getAll:        ()           => api.get('/api/spots').then(r => r.data.spots),
-  getMine:       ()           => api.get('/api/spots/moderator').then(r => r.data.spots),
-  create:        (data)       => api.post('/api/spots', data).then(r => r.data),
-  update:        (id, data)   => api.put(`/api/spots/${id}`, data).then(r => r.data),
-  delete:        (id)         => api.delete(`/api/spots/${id}`).then(r => r.data),
-  getPending:    ()           => api.get('/api/spots/pending').then(r => r.data),
-  proposeChange: (id, data)   => api.patch(`/api/spots/${id}/propose`, data).then(r => r.data),
-  reviewChange:  (id, action) => api.patch(`/api/spots/${id}/review`, { action }).then(r => r.data),
+  getAll:        ()             => api.get('/api/spots').then(r => r.data.spots),
+  getMine:       ()             => api.get('/api/spots/moderator').then(r => r.data.spots),
+  create:        (data)         => api.post('/api/spots', data).then(r => r.data),
+  update:        (id, data)     => api.put(`/api/spots/${id}`, data).then(r => r.data),
+  delete:        (id)           => api.delete(`/api/spots/${id}`).then(r => r.data),
+  getPending:    ()             => api.get('/api/spots/pending').then(r => r.data),
+  proposeChange: (id, data)     => api.patch(`/api/spots/${id}/propose`, data).then(r => r.data),
+  proposeCreate: (data)         => api.post('/api/spots/propose', data).then(r => r.data),
+  proposeDelete: (id)           => api.delete(`/api/spots/${id}/propose`).then(r => r.data),
+  reviewChange:  (id, action)   => api.patch(`/api/spots/${id}/review`, { action }).then(r => r.data),
+  reviewProposal: (id, action)  => api.patch(`/api/spots/proposals/${id}/review`, { action }).then(r => r.data),
+  getPendingProposals: ()       => api.get('/api/spots/proposals').then(r => r.data),
+  getMyProposals: () => api.get('/api/spots/proposals/mine').then(r => r.data),
 };
 
 export const commentAPI = {
@@ -87,6 +92,35 @@ export const uploadAPI = {
         headers: { 'Content-Type': 'multipart/form-data' },
       })
       .then(r => r.data);
+  },
+};
+
+export const spotProposalAPI = {
+  create: async (payload) => {
+    const response = await api.post('/spot-proposals', payload);
+    return response.data;
+  },
+
+  getAll: async () => {
+    const response = await api.get('/spot-proposals');
+    return response.data;
+  },
+
+  getPending: async () => {
+    const response = await api.get('/spot-proposals/pending');
+    return response.data;
+  },
+
+  reviewProposal: async (id, action, rejectionReason = '') => {
+    const response = await api.patch(
+      `/spot-proposals/${id}/review`,
+      {
+        action,
+        rejectionReason,
+      }
+    );
+
+    return response.data;
   },
 };
 

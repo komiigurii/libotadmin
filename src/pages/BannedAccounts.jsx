@@ -151,13 +151,14 @@ const s = {
   searchInput: { width: '100%', padding: '10px 14px', borderRadius: 10, border: `1px solid ${t.border}`, fontSize: 14, background: t.cardBg, outline: 'none', color: t.textPrimary, boxSizing: 'border-box' },
 
   list:        { background: t.cardBg, border: `1px solid ${t.border}`, borderRadius: 14, overflow: 'hidden' },
-  listHead:    { display: 'grid', gridTemplateColumns: '2fr 2fr 0.7fr 1.3fr auto', gap: 12, padding: '10px 18px', fontSize: 11, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: t.textMuted, borderBottom: `1px solid ${t.border}` },
-  row:         { display: 'grid', gridTemplateColumns: '2fr 2fr 0.7fr 1.3fr auto', gap: 12, alignItems: 'center', padding: '14px 18px', borderBottom: `1px solid ${t.divider}` },
+  listHead:    { display: 'grid', gridTemplateColumns: '2fr 2fr 0.7fr 1.3fr 100px', gap: 12, alignItems: 'center', padding: '10px 18px', fontSize: 11, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: t.textMuted, borderBottom: `1px solid ${t.border}` },
+  row:         { display: 'grid', gridTemplateColumns: '2fr 2fr 0.7fr 1.3fr 100px', gap: 12, alignItems: 'center', padding: '14px 18px', borderBottom: `1px solid ${t.divider}` },
 
+  //fix this shti
   colUser:     { display: 'flex', alignItems: 'center', gap: 10 },
   colReason:   { fontSize: 13, color: t.textSecondary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   colStrikes:  { fontSize: 13, fontWeight: 600, color: t.textPrimary },
-  colStatus:   { display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-start' },
+  colStatus:   { fontSize: 13, display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-start' },
   colActions:  { display: 'flex', justifyContent: 'flex-end' },
 
   avatar:      { width: 34, height: 34, borderRadius: '50%', background: t.brandSoft, color: t.brand, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 14, flexShrink: 0 },

@@ -31,32 +31,47 @@ export default function Spots() {
 
   useEffect(() => { load(); }, []);
 
+  // Moderators only — always a proposal, never a hard delete.
   const handleDelete = async (id) => {
-    if (!confirm('Delete this spot?')) return;
+    const reason = window.prompt('Reason for requesting deletion (optional):');
+    if (reason === null) return; // cancelled
+
     try {
-      await spotAPI.delete(id);
+      await spotAPI.proposeDelete(id, reason);
+      alert('Deletion request submitted for admin approval.');
       load();
     } catch (err) {
-      alert('Failed to delete: ' + (err.message || 'Unknown error'));
+      const msg = err.response?.data?.message || err.message || 'Unknown error';
+      alert('Failed to submit request: ' + msg);
     }
   };
 
   const handleSave = async (formData) => {
     setSaving(true);
     setError('');
+
     try {
       if (editing) {
-        await spotAPI.update(editing._id, formData);
+        await spotAPI.proposeChange(editing._id, formData);
+        alert('Changes submitted for admin approval.');
       } else {
-        await spotAPI.create(formData);
+        await spotAPI.proposeCreate(formData);
+        alert('New spot submitted for admin approval.');
       }
+
       setShowForm(false);
       setEditing(null);
       load();
+
     } catch (err) {
-      const msg = err.message || 'Something went wrong';
+      const msg =
+        err.response?.data?.message ||
+        err.message ||
+        'Something went wrong';
+
       setError(msg);
       alert('Error: ' + msg);
+
     } finally {
       setSaving(false);
     }
@@ -154,21 +169,35 @@ export default function Spots() {
                   </div>
                 </div>
 
+                {spot.pendingChange && (
+                  <div style={s.pendingNotice}>⏳ Edit pending admin approval</div>
+                )}
+                {spot.pendingDelete && (
+                  <div style={s.pendingNoticeDanger}>🗑️ Deletion pending admin approval</div>
+                )}
+
                 <div style={s.cardFooter}>
                   <span style={s.cardVisits}>
                     {(spot.visitCount || 0).toLocaleString()} visits
                   </span>
-                  <div style={s.actions}>
-                    <button
-                      onClick={() => { setEditing(spot); setShowForm(true); }}
-                      style={s.btnEdit}
-                    >
-                      Edit
-                    </button>
-                    <button onClick={() => handleDelete(spot._id)} style={s.btnDelete}>
-                      Delete
-                    </button>
-                  </div>
+                  {isModerator && (
+                    <div style={s.actions}>
+                      <button
+                        onClick={() => { setEditing(spot); setShowForm(true); }}
+                        style={s.btnEdit}
+                        disabled={!!spot.pendingChange || !!spot.pendingDelete}
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => handleDelete(spot._id)}
+                        style={s.btnDelete}
+                        disabled={!!spot.pendingChange || !!spot.pendingDelete}
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -217,6 +246,9 @@ const s = {
   detailRow:   { display: 'flex', alignItems: 'flex-start', gap: 7, fontSize: 12, color: t.textMuted },
   detailIcon:  { flexShrink: 0, fontSize: 12, lineHeight: '18px' },
   detailText:  { lineHeight: 1.4 },
+
+  pendingNotice:       { fontSize: 11.5, fontWeight: 600, color: t.purple, background: t.purpleBg, borderRadius: 7, padding: '5px 9px' },
+  pendingNoticeDanger: { fontSize: 11.5, fontWeight: 600, color: t.danger, background: t.dangerBg, borderRadius: 7, padding: '5px 9px' },
 
   cardFooter:  { marginTop: 'auto', paddingTop: 10, borderTop: `1px solid ${t.divider}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 },
   cardVisits:  { fontSize: 12, fontWeight: 600, color: t.textPrimary },
