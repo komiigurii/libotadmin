@@ -25,7 +25,7 @@ export const spotAPI = {
   reviewProposal: (id, action)  => api.patch(`/api/spots/proposals/${id}/review`, { action }).then(r => r.data),
   getPendingProposals: ()       => api.get('/api/spots/proposals').then(r => r.data),
   getMyProposals: () => api.get('/api/spots/proposals/mine').then(r => r.data),
-  getMyDeleteRequests: () => api.get('/api/spots/proposals/mine-delete').then(r => r.data),
+  getMyDeleteRequests: () => api.get('/api/spots/delete-requests/mine').then(r => r.data),
 };
 
 export const commentAPI = {
