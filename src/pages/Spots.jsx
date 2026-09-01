@@ -14,6 +14,8 @@ export default function Spots() {
   const [search,   setSearch]   = useState('');
   const [saving,   setSaving]   = useState(false);
   const [error,    setError]    = useState('');
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleteReason, setDeleteReason] = useState('');
 
   const isModerator = role() === 'moderator';
   const lockedCity = isModerator ? modCity() : '';
@@ -31,18 +33,24 @@ export default function Spots() {
 
   useEffect(() => { load(); }, []);
 
-  // Moderators only — always a proposal, never a hard delete.
-  const handleDelete = async (id) => {
-    const reason = window.prompt('Reason for requesting deletion (optional):');
-    if (reason === null) return; // cancelled
+  // Moderators only — opens our custom modal instead of window.prompt
+  const openDeleteModal = (id) => {
+    setDeleteTarget(id);
+    setDeleteReason('');
+  };
+
+  // Called when the moderator confirms inside the modal
+  const confirmDelete = async () => {
+    const id = deleteTarget;
+    setDeleteTarget(null);
 
     try {
-      await spotAPI.proposeDelete(id, reason);
-      alert('Deletion request submitted for admin approval.');
+      await spotAPI.proposeDelete(id, deleteReason);
+      setError('');
       load();
     } catch (err) {
       const msg = err.response?.data?.message || err.message || 'Unknown error';
-      alert('Failed to submit request: ' + msg);
+      setError('Failed to submit request: ' + msg);
     }
   };
 
@@ -104,6 +112,29 @@ export default function Spots() {
         <div style={s.errorBanner}>
           ⚠ {error}
           <button onClick={() => setError('')} style={s.errorClose}>✕</button>
+        </div>
+      )}
+
+      {deleteTarget && (
+        <div style={s.modalOverlay}>
+          <div style={s.modalBox}>
+            <h3 style={{ marginTop: 0, marginBottom: 4, color: t.textPrimary }}>Request deletion</h3>
+            <p style={{ fontSize: 13, color: t.textSecondary, marginTop: 0 }}>
+              Reason for requesting deletion (optional):
+            </p>
+            <textarea
+              value={deleteReason}
+              onChange={e => setDeleteReason(e.target.value)}
+              rows={3}
+              style={s.modalTextarea}
+              placeholder="e.g. permanently closed"
+              autoFocus
+            />
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 12 }}>
+              <button onClick={() => setDeleteTarget(null)} style={s.btnEdit}>Cancel</button>
+              <button onClick={confirmDelete} style={s.btnDelete}>Submit Request</button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -190,7 +221,7 @@ export default function Spots() {
                         Edit
                       </button>
                       <button
-                        onClick={() => handleDelete(spot._id)}
+                        onClick={() => openDeleteModal(spot._id)}
                         style={s.btnDelete}
                         disabled={!!spot.pendingChange || !!spot.pendingDelete}
                       >
@@ -216,6 +247,9 @@ const s = {
   btnPrimary:  { padding: '9px 20px', background: t.brandSolid, color: '#fff', border: 'none', borderRadius: 10, fontWeight: 600, fontSize: 14, cursor: 'pointer' },
   errorBanner: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: t.dangerBg, border: `1px solid ${t.danger}44`, borderRadius: 10, padding: '12px 16px', marginBottom: 16, color: t.danger, fontSize: 14, fontWeight: 500 },
   errorClose:  { background: 'none', border: 'none', color: t.danger, cursor: 'pointer', fontWeight: 700, fontSize: 16 },
+  modalOverlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 },
+  modalBox:     { background: t.cardBg, borderRadius: 12, padding: 20, width: 360, boxShadow: '0 10px 30px rgba(0,0,0,0.2)' },
+  modalTextarea:{ width: '100%', padding: 10, borderRadius: 8, border: `1px solid ${t.border}`, fontSize: 13, resize: 'vertical', boxSizing: 'border-box', fontFamily: 'inherit', color: t.textPrimary, background: t.cardBg },
   formWrap:    { marginBottom: 18 },
   filterRow:   { marginBottom: 18 },
   searchInput: { width: '100%', padding: '10px 14px', borderRadius: 10, border: `1px solid ${t.border}`, fontSize: 14, background: t.cardBg, outline: 'none', color: t.textPrimary, boxSizing: 'border-box' },
