@@ -149,10 +149,11 @@ export default function MyReviewRequests() {
     setLoading(true);
     setError(null);
     try {
-      const [mySpotsData, myProposalsData, myAccountActionsData] = await Promise.all([
+      const [mySpotsData, myProposalsData, myAccountActionsData, myDeleteRequestsData] = await Promise.all([
         spotAPI.getMine(),
         spotAPI.getMyProposals(),
         accountActionAPI.getMine(),
+        spotAPI.getMyDeleteRequests(),
       ]);
 
       const spotItems = toArray(mySpotsData)
@@ -186,7 +187,17 @@ export default function MyReviewRequests() {
           body: a,
         }));
 
-      const all = [...spotItems, ...proposalItems, ...accountItems]
+      const deleteItems = toArray(myDeleteRequestsData.requests || myDeleteRequestsData)
+        .map(d => ({
+          kind: 'delete',
+          id: d._id,
+          status: d.status || 'pending',
+          subtitle: d.spotName || '—',
+          date: d.submittedAt,
+          body: d,
+        }));
+
+      const all = [...spotItems, ...proposalItems, ...accountItems, ...deleteItems]
         .sort((a, b) => new Date(b.date) - new Date(a.date));
       setRequests(all);
     } catch (err) {
@@ -236,7 +247,7 @@ export default function MyReviewRequests() {
             const image = r.kind === 'spot' ? r.body.image : r.kind === 'proposal' ? r.body.image : null;
 
             const changedFields = r.kind === 'spot' ? changedFieldSummary(r.body) : [];
-            const kindLabel = r.kind === 'spot' ? 'Spot edit' : r.kind === 'proposal' ? 'New spot' : 'Account action';
+            const kindLabel = r.kind === 'spot' ? 'Spot edit' : r.kind === 'proposal' ? 'New spot' : r.kind === 'delete' ? 'Spot deletion' : 'Account action';
 
             const dateStr = r.date
               ? new Date(r.date).toLocaleString('en-PH', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
@@ -287,6 +298,11 @@ export default function MyReviewRequests() {
                       <div style={s.detailRow}>
                         <span style={s.detailIcon}>✅</span>
                         <span style={s.detailText}>{r.body.resultSummary}</span>
+                      </div>
+                    )}
+                    {r.kind === 'delete' && (
+                      <div style={s.cardDesc} title={r.body.reason}>
+                        {r.body.reason ? `Reason: ${r.body.reason}` : 'No reason given'}
                       </div>
                     )}
                   </div>
