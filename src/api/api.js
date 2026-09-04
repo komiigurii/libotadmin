@@ -35,8 +35,8 @@ export const spotAPI = {
 // nothing changes live until an admin approves it via reviewLocation.
 export const missionAPI = {
   getForSpot: (spotId) => api.get(`/api/missions/${spotId}`).then(r => r.data.missions),
-  proposeLocation: (missionId, { lat, lng, locationName, image, radiusMeters }) =>
-    api.patch(`/api/missions/${missionId}/location`, { lat, lng, locationName, image, radiusMeters }).then(r => r.data),
+  proposeLocation: (missionId, { lat, lng, locationName, image, locationInfo, radiusMeters }) =>
+    api.patch(`/api/missions/${missionId}/location`, { lat, lng, locationName, image, locationInfo, radiusMeters }).then(r => r.data),
   getProposals: () => api.get('/api/missions/proposals').then(r => r.data.proposals),
   reviewLocation: (missionId, action) =>
     api.patch(`/api/missions/${missionId}/review`, { action }).then(r => r.data),

@@ -19,6 +19,7 @@ const KIND_LABELS = {
 const MISSION_FIELD_LABELS = {
   locationName: 'Restaurant name',
   image:        'Restaurant photo',
+  locationInfo: 'Restaurant info',
   coordinates:  'Coordinates',
   radiusMeters: 'Radius (m)',
 };
@@ -30,7 +31,7 @@ const FIELD_LABELS = {
   Badge: 'Badge', City: 'City', coordinates: 'Coordinates', modelsCoordinates: 'AR Positions', trivia: 'Trivia',
 };
 
-const LONG_FIELDS = new Set(['description', 'history', 'recommendations', 'trivia']);
+const LONG_FIELDS = new Set(['description', 'history', 'recommendations', 'trivia', 'locationInfo']);
 const THUMB_FIELDS = new Set(['image', 'Badge']);
 const FILE_LINK_FIELDS = new Set(['modelUrl', 'AR3DModelURL']);
 
@@ -448,7 +449,7 @@ export default function ModRequests() {
                     <span style={s.byLineLabel}>Mission: </span>{r.body.title}
                   </p>
                   {Object.entries(r.body.pendingChange || {})
-                    .filter(([k]) => ['locationName', 'image', 'coordinates', 'radiusMeters'].includes(k))
+                    .filter(([k]) => ['locationName', 'image', 'locationInfo', 'coordinates', 'radiusMeters'].includes(k))
                     .map(([k, newVal]) => (
                       <DiffField key={k} fieldKey={k} oldVal={r.body[k]} newVal={newVal} labelMap={MISSION_FIELD_LABELS} />
                     ))}
