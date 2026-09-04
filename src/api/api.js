@@ -75,6 +75,9 @@ export const reportAPI = {
     return api.get(`/api/reports${query ? '?' + query : ''}`).then(r => r.data.reports);
   },
   update: (id, data) => api.patch(`/api/reports/${id}`, data).then(r => r.data),
+  // Skips the warning ladder — permanently bans the reported user immediately.
+  ban: (id, banReason) =>
+    api.patch(`/api/reports/${id}`, { decision: 'ban', banReason }).then(r => r.data),
 };
 
 export const authAPI = {

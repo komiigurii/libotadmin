@@ -143,6 +143,23 @@ function ReportRow({ report, expanded, acting, setActing, onToggle, onUpdated })
     setActing(null);
   };
 
+  // Manual override — skips the 3-warning ladder and bans the reported user
+  // immediately. Separate from "Agree" (which only ever issues the next
+  // warning/suspension step).
+  const banUser = async () => {
+    if (!report.reportedClerkUserId) { alert('No reported user on this report.'); return; }
+    if (!confirm(`Permanently ban ${commentUserName}? This is immediate — it does not go through the usual warning/suspension steps.`)) return;
+    setActing(report._id);
+    try {
+      const data = await reportAPI.ban(report._id, adminNote);
+      if (data?.success === false) alert('Failed: ' + (data?.message || 'Unknown error'));
+      else onUpdated();
+    } catch (err) {
+      alert(err?.response?.data?.message || 'Network error');
+    }
+    setActing(null);
+  };
+
   return (
     <div style={s.card}>
       <div style={s.cardTop} onClick={onToggle}>
@@ -211,6 +228,16 @@ function ReportRow({ report, expanded, acting, setActing, onToggle, onUpdated })
             <button disabled={acting || !review} onClick={deleteComment} style={{ ...s.btn, ...s.btnDelete, opacity: (acting || !review) ? 0.6 : 1 }}>
               🗑 Delete Comment
             </button>
+            {!report.banApproved && (
+              <button
+                disabled={acting || !report.reportedClerkUserId}
+                onClick={banUser}
+                style={{ ...s.btn, ...s.btnBan, opacity: (acting || !report.reportedClerkUserId) ? 0.6 : 1 }}
+                title="Skips the warning ladder — bans the user immediately"
+              >
+                🔨 Ban Permanently
+              </button>
+            )}
           </div>
         </div>
       )}
@@ -255,6 +282,7 @@ const s = {
   btnAgree:     { background: t.successBg, color: t.success },
   btnDisagree:  { background: t.sidebarBg, color: t.textSecondary, border: `1px solid ${t.border}` },
   btnDelete:    { background: t.dangerBg, color: t.danger },
+  btnBan:       { background: t.danger, color: '#fff' },
 
   empty:      { padding: 60, textAlign: 'center', color: t.textSecondary },
   emptyState: { textAlign: 'center', padding: '70px 20px' },
