@@ -20,11 +20,12 @@ export const spotAPI = {
   getPending:    ()             => api.get('/api/spots/pending').then(r => r.data),
   proposeChange: (id, data)     => api.patch(`/api/spots/${id}/propose`, data).then(r => r.data),
   proposeCreate: (data)         => api.post('/api/spots/propose', data).then(r => r.data),
-  proposeDelete: (id)           => api.delete(`/api/spots/${id}/propose`).then(r => r.data),
+  proposeDelete: (id, reason)   => api.patch(`/api/spots/${id}/propose-delete`, { reason }).then(r => r.data),
   reviewChange:  (id, action)   => api.patch(`/api/spots/${id}/review`, { action }).then(r => r.data),
   reviewProposal: (id, action)  => api.patch(`/api/spots/proposals/${id}/review`, { action }).then(r => r.data),
   getPendingProposals: ()       => api.get('/api/spots/proposals').then(r => r.data),
   getMyProposals: () => api.get('/api/spots/proposals/mine').then(r => r.data),
+  getMyDeleteRequests: () => api.get('/api/spots/delete-requests/mine').then(r => r.data),
 };
 
 export const commentAPI = {
