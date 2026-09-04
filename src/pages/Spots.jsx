@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { spotAPI } from '../api/api';
 import SpotForm from '../components/SpotForm';
-import { theme as t } from '../theme';
+import { theme as t, radius, shadow } from '../theme';
 
 const role = () => localStorage.getItem('role');
 const modCity = () => localStorage.getItem('city') || '';
@@ -102,7 +102,7 @@ export default function Spots() {
           <p style={s.pageSub}>{spots.length} spots total</p>
         </div>
         {isModerator && (
-          <button onClick={() => { setEditing(null); setShowForm(true); }} style={s.btnPrimary}>
+          <button onClick={() => { setEditing(null); setShowForm(true); }} style={s.btnPrimary} className="modern-btn">
             + Add Spot
           </button>
         )}
@@ -127,12 +127,13 @@ export default function Spots() {
               onChange={e => setDeleteReason(e.target.value)}
               rows={3}
               style={s.modalTextarea}
+              className="modern-input"
               placeholder="e.g. permanently closed"
               autoFocus
             />
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 12 }}>
-              <button onClick={() => setDeleteTarget(null)} style={s.btnEdit}>Cancel</button>
-              <button onClick={confirmDelete} style={s.btnDelete}>Submit Request</button>
+              <button onClick={() => setDeleteTarget(null)} style={s.btnEdit} className="modern-btn">Cancel</button>
+              <button onClick={confirmDelete} style={s.btnDelete} className="modern-btn">Submit Request</button>
             </div>
           </div>
         </div>
@@ -157,6 +158,7 @@ export default function Spots() {
           value={search}
           onChange={e => setSearch(e.target.value)}
           style={s.searchInput}
+          className="modern-input"
         />
       </div>
 
@@ -167,7 +169,7 @@ export default function Spots() {
       ) : (
         <div style={s.grid}>
           {filtered.map(spot => (
-            <div key={spot._id} style={s.card}>
+            <div key={spot._id} style={s.card} className="modern-card">
               <div style={s.cardImgWrap}>
                 {spot.image
                   ? <img src={spot.image} alt={spot.name} style={s.cardImg} />
@@ -216,6 +218,7 @@ export default function Spots() {
                       <button
                         onClick={() => { setEditing(spot); setShowForm(true); }}
                         style={s.btnEdit}
+                        className="modern-btn"
                         disabled={!!spot.pendingChange || !!spot.pendingDelete}
                       >
                         Edit
@@ -223,6 +226,7 @@ export default function Spots() {
                       <button
                         onClick={() => openDeleteModal(spot._id)}
                         style={s.btnDelete}
+                        className="modern-btn"
                         disabled={!!spot.pendingChange || !!spot.pendingDelete}
                       >
                         Delete
@@ -244,11 +248,11 @@ const s = {
   pageHeader:  { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 },
   pageTitle:   { fontSize: 22, fontWeight: 600, color: t.textPrimary, marginBottom: 4 },
   pageSub:     { fontSize: 13, color: t.textSecondary },
-  btnPrimary:  { padding: '9px 20px', background: t.brandSolid, color: '#fff', border: 'none', borderRadius: 10, fontWeight: 600, fontSize: 14, cursor: 'pointer' },
+  btnPrimary:  { padding: '9px 20px', background: t.brandSolid, color: '#fff', border: 'none', borderRadius: radius.lg, fontWeight: 600, fontSize: 14, cursor: 'pointer', boxShadow: shadow.sm },
   errorBanner: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: t.dangerBg, border: `1px solid ${t.danger}44`, borderRadius: 10, padding: '12px 16px', marginBottom: 16, color: t.danger, fontSize: 14, fontWeight: 500 },
   errorClose:  { background: 'none', border: 'none', color: t.danger, cursor: 'pointer', fontWeight: 700, fontSize: 16 },
-  modalOverlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 },
-  modalBox:     { background: t.cardBg, borderRadius: 12, padding: 20, width: 360, boxShadow: '0 10px 30px rgba(0,0,0,0.2)' },
+  modalOverlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 },
+  modalBox:     { background: t.cardBg, borderRadius: radius.xl, padding: 20, width: 360, boxShadow: shadow.lg, border: `1px solid ${t.border}` },
   modalTextarea:{ width: '100%', padding: 10, borderRadius: 8, border: `1px solid ${t.border}`, fontSize: 13, resize: 'vertical', boxSizing: 'border-box', fontFamily: 'inherit', color: t.textPrimary, background: t.cardBg },
   formWrap:    { marginBottom: 18 },
   filterRow:   { marginBottom: 18 },
@@ -256,7 +260,7 @@ const s = {
 
   grid:        { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 18 },
 
-  card:        { background: t.cardBg, border: `1px solid ${t.border}`, borderRadius: 14, overflow: 'hidden', display: 'flex', flexDirection: 'column' },
+  card:        { background: t.cardBg, border: `1px solid ${t.border}`, borderRadius: radius.xl, overflow: 'hidden', display: 'flex', flexDirection: 'column', boxShadow: shadow.sm, cursor: 'default' },
 
   cardImgWrap: { position: 'relative', width: '100%', height: 140, background: t.sidebarBg },
   cardImg:     { width: '100%', height: '100%', objectFit: 'cover', display: 'block' },

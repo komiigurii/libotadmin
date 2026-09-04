@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { reportAPI, commentAPI } from '../api/api';
-import { theme as t } from '../theme';
+import { theme as t, radius, shadow } from '../theme';
 
 const STATUS_PILL = {
   pending:   { background: t.purpleBg,  color: t.purple,  label: 'PENDING' },
@@ -68,7 +68,7 @@ export default function ReportedComments() {
       </div>
 
       <div style={s.filterRow}>
-        <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} style={s.filterSelect}>
+        <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} style={s.filterSelect} className="modern-input">
           <option value="">All ({reports.length})</option>
           <option value="pending">Pending ({pendingCount})</option>
           <option value="resolved">Resolved</option>
@@ -161,7 +161,7 @@ function ReportRow({ report, expanded, acting, setActing, onToggle, onUpdated })
   };
 
   return (
-    <div style={s.card}>
+    <div style={s.card} className="modern-card">
       <div style={s.cardTop} onClick={onToggle}>
         <div style={s.avatar}>{initialsOf(commentUserName)}</div>
 
@@ -203,6 +203,7 @@ function ReportRow({ report, expanded, acting, setActing, onToggle, onUpdated })
             onChange={e => setAdminNote(e.target.value)}
             placeholder="Internal note about this report…"
             style={s.textarea}
+            className="modern-input"
             rows={2}
           />
 
@@ -217,15 +218,15 @@ function ReportRow({ report, expanded, acting, setActing, onToggle, onUpdated })
           <div style={s.actions}>
             {isPending && (
               <>
-                <button disabled={acting || !report.reportedClerkUserId} onClick={agree} style={{ ...s.btn, ...s.btnAgree, opacity: (acting || !report.reportedClerkUserId) ? 0.6 : 1 }}>
+                <button disabled={acting || !report.reportedClerkUserId} onClick={agree} style={{ ...s.btn, ...s.btnAgree, opacity: (acting || !report.reportedClerkUserId) ? 0.6 : 1 }} className="modern-btn">
                   ✓ Agree
                 </button>
-                <button disabled={acting} onClick={disagree} style={{ ...s.btn, ...s.btnDisagree, opacity: acting ? 0.6 : 1 }}>
+                <button disabled={acting} onClick={disagree} style={{ ...s.btn, ...s.btnDisagree, opacity: acting ? 0.6 : 1 }} className="modern-btn">
                   ✕ Disagree
                 </button>
               </>
             )}
-            <button disabled={acting || !review} onClick={deleteComment} style={{ ...s.btn, ...s.btnDelete, opacity: (acting || !review) ? 0.6 : 1 }}>
+            <button disabled={acting || !review} onClick={deleteComment} style={{ ...s.btn, ...s.btnDelete, opacity: (acting || !review) ? 0.6 : 1 }} className="modern-btn">
               🗑 Delete Comment
             </button>
             {!report.banApproved && (
@@ -233,6 +234,7 @@ function ReportRow({ report, expanded, acting, setActing, onToggle, onUpdated })
                 disabled={acting || !report.reportedClerkUserId}
                 onClick={banUser}
                 style={{ ...s.btn, ...s.btnBan, opacity: (acting || !report.reportedClerkUserId) ? 0.6 : 1 }}
+                className="modern-btn"
                 title="Skips the warning ladder — bans the user immediately"
               >
                 🔨 Ban Permanently
@@ -255,7 +257,7 @@ const s = {
   filterRow:    { marginBottom: 18 },
   filterSelect: { padding: '10px 14px', borderRadius: 10, border: `1px solid ${t.border}`, fontSize: 13, color: t.textPrimary, background: t.cardBg, outline: 'none', cursor: 'pointer' },
 
-  card:       { background: t.cardBg, border: `1px solid ${t.border}`, borderRadius: 14, marginBottom: 10, overflow: 'hidden' },
+  card:       { background: t.cardBg, border: `1px solid ${t.border}`, borderRadius: radius.xl, marginBottom: 12, overflow: 'hidden', boxShadow: shadow.sm },
   cardTop:    { display: 'flex', alignItems: 'flex-start', gap: 14, padding: '16px 18px', cursor: 'pointer' },
   avatar:     { width: 38, height: 38, borderRadius: '50%', background: t.brandSoft, color: t.brand, fontWeight: 700, fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   metaRow:    { display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 6 },
