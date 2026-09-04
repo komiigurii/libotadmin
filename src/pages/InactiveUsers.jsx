@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { inactiveUsersAPI, accountActionAPI } from '../api/api';
-import { theme as t } from '../theme';
+import { theme as t, radius, shadow } from '../theme';
 
 const role = () => localStorage.getItem('role');
 
@@ -117,6 +117,7 @@ export default function InactiveUsers() {
                             disabled={acting === u.clerkUserId}
                             onClick={() => { setProposingId(proposingId === u.clerkUserId ? null : u.clerkUserId); setProposeReason(''); }}
                             style={{ ...s.btnPropose, opacity: acting === u.clerkUserId ? 0.6 : 1 }}
+                            className="modern-btn"
                           >
                             ⏸ Propose Suspension
                           </button>
@@ -125,6 +126,7 @@ export default function InactiveUsers() {
                             disabled={acting === u.clerkUserId}
                             onClick={() => archive(u.clerkUserId)}
                             style={{ ...s.btnArchive, opacity: acting === u.clerkUserId ? 0.6 : 1 }}
+                            className="modern-btn"
                           >
                             🗂 Approve Archival
                           </button>
@@ -139,6 +141,7 @@ export default function InactiveUsers() {
                             onChange={e => setProposeReason(e.target.value)}
                             placeholder={`Why should ${u.name} be temporarily suspended?`}
                             style={s.textarea}
+                            className="modern-input"
                             rows={2}
                           />
                           <div style={s.proposeActions}>
@@ -146,10 +149,11 @@ export default function InactiveUsers() {
                               disabled={acting === u.clerkUserId}
                               onClick={() => submitProposal(u.clerkUserId)}
                               style={{ ...s.btn, ...s.btnPrimary, opacity: acting === u.clerkUserId ? 0.6 : 1 }}
+                              className="modern-btn"
                             >
                               Send to admin
                             </button>
-                            <button onClick={() => setProposingId(null)} style={{ ...s.btn, ...s.btnCancel }}>
+                            <button onClick={() => setProposingId(null)} style={{ ...s.btn, ...s.btnCancel }} className="modern-btn">
                               Cancel
                             </button>
                           </div>
@@ -174,7 +178,7 @@ const s = {
   pageSub:    { fontSize: 13, color: t.textSecondary },
   alertBadge: { padding: '7px 14px', background: t.warningBg, color: t.warning, borderRadius: 8, fontSize: 12, fontWeight: 700 },
 
-  card:       { background: t.cardBg, border: `1px solid ${t.border}`, borderRadius: 14, overflow: 'hidden' },
+  card:       { background: t.cardBg, border: `1px solid ${t.border}`, borderRadius: radius.xl, overflow: 'hidden', boxShadow: shadow.sm },
   tblWrap:    { overflowX: 'auto' },
   table:      { width: '100%', borderCollapse: 'collapse' },
   th:         { padding: '11px 16px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: t.textMuted, textTransform: 'uppercase', letterSpacing: '.06em', borderBottom: `1px solid ${t.border}` },

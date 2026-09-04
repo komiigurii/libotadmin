@@ -11,8 +11,8 @@ html, body, #root {
 
 body {
   font-family: 'DM Sans', system-ui, -apple-system, sans-serif;
-  background: #faf5f4;
-  color: #2d1f1e;
+  background: #0E1C1E;
+  color: #EAF6F7;
   font-size: 14px;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
@@ -21,28 +21,79 @@ body {
 /* ── Scrollbar ── */
 ::-webkit-scrollbar       { width: 5px; height: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #e8d0ce; border-radius: 10px; }
-::-webkit-scrollbar-thumb:hover { background: #c4a49f; }
+::-webkit-scrollbar-thumb { background: #2A4443; border-radius: 10px; }
+::-webkit-scrollbar-thumb:hover { background: #3C5F5E; }
 
 /* ── Focus ring ── */
 *:focus-visible {
-  outline: 2px solid #6b4b45;
+  outline: 2px solid #4FD0DC;
   outline-offset: 2px;
 }
 
 /* ── Table hover row ── */
+tbody td {
+  transition: background 0.12s ease;
+}
 tbody tr:hover td {
-  background: #fdf8f7;
+  background: #1D3538;
 }
 
 /* ── Nav link hover (can't do :hover in inline styles) ── */
 .nav-link-btn:hover {
-  background: rgba(107, 75, 69, 0.25) !important;
-  color: rgba(255,255,255,0.85) !important;
+  background: rgba(79, 208, 220, 0.14) !important;
+  color: #EAF6F7 !important;
 }
 
 .logout-btn:hover {
   border-color: rgba(255,255,255,0.25) !important;
   color: rgba(255,255,255,0.75) !important;
   background: rgba(255,255,255,0.06) !important;
+}
+
+/* ── Modern interactive utilities ──────────────────────────────
+   Inline style objects (used everywhere in this app) can't express
+   :hover/:focus/animation — these classes layer that on top without
+   having to rewrite every page's styles into CSS modules. */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.modern-card {
+  animation: fadeInUp 0.25s ease both;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+}
+.modern-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 14px 32px rgba(0,0,0,0.36);
+  border-color: #3C5F5E;
+}
+
+.modern-btn {
+  transition: filter 0.15s ease, transform 0.1s ease, box-shadow 0.15s ease;
+}
+.modern-btn:hover:not(:disabled) {
+  filter: brightness(1.14);
+  transform: translateY(-1px);
+}
+.modern-btn:active:not(:disabled) {
+  transform: translateY(0);
+  filter: brightness(0.92);
+}
+
+.modern-input {
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.modern-input:focus {
+  border-color: #4FD0DC !important;
+  box-shadow: 0 0 0 3px rgba(79,208,220,0.18);
+}
+
+/* For div-based list rows (not <table> — those already get the
+   `tbody tr:hover td` rule above) */
+.modern-row {
+  transition: background 0.12s ease;
+}
+.modern-row:hover {
+  background: #1D3538;
 }
