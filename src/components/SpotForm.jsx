@@ -513,10 +513,19 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
   const [missionLng, setMissionLng]     = useState('');
   const [locationName, setLocationName] = useState(''); // the restaurant's name
   const [missionImage, setMissionImage] = useState(''); // photo of the restaurant
+  const [locationInfo, setLocationInfo] = useState(''); // info about the restaurant (specialty, hours, etc.), shown below the photo
   const [radiusMeters, setRadiusMeters] = useState(60);
   const [savingMission, setSavingMission] = useState(false);
   const [missionError, setMissionError]   = useState('');
   const [creatingMissions, setCreatingMissions] = useState(false);
+
+  // Snapshot of the mission fields as last loaded/saved, so the unified
+  // submit button below only proposes a mission-location change when one of
+  // these actually changed — editing just the spot's name shouldn't also
+  // silently re-submit an identical mission proposal.
+  const missionSnapshotRef = useRef(null);
+  const snapshotMission = (lat, lng, name, image, info, radius) =>
+    JSON.stringify({ lat, lng, name, image, info, radius });
 
   useEffect(() => {
     if (!initial?._id) { setLoadingMission(false); return; }
@@ -527,11 +536,19 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
         const mission = (missions || []).find((m) => m.order === 2);
         setLocationMission(mission || null);
         if (mission) {
-          setMissionLat(mission.coordinates?.lat ?? '');
-          setMissionLng(mission.coordinates?.lng ?? '');
-          setLocationName(mission.locationName || '');
-          setMissionImage(mission.image || '');
-          setRadiusMeters(mission.radiusMeters || 60);
+          const lat = mission.coordinates?.lat ?? '';
+          const lng = mission.coordinates?.lng ?? '';
+          const name = mission.locationName || '';
+          const image = mission.image || '';
+          const info = mission.locationInfo || '';
+          const radius = mission.radiusMeters || 60;
+          setMissionLat(lat);
+          setMissionLng(lng);
+          setLocationName(name);
+          setMissionImage(image);
+          setLocationInfo(info);
+          setRadiusMeters(radius);
+          missionSnapshotRef.current = snapshotMission(lat, lng, name, image, info, radius);
         }
       })
       .catch(() => { if (!cancelled) setLocationMission(null); })
@@ -554,11 +571,19 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
       const mission = (missions || []).find((m) => m.order === 2);
       setLocationMission(mission || null);
       if (mission) {
-        setMissionLat(mission.coordinates?.lat ?? '');
-        setMissionLng(mission.coordinates?.lng ?? '');
-        setLocationName(mission.locationName || '');
-        setMissionImage(mission.image || '');
-        setRadiusMeters(mission.radiusMeters || 60);
+        const lat = mission.coordinates?.lat ?? '';
+        const lng = mission.coordinates?.lng ?? '';
+        const name = mission.locationName || '';
+        const image = mission.image || '';
+        const info = mission.locationInfo || '';
+        const radius = mission.radiusMeters || 60;
+        setMissionLat(lat);
+        setMissionLng(lng);
+        setLocationName(name);
+        setMissionImage(image);
+        setLocationInfo(info);
+        setRadiusMeters(radius);
+        missionSnapshotRef.current = snapshotMission(lat, lng, name, image, info, radius);
       }
     } catch (err) {
       setMissionError(err?.response?.data?.message || err.message || 'Failed to create missions.');
@@ -566,8 +591,19 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
     setCreatingMissions(false);
   };
 
-  const handleSaveMissionLocation = async () => {
-    if (!locationMission) return;
+  // Proposes the mission-location change, if anything about it actually
+  // changed since it was loaded. Called from the single Save/Submit button
+  // below — not its own separate button — so one click submits both the
+  // spot's edits and the food-mission location together.
+  // Returns true if it's safe to proceed with the spot save (nothing to
+  // submit, or it succeeded) — false means it failed, in which case the
+  // caller stops and keeps the form open so the error stays visible instead
+  // of the modal closing out from under it.
+  const maybeSubmitMissionLocation = async () => {
+    if (!locationMission) return true;
+    const currentSnapshot = snapshotMission(missionLat, missionLng, locationName, missionImage, locationInfo, radiusMeters);
+    if (currentSnapshot === missionSnapshotRef.current) return true; // nothing mission-related changed
+
     setSavingMission(true);
     setMissionError('');
     try {
@@ -576,14 +612,18 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
         lng: missionLng === '' ? null : Number(missionLng),
         locationName: locationName.trim(),
         image: missionImage,
+        locationInfo: locationInfo.trim(),
         radiusMeters: Number(radiusMeters) || 60,
       });
       setLocationMission(data.mission);
-      alert('Food mission location submitted for admin review.');
+      missionSnapshotRef.current = currentSnapshot;
+      setSavingMission(false);
+      return true;
     } catch (err) {
-      setMissionError(err?.response?.data?.message || err.message || 'Failed to submit location.');
+      setMissionError(err?.response?.data?.message || err.message || 'Failed to submit food mission location.');
+      setSavingMission(false);
+      return false;
     }
-    setSavingMission(false);
   };
 
   // Snapshot of the form's starting values, used to detect unsaved changes on Cancel
@@ -628,7 +668,7 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
     onCancel();
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
   if (!form.name.trim()) {
     return alert('Name is required');
   }
@@ -677,6 +717,13 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
         lng: Number(model.lng),
       })),
   };
+
+  // One submit button covers both: the food-mission location proposal (if
+  // it changed) goes out alongside the spot's own save/proposal, instead of
+  // needing a separate click. If it fails, stop here — don't let the spot
+  // save succeed and close the form out from under a visible error.
+  const missionOk = await maybeSubmitMissionLocation();
+  if (!missionOk) return;
   onSave(payload);
 };
 
@@ -701,7 +748,7 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
               ? (isModerator ? 'Propose Edit' : 'Edit Spot')
               : 'Add New Spot'}
           </h2>
-          <button onClick={handleCancelClick} style={styles.closeBtn} className="modern-btn" disabled={saving}>✕</button>
+          <button onClick={handleCancelClick} style={styles.closeBtn} className="modern-btn" disabled={saving || savingMission}>✕</button>
         </div>
 
         <div style={styles.body}>
@@ -905,8 +952,9 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
               <p style={styles.hint}>
                 This spot's 2nd mission — the user must physically be within range of this pin to
                 complete it. Switch the map above to "Food mission" mode to place or move it.
-                Submitting here proposes the change for admin review — same as spot edits — it
-                only goes live once approved.
+                Changes here go out together with the spot's own edits when you press{' '}
+                {isModerator ? '"Submit for review"' : '"Save changes"'} below — proposed for
+                admin review, same as spot edits, only going live once approved.
               </p>
 
               {missionError && <p style={styles.warningText}>⚠️ {missionError}</p>}
@@ -952,15 +1000,17 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
                 </div>
               </div>
 
-              <button
-                type="button"
-                onClick={handleSaveMissionLocation}
-                disabled={savingMission}
-                style={{ ...styles.saveMissionBtn, opacity: savingMission ? 0.7 : 1 }}
-                className="modern-btn"
-              >
-                {savingMission ? 'Submitting…' : '📤 Submit Food Mission Location for Review'}
-              </button>
+              <div style={styles.field}>
+                <label style={styles.label}>Restaurant info</label>
+                <textarea
+                  value={locationInfo}
+                  onChange={(e) => setLocationInfo(e.target.value)}
+                  style={styles.textarea} className="modern-input"
+                  rows={3}
+                  placeholder="e.g. Famous for their sisig and halo-halo. Open 10am–9pm, cash only."
+                />
+                <p style={styles.hint}>Shown to the user below the restaurant photo.</p>
+              </div>
             </section>
           )}
 
@@ -969,9 +1019,9 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
         <div style={styles.footer}>
           <span style={styles.requiredNote}>* Required fields</span>
           <div style={styles.footerRight}>
-            <button onClick={handleCancelClick} style={styles.cancelBtn} className="modern-btn" disabled={saving}>Cancel</button>
-            <button onClick={handleSave} style={{ ...styles.saveBtn, opacity: saving ? 0.7 : 1 }} className="modern-btn" disabled={saving}>
-              {saving
+            <button onClick={handleCancelClick} style={styles.cancelBtn} className="modern-btn" disabled={saving || savingMission}>Cancel</button>
+            <button onClick={handleSave} style={{ ...styles.saveBtn, opacity: (saving || savingMission) ? 0.7 : 1 }} className="modern-btn" disabled={saving || savingMission}>
+              {saving || savingMission
                 ? 'Saving…'
                 : initial
                   ? (isModerator ? 'Submit for review' : 'Save changes')
