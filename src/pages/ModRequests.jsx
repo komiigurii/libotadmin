@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { spotAPI, accountActionAPI, missionAPI } from '../api/api';
+import { notify } from '../components/AppAlert';
 import { theme as t, radius, shadow } from '../theme';
 
 const STATUS_PILL = {
@@ -263,10 +264,10 @@ export default function ModRequests() {
     try {
       const data = await spotAPI.reviewProposal(id, action);
       if (data?.success !== false) await load();
-      else alert('Failed: ' + (data?.message || 'Unknown error'));
+      else notify('Failed: ' + (data?.message || 'Unknown error'), { tone: 'danger' });
     } catch (err) {
       console.error(err);
-      alert('Network error');
+      notify('Network error', { tone: 'danger' });
     }
     setActing(null);
   };
@@ -277,10 +278,10 @@ export default function ModRequests() {
     try {
       const data = await spotAPI.reviewChange(id, action);
       if (data?.success !== false) await load();
-      else alert('Failed: ' + (data?.message || 'Unknown error'));
+      else notify('Failed: ' + (data?.message || 'Unknown error'), { tone: 'danger' });
     } catch (err) {
       console.error(err);
-      alert('Network error');
+      notify('Network error', { tone: 'danger' });
     }
     setActing(null);
   };
@@ -290,8 +291,8 @@ export default function ModRequests() {
     try {
       const data = await accountActionAPI.decide(id, decision);
       if (data?.success !== false) load();
-      else alert('Failed: ' + (data?.message || 'Unknown error'));
-    } catch { alert('Network error'); }
+      else notify('Failed: ' + (data?.message || 'Unknown error'), { tone: 'danger' });
+    } catch { notify('Network error', { tone: 'danger' }); }
     setActing(null);
   };
 
@@ -301,10 +302,10 @@ export default function ModRequests() {
     try {
       const data = await missionAPI.reviewLocation(id, action);
       if (data?.success !== false) await load();
-      else alert('Failed: ' + (data?.message || 'Unknown error'));
+      else notify('Failed: ' + (data?.message || 'Unknown error'), { tone: 'danger' });
     } catch (err) {
       console.error(err);
-      alert('Network error');
+      notify('Network error', { tone: 'danger' });
     }
     setActing(null);
   };

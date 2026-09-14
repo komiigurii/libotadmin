@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { commentAPI, bannedAccountsAPI } from '../api/api';
+import { notify, confirmAction } from '../components/AppAlert';
 import { theme as t, radius, shadow } from '../theme';
 
 const role = () => localStorage.getItem('role');
@@ -126,57 +127,63 @@ function CommentRow({ comment, isModerator, expanded, onToggle, onUpdated }) {
     || (comment.userId && typeof comment.userId === 'object' ? comment.userId.clerkUserId : null);
 
   const requestReview = async () => {
-    if (!reason.trim()) { alert('Add a short reason for admin'); return; }
+    if (!reason.trim()) { notify('Add a short reason for admin'); return; }
     setSaving(true);
     try {
       const data = await commentAPI.requestReview(comment._id, reason.trim(), proposedAction || null);
       if (data?.success !== false) onUpdated();
-      else alert('Failed: ' + (data?.message || 'Unknown error'));
-    } catch { alert('Network error'); }
+      else notify('Failed: ' + (data?.message || 'Unknown error'), { tone: 'danger' });
+    } catch { notify('Network error', { tone: 'danger' }); }
     setSaving(false);
   };
 
   const remove = async () => {
-    if (!confirm('Delete this comment permanently?')) return;
+    if (!(await confirmAction('Delete this comment permanently?', { danger: true, confirmText: 'Delete' }))) return;
     setSaving(true);
     try {
       const data = await commentAPI.delete(comment._id);
       if (data?.success !== false) onUpdated();
-      else alert('Failed: ' + (data?.message || 'Unknown error'));
-    } catch { alert('Network error'); }
+      else notify('Failed: ' + (data?.message || 'Unknown error'), { tone: 'danger' });
+    } catch { notify('Network error', { tone: 'danger' }); }
     setSaving(false);
   };
 
   // Suspend applies whatever the *next* escalation step is (7d → 14d →
   // auto-ban on the 3rd) — the backend decides the duration, not the admin.
   const suspendUser = async () => {
-    if (!banReason.trim()) { alert('Add a reason for suspending this user'); return; }
-    if (!clerkUserId) { alert('Could not identify this user (missing clerkUserId).'); return; }
-    if (!confirm(`Suspend ${userName}? This applies the next escalation step automatically (1st = 7 days, 2nd = 14 days, 3rd = permanent ban).`)) return;
+    if (!banReason.trim()) { notify('Add a reason for suspending this user'); return; }
+    if (!clerkUserId) { notify('Could not identify this user (missing clerkUserId).', { tone: 'danger' }); return; }
+    if (!(await confirmAction(
+      `Suspend ${userName}? This applies the next escalation step automatically (1st = 7 days, 2nd = 14 days, 3rd = permanent ban).`,
+      { danger: true, confirmText: 'Suspend' }
+    ))) return;
 
     setSaving(true);
     try {
       const data = await bannedAccountsAPI.suspend(clerkUserId, banReason.trim());
       if (data?.success !== false) onUpdated();
-      else alert('Failed: ' + (data?.message || 'Unknown error'));
+      else notify('Failed: ' + (data?.message || 'Unknown error'), { tone: 'danger' });
     } catch (err) {
-      alert(err?.response?.data?.message || 'Network error');
+      notify(err?.response?.data?.message || 'Network error', { tone: 'danger' });
     }
     setSaving(false);
   };
 
   const banUser = async () => {
-    if (!banReason.trim()) { alert('Add a reason for banning this user'); return; }
-    if (!clerkUserId) { alert('Could not identify this user (missing clerkUserId).'); return; }
-    if (!confirm(`Permanently ban ${userName}? This archives their account for 30 days before permanent deletion, with a chance to appeal.`)) return;
+    if (!banReason.trim()) { notify('Add a reason for banning this user'); return; }
+    if (!clerkUserId) { notify('Could not identify this user (missing clerkUserId).', { tone: 'danger' }); return; }
+    if (!(await confirmAction(
+      `Permanently ban ${userName}? This archives their account for 30 days before permanent deletion, with a chance to appeal.`,
+      { danger: true, confirmText: 'Ban Permanently' }
+    ))) return;
 
     setSaving(true);
     try {
       const data = await bannedAccountsAPI.ban(clerkUserId, banReason.trim());
       if (data?.success !== false) onUpdated();
-      else alert('Failed: ' + (data?.message || 'Unknown error'));
+      else notify('Failed: ' + (data?.message || 'Unknown error'), { tone: 'danger' });
     } catch (err) {
-      alert(err?.response?.data?.message || 'Network error');
+      notify(err?.response?.data?.message || 'Network error', { tone: 'danger' });
     }
     setSaving(false);
   };

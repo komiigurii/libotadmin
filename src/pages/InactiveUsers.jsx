@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { inactiveUsersAPI, accountActionAPI } from '../api/api';
+import { notify, confirmAction } from '../components/AppAlert';
 import { theme as t, radius, shadow } from '../theme';
 
 const role = () => localStorage.getItem('role');
@@ -29,31 +30,34 @@ export default function InactiveUsers() {
   const pendingCount = users.filter(u => u.status === 'pending').length;
 
   const archive = async (clerkUserId) => {
-    if (!confirm('Approve archival for this user? They will be permanently deleted after 30 days.')) return;
+    if (!(await confirmAction(
+      'Approve archival for this user? They will be permanently deleted after 30 days.',
+      { danger: true, confirmText: 'Approve Archival' }
+    ))) return;
     setActing(clerkUserId);
     try {
       await inactiveUsersAPI.archive(clerkUserId);
       load();
     } catch {
-      alert('Failed to archive user.');
+      notify('Failed to archive user.', { tone: 'danger' });
     }
     setActing(null);
   };
 
   const submitProposal = async (clerkUserId) => {
-    if (!proposeReason.trim()) { alert('Add a reason for the suspension request'); return; }
+    if (!proposeReason.trim()) { notify('Add a reason for the suspension request'); return; }
     setActing(clerkUserId);
     try {
       const data = await accountActionAPI.propose(clerkUserId, proposeReason.trim());
       if (data?.success !== false) {
         setProposingId(null);
         setProposeReason('');
-        alert('Suspension request sent to admin for approval.');
+        notify('Suspension request sent to admin for approval.', { tone: 'success' });
       } else {
-        alert('Failed: ' + (data?.message || 'Unknown error'));
+        notify('Failed: ' + (data?.message || 'Unknown error'), { tone: 'danger' });
       }
     } catch (err) {
-      alert(err?.response?.data?.message || 'Network error');
+      notify(err?.response?.data?.message || 'Network error', { tone: 'danger' });
     }
     setActing(null);
   };
