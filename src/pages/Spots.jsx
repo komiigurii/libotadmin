@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { spotAPI } from '../api/api';
 import SpotForm from '../components/SpotForm';
+import { notify } from '../components/AppAlert';
 import { theme as t, radius, shadow } from '../theme';
 
 const role = () => localStorage.getItem('role');
@@ -61,10 +62,10 @@ export default function Spots() {
     try {
       if (editing) {
         await spotAPI.proposeChange(editing._id, formData);
-        alert('Changes submitted for admin approval.');
+        notify('Changes submitted for admin approval.', { tone: 'success' });
       } else {
         await spotAPI.proposeCreate(formData);
-        alert('New spot submitted for admin approval.');
+        notify('New spot submitted for admin approval.', { tone: 'success' });
       }
 
       setShowForm(false);
@@ -78,7 +79,7 @@ export default function Spots() {
         'Something went wrong';
 
       setError(msg);
-      alert('Error: ' + msg);
+      notify('Error: ' + msg, { tone: 'danger' });
 
     } finally {
       setSaving(false);

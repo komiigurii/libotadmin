@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { reportAPI, commentAPI } from '../api/api';
+import { notify, confirmAction } from '../components/AppAlert';
 import { theme as t, radius, shadow } from '../theme';
 
 const STATUS_PILL = {
@@ -116,30 +117,33 @@ function ReportRow({ report, expanded, acting, setActing, onToggle, onUpdated })
     try {
       const data = await reportAPI.update(report._id, { decision, adminNote });
       if (data?.success !== false) onUpdated();
-      else alert('Failed: ' + (data?.message || 'Unknown error'));
+      else notify('Failed: ' + (data?.message || 'Unknown error'), { tone: 'danger' });
     } catch (err) {
-      alert(err?.response?.data?.message || 'Network error');
+      notify(err?.response?.data?.message || 'Network error', { tone: 'danger' });
     }
     setActing(null);
   };
 
   const agree = async () => {
-    if (!report.reportedClerkUserId) { alert('No reported user on this report.'); return; }
-    if (!confirm(`Agree with this report? This applies the next warning/suspension step for ${commentUserName} automatically.`)) return;
+    if (!report.reportedClerkUserId) { notify('No reported user on this report.', { tone: 'danger' }); return; }
+    if (!(await confirmAction(
+      `Agree with this report? This applies the next warning/suspension step for ${commentUserName} automatically.`,
+      { danger: true, confirmText: 'Agree' }
+    ))) return;
     await decide('agree');
   };
 
   const disagree = () => decide('disagree');
 
   const deleteComment = async () => {
-    if (!review?._id) { alert('This comment no longer exists.'); return; }
-    if (!confirm('Delete this comment permanently?')) return;
+    if (!review?._id) { notify('This comment no longer exists.', { tone: 'danger' }); return; }
+    if (!(await confirmAction('Delete this comment permanently?', { danger: true, confirmText: 'Delete' }))) return;
     setActing(report._id);
     try {
       const data = await commentAPI.delete(review._id);
-      if (data?.success === false) alert('Failed: ' + (data?.message || 'Unknown error'));
+      if (data?.success === false) notify('Failed: ' + (data?.message || 'Unknown error'), { tone: 'danger' });
       else onUpdated();
-    } catch { alert('Network error'); }
+    } catch { notify('Network error', { tone: 'danger' }); }
     setActing(null);
   };
 
@@ -147,15 +151,18 @@ function ReportRow({ report, expanded, acting, setActing, onToggle, onUpdated })
   // immediately. Separate from "Agree" (which only ever issues the next
   // warning/suspension step).
   const banUser = async () => {
-    if (!report.reportedClerkUserId) { alert('No reported user on this report.'); return; }
-    if (!confirm(`Permanently ban ${commentUserName}? This is immediate — it does not go through the usual warning/suspension steps.`)) return;
+    if (!report.reportedClerkUserId) { notify('No reported user on this report.', { tone: 'danger' }); return; }
+    if (!(await confirmAction(
+      `Permanently ban ${commentUserName}? This is immediate — it does not go through the usual warning/suspension steps.`,
+      { danger: true, confirmText: 'Ban Permanently' }
+    ))) return;
     setActing(report._id);
     try {
       const data = await reportAPI.ban(report._id, adminNote);
-      if (data?.success === false) alert('Failed: ' + (data?.message || 'Unknown error'));
+      if (data?.success === false) notify('Failed: ' + (data?.message || 'Unknown error'), { tone: 'danger' });
       else onUpdated();
     } catch (err) {
-      alert(err?.response?.data?.message || 'Network error');
+      notify(err?.response?.data?.message || 'Network error', { tone: 'danger' });
     }
     setActing(null);
   };

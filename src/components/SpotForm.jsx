@@ -3,6 +3,7 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { theme as t, radius, shadow } from '../theme';
 import { uploadAPI, missionAPI } from '../api/api';
+import { notify, confirmAction } from './AppAlert';
 
 // Fix default marker icons breaking under Vite/webpack bundling
 import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
@@ -536,12 +537,18 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
         const mission = (missions || []).find((m) => m.order === 2);
         setLocationMission(mission || null);
         if (mission) {
-          const lat = mission.coordinates?.lat ?? '';
-          const lng = mission.coordinates?.lng ?? '';
-          const name = mission.locationName || '';
-          const image = mission.image || '';
-          const info = mission.locationInfo || '';
-          const radius = mission.radiusMeters || 60;
+          // If a proposal is already pending, load THAT instead of the
+          // (stale) live values — otherwise reopening this form shows blank
+          // fields even though something was already submitted, and saving
+          // again from there would silently overwrite the pending proposal
+          // with the reset/blank values instead of what was actually meant.
+          const pc = mission.pendingChange;
+          const lat = (pc ? pc.coordinates?.lat : mission.coordinates?.lat) ?? '';
+          const lng = (pc ? pc.coordinates?.lng : mission.coordinates?.lng) ?? '';
+          const name = (pc ? pc.locationName : mission.locationName) || '';
+          const image = (pc ? pc.image : mission.image) || '';
+          const info = (pc ? pc.locationInfo : mission.locationInfo) || '';
+          const radius = (pc ? pc.radiusMeters : mission.radiusMeters) || 60;
           setMissionLat(lat);
           setMissionLng(lng);
           setLocationName(name);
@@ -594,15 +601,20 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
   // Proposes the mission-location change, if anything about it actually
   // changed since it was loaded. Called from the single Save/Submit button
   // below — not its own separate button — so one click submits both the
-  // spot's edits and the food-mission location together.
-  // Returns true if it's safe to proceed with the spot save (nothing to
-  // submit, or it succeeded) — false means it failed, in which case the
-  // caller stops and keeps the form open so the error stays visible instead
-  // of the modal closing out from under it.
+  // spot's edits and the food-mission location together, but only the ones
+  // that actually changed: a spot's own fields (Spot.pendingChange) and a
+  // mission's location (Mission.pendingChange) are two different documents
+  // on the backend, each producing their own mod-request item, so
+  // submitting one that didn't change would create a spurious extra
+  // request for the admin to review.
+  // Returns 'skipped' (nothing mission-related changed, or there's no
+  // mission at all), 'ok' (proposed successfully), or 'failed' (caller
+  // should stop and keep the form open so the error stays visible instead
+  // of the modal closing out from under it).
   const maybeSubmitMissionLocation = async () => {
-    if (!locationMission) return true;
+    if (!locationMission) return 'skipped';
     const currentSnapshot = snapshotMission(missionLat, missionLng, locationName, missionImage, locationInfo, radiusMeters);
-    if (currentSnapshot === missionSnapshotRef.current) return true; // nothing mission-related changed
+    if (currentSnapshot === missionSnapshotRef.current) return 'skipped';
 
     setSavingMission(true);
     setMissionError('');
@@ -618,11 +630,11 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
       setLocationMission(data.mission);
       missionSnapshotRef.current = currentSnapshot;
       setSavingMission(false);
-      return true;
+      return 'ok';
     } catch (err) {
       setMissionError(err?.response?.data?.message || err.message || 'Failed to submit food mission location.');
       setSavingMission(false);
-      return false;
+      return 'failed';
     }
   };
 
@@ -660,32 +672,32 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
 
   const removeArModel = (id) => setArModels(prev => prev.filter(m => m.id !== id));
 
-  const handleCancelClick = () => {
+  const handleCancelClick = async () => {
     const currentSnapshot = JSON.stringify({ form, arModels });
     if (currentSnapshot !== initialSnapshotRef.current) {
-      if (!window.confirm('You have unsaved changes. Discard them and close this form?')) return;
+      if (!(await confirmAction('You have unsaved changes. Discard them and close this form?', { danger: true, confirmText: 'Discard' }))) return;
     }
     onCancel();
   };
 
   const handleSave = async () => {
   if (!form.name.trim()) {
-    return alert('Name is required');
+    return notify('Name is required');
   }
   if (!form.category.length) {
-    return alert('Select at least one category');
+    return notify('Select at least one category');
   }
   if (!form.city.trim()) {
-    return alert('City is required');
+    return notify('City is required');
   }
   if (!form.image) {
-    return alert('Image is required');
+    return notify('Image is required');
   }
   if (
     form.coordinates_lat === '' ||
     form.coordinates_lng === ''
   ) {
-    return alert('Spot location is required');
+    return notify('Spot location is required');
   }
 
   const payload = {
@@ -722,9 +734,25 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
   // it changed) goes out alongside the spot's own save/proposal, instead of
   // needing a separate click. If it fails, stop here — don't let the spot
   // save succeed and close the form out from under a visible error.
-  const missionOk = await maybeSubmitMissionLocation();
-  if (!missionOk) return;
-  onSave(payload);
+  const missionResult = await maybeSubmitMissionLocation();
+  if (missionResult === 'failed') return;
+
+  // Only actually submit the spot itself if something about it changed (or
+  // it's a brand-new spot, which must always go through) — otherwise a
+  // mission-only edit would also create a spurious, unchanged spot-edit
+  // request alongside the real mission-location one.
+  const spotChanged = JSON.stringify({ form, arModels }) !== initialSnapshotRef.current;
+  if (!initial || spotChanged) {
+    onSave(payload);
+    return;
+  }
+
+  if (missionResult === 'ok') {
+    notify('Food mission location submitted for admin review.', { tone: 'success' });
+    onCancel();
+  } else {
+    notify('No changes to submit.');
+  }
 };
 
   const mapHint =

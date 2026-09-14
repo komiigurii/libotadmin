@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { bannedAccountsAPI, appealAPI } from '../api/api';
+import { notify, confirmAction } from '../components/AppAlert';
 import { theme as t, radius, shadow } from '../theme';
 
 function formatRemaining(expiresAt) {
@@ -40,28 +41,29 @@ export default function BannedAccounts() {
   useEffect(() => { load(); }, []);
 
   const handleUnban = async (clerkUserId) => {
-    if (!confirm('Unban this account?')) return;
+    if (!(await confirmAction('Unban this account?', { confirmText: 'Unban' }))) return;
     setBusyId(clerkUserId);
     try {
       await bannedAccountsAPI.unban(clerkUserId);
       setUsers(prev => prev.filter(u => u.clerkUserId !== clerkUserId));
     } catch (err) {
-      alert('Failed to unban: ' + (err.message || 'Unknown error'));
+      notify('Failed to unban: ' + (err.message || 'Unknown error'), { tone: 'danger' });
     }
     setBusyId(null);
   };
 
   const handleAppealDecision = async (clerkUserId, decision) => {
     const verb = decision === 'approved' ? 'approve' : 'reject';
-    if (!confirm(`${verb === 'approve' ? 'Approve' : 'Reject'} this appeal?` +
-      (decision === 'approved' ? ' This unbans the account.' : ' The account stays banned.'))) return;
+    const question = `${verb === 'approve' ? 'Approve' : 'Reject'} this appeal?` +
+      (decision === 'approved' ? ' This unbans the account.' : ' The account stays banned.');
+    if (!(await confirmAction(question, { danger: verb === 'reject', confirmText: verb === 'approve' ? 'Approve' : 'Reject' }))) return;
     setBusyId(clerkUserId);
     try {
       await appealAPI.decide(clerkUserId, decision);
       setExpandedId(null);
       await load();
     } catch (err) {
-      alert(`Failed to ${verb} appeal: ` + (err?.response?.data?.message || err.message || 'Unknown error'));
+      notify(`Failed to ${verb} appeal: ` + (err?.response?.data?.message || err.message || 'Unknown error'), { tone: 'danger' });
     }
     setBusyId(null);
   };
