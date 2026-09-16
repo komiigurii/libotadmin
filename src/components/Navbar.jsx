@@ -1,5 +1,5 @@
 import { useNavigate, useLocation } from 'react-router-dom';
-import { theme as t } from '../theme';
+import { theme as t, radius, shadow } from '../theme';
 import logo from '../assets/logo.png';
 
 export default function Navbar() {
@@ -27,7 +27,7 @@ export default function Navbar() {
         { label: 'All Comments',                      path: '/comments' },
         { label: 'Reported Comments',                 path: '/reported-comments' },
         { label: 'Banned Accounts',                   path: '/banned-accounts' },
-        { label: 'Inactive Users',                    path: '/inactive-users' }
+        { label: 'Inactive Users',                    path: '/inactive-users' },
       ];
 
   const home = isModerator ? '/my-review-requests' : '/comments';
@@ -95,6 +95,7 @@ const s = {
   sidebar: {
     display: 'flex', flexDirection: 'column', width: 240, minWidth: 240, height: '100vh',
     background: t.sidebarBg, borderRight: `1px solid ${t.divider}`, position: 'sticky', top: 0, flexShrink: 0,
+    boxShadow: shadow.sm,
   },
   brand: { display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', padding: '20px 20px 18px' },
   logo: {
@@ -102,13 +103,14 @@ const s = {
   height: 42,
   objectFit: 'contain',
   flexShrink: 0,
+  borderRadius: radius.md,
 },
   brandName:  { color: t.textPrimary, fontWeight: 700, fontSize: 15, lineHeight: 1.2 },
   brandSub:   { color: t.textMuted, fontSize: 10, fontWeight: 500, letterSpacing: '0.08em', textTransform: 'uppercase' },
 
   roleSection: { padding: '4px 20px 16px', borderBottom: `1px solid ${t.divider}` },
   roleLabel:   { fontSize: 10, fontWeight: 700, color: t.textMuted, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 },
-  rolePill:    { display: 'inline-block', padding: '5px 14px', borderRadius: 8, fontSize: 12, fontWeight: 700, letterSpacing: '0.03em' },
+  rolePill:    { display: 'inline-block', padding: '5px 14px', borderRadius: radius.pill, fontSize: 12, fontWeight: 700, letterSpacing: '0.03em' },
   rolePillMod:   { background: t.infoBg, color: t.info },
   rolePillAdmin: { background: t.brandSolid, color: '#fff' },
 
@@ -117,7 +119,7 @@ const s = {
   links:      { display: 'flex', flexDirection: 'column', gap: 2 },
   link: {
     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-    textAlign: 'left', padding: '9px 12px', borderRadius: 9, border: 'none',
+    textAlign: 'left', padding: '9px 12px', borderRadius: radius.md, border: 'none',
     borderLeft: '3px solid transparent',
     background: 'transparent', color: t.textSecondary, fontWeight: 500, fontSize: 13.5, cursor: 'pointer',
     transition: 'all 0.15s', width: '100%',
@@ -127,9 +129,9 @@ const s = {
 
   footer: { marginTop: 'auto', padding: '14px 20px 20px', borderTop: `1px solid ${t.divider}` },
   logoutBtn: {
-    padding: '9px 14px', borderRadius: 9,
+    padding: '9px 14px', borderRadius: radius.md,
     border: `1px solid ${t.border}`, background: 'transparent', color: t.textMuted, fontSize: 13,
-    fontWeight: 500, cursor: 'pointer', width: '100%',
+    fontWeight: 500, cursor: 'pointer', width: '100%', transition: 'all 0.15s',
   },
   versionText: { fontSize: 10.5, color: t.textMuted, textAlign: 'center', marginTop: 10 },
 };
