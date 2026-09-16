@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { authAPI } from '../api/api';
-import { theme as t } from '../theme';
+import { theme as t, radius, shadow } from '../theme';
 
 export default function Login() {
   const [email, setEmail]       = useState('');
@@ -57,6 +57,7 @@ export default function Login() {
             onChange={e => setEmail(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && handleLogin()}
             style={styles.input}
+            className="modern-input"
           />
         </div>
 
@@ -69,6 +70,7 @@ export default function Login() {
             onChange={e => setPassword(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && handleLogin()}
             style={styles.input}
+            className="modern-input"
           />
         </div>
 
@@ -76,6 +78,7 @@ export default function Login() {
           onClick={handleLogin}
           disabled={loading}
           style={{ ...styles.btn, opacity: loading ? 0.7 : 1 }}
+          className="modern-btn"
         >
           {loading ? 'Signing in...' : 'Sign In'}
         </button>
@@ -87,9 +90,9 @@ export default function Login() {
 
 const styles = {
   container: { minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: t.bg, padding: 20 },
-  card:      { background: t.cardBg, borderRadius: 20, padding: '40px 44px', width: '100%', maxWidth: 400, boxShadow: '0 4px 32px rgba(0,0,0,0.4)', border: `1px solid ${t.border}` },
+  card:      { background: t.cardBg, borderRadius: radius.xl + 4, padding: '40px 44px', width: '100%', maxWidth: 400, boxShadow: shadow.lg, border: `1px solid ${t.border}` },
   logoWrap:  { display: 'flex', justifyContent: 'center', marginBottom: 20 },
-  logo:      { width: 52, height: 52, borderRadius: 16, background: t.brandSolid, color: '#fff', fontWeight: 700, fontSize: 22, display: 'flex', alignItems: 'center', justifyContent: 'center' },
+  logo:      { width: 52, height: 52, borderRadius: radius.lg, background: t.brandSolid, color: '#fff', fontWeight: 700, fontSize: 22, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: shadow.sm },
   title:     { fontSize: 22, fontWeight: 700, color: t.textPrimary, textAlign: 'center', marginBottom: 6 },
   subtitle:  { fontSize: 14, color: t.textSecondary, textAlign: 'center', marginBottom: 28 },
   error:     { background: t.dangerBg, border: `1px solid ${t.danger}44`, borderRadius: 9, padding: '10px 14px', color: t.danger, fontSize: 13, marginBottom: 16 },

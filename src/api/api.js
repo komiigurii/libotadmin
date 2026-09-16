@@ -28,6 +28,24 @@ export const spotAPI = {
   getMyDeleteRequests: () => api.get('/api/spots/delete-requests/mine').then(r => r.data),
 };
 
+// Missions — currently only used for the 2nd ("location") mission's geofence
+// (a food recommendation near the spot the user must physically visit).
+// GET is public (no auth needed). Setting the location is propose-then-review,
+// same as spot edits: proposeLocation submits it (any admin/moderator can),
+// nothing changes live until an admin approves it via reviewLocation.
+export const missionAPI = {
+  getForSpot: (spotId) => api.get(`/api/missions/${spotId}`).then(r => r.data.missions),
+  proposeLocation: (missionId, { lat, lng, locationName, image, locationInfo, radiusMeters }) =>
+    api.patch(`/api/missions/${missionId}/location`, { lat, lng, locationName, image, locationInfo, radiusMeters }).then(r => r.data),
+  getProposals: () => api.get('/api/missions/proposals').then(r => r.data.proposals),
+  reviewLocation: (missionId, action) =>
+    api.patch(`/api/missions/${missionId}/review`, { action }).then(r => r.data),
+  // Missions are now created automatically when a spot itself is created —
+  // this only matters for older spots that predate that (or where it
+  // failed), so an admin/mod isn't stuck with no way to add them from here.
+  createDefaults: (spotId) => api.post(`/api/missions/spot/${spotId}/create-defaults`).then(r => r.data),
+};
+
 export const commentAPI = {
   getAll: (params = {}) => {
     const query = new URLSearchParams(params).toString();
@@ -45,10 +63,25 @@ export const commentAPI = {
 
 export const bannedAccountsAPI = {
   getAll: () => api.get('/api/admin/banned-users').then(r => r.data.users),
-  ban:    (clerkUserId, reason, durationDays) =>
-    api.patch(`/api/admin/users/${clerkUserId}/ban`, { reason, durationDays }).then(r => r.data),
+  // No custom duration — the backend applies the next escalating step
+  // itself (1st suspension = 7 days, 2nd = 14 days, 3rd auto-escalates to
+  // a permanent ban), so manual and automatic suspensions stay consistent.
+  suspend: (clerkUserId, reason) =>
+    api.patch(`/api/admin/users/${clerkUserId}/suspend`, { reason }).then(r => r.data),
+  ban:    (clerkUserId, reason) =>
+    api.patch(`/api/admin/users/${clerkUserId}/ban`, { reason }).then(r => r.data),
   unban:  (clerkUserId) =>
     api.patch(`/api/admin/users/${clerkUserId}/unban`).then(r => r.data),
+};
+
+// Ban appeals submitted by archived/banned users. The backend route already
+// existed (GET/PATCH /api/admin/appeals) but nothing in this app called it —
+// admins could only see an "Appeal pending" badge with no way to read or
+// act on the appeal itself.
+export const appealAPI = {
+  getAll: (status) => api.get(`/api/admin/appeals${status ? `?status=${status}` : ''}`).then(r => r.data.appeals),
+  decide: (clerkUserId, decision, adminNote) =>
+    api.patch(`/api/admin/appeals/${clerkUserId}`, { decision, adminNote }).then(r => r.data),
 };
 
 export const inactiveUsersAPI = {
@@ -76,6 +109,9 @@ export const reportAPI = {
     return api.get(`/api/reports${query ? '?' + query : ''}`).then(r => r.data.reports);
   },
   update: (id, data) => api.patch(`/api/reports/${id}`, data).then(r => r.data),
+  // Skips the warning ladder — permanently bans the reported user immediately.
+  ban: (id, banReason) =>
+    api.patch(`/api/reports/${id}`, { decision: 'ban', banReason }).then(r => r.data),
 };
 
 export const authAPI = {

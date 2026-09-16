@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { spotAPI, accountActionAPI } from '../api/api';
-import { theme as t } from '../theme';
+import { theme as t, radius, shadow } from '../theme';
 
 const STATUS_PILL = {
   pending:  { background: t.warningBg, color: t.warning, label: 'Pending' },
@@ -223,7 +223,7 @@ export default function MyReviewRequests() {
       </div>
 
       <div style={s.filterRow}>
-        <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} style={s.select}>
+        <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} style={s.select} className="modern-input">
           <option value="">All ({requests.length})</option>
           <option value="pending">Pending ({pendingCount})</option>
           <option value="approved">Approved</option>
@@ -254,7 +254,7 @@ export default function MyReviewRequests() {
               : '—';
 
             return (
-              <div key={key} style={s.card}>
+              <div key={key} style={s.card} className="modern-card">
                 <div style={s.cardImgWrap}>
                   {image
                     ? <img src={image} alt={r.subtitle} style={s.cardImg} />
@@ -322,7 +322,7 @@ export default function MyReviewRequests() {
                       {r.kind === 'spot' ? 'Proposed edit' : 'Proposed action'}
                     </span>
                     {r.kind === 'spot' && (
-                      <button onClick={() => setExpanded(isOpen ? null : key)} style={s.btnView}>
+                      <button onClick={() => setExpanded(isOpen ? null : key)} style={s.btnView} className="modern-btn">
                         {isOpen ? 'Hide Changes' : 'View Changes'}
                       </button>
                     )}
@@ -348,7 +348,7 @@ const s = {
 
   grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 14 },
 
-  card: { background: t.cardBg, border: `1px solid ${t.border}`, borderRadius: 12, overflow: 'hidden', display: 'flex', flexDirection: 'column' },
+  card: { background: t.cardBg, border: `1px solid ${t.border}`, borderRadius: radius.lg, overflow: 'hidden', display: 'flex', flexDirection: 'column', boxShadow: shadow.sm },
 
   cardImgWrap: { position: 'relative', width: '100%', height: 100, background: t.sidebarBg },
   cardImg:     { width: '100%', height: '100%', objectFit: 'cover', display: 'block' },

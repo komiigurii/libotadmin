@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { reportAPI, commentAPI } from '../api/api';
-import { theme as t } from '../theme';
+import { notify, confirmAction } from '../components/AppAlert';
+import { theme as t, radius, shadow } from '../theme';
 
 const STATUS_PILL = {
   pending:   { background: t.purpleBg,  color: t.purple,  label: 'PENDING' },
@@ -68,7 +69,7 @@ export default function ReportedComments() {
       </div>
 
       <div style={s.filterRow}>
-        <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} style={s.filterSelect}>
+        <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} style={s.filterSelect} className="modern-input">
           <option value="">All ({reports.length})</option>
           <option value="pending">Pending ({pendingCount})</option>
           <option value="resolved">Resolved</option>
@@ -116,35 +117,58 @@ function ReportRow({ report, expanded, acting, setActing, onToggle, onUpdated })
     try {
       const data = await reportAPI.update(report._id, { decision, adminNote });
       if (data?.success !== false) onUpdated();
-      else alert('Failed: ' + (data?.message || 'Unknown error'));
+      else notify('Failed: ' + (data?.message || 'Unknown error'), { tone: 'danger' });
     } catch (err) {
-      alert(err?.response?.data?.message || 'Network error');
+      notify(err?.response?.data?.message || 'Network error', { tone: 'danger' });
     }
     setActing(null);
   };
 
   const agree = async () => {
-    if (!report.reportedClerkUserId) { alert('No reported user on this report.'); return; }
-    if (!confirm(`Agree with this report? This applies the next warning/suspension step for ${commentUserName} automatically.`)) return;
+    if (!report.reportedClerkUserId) { notify('No reported user on this report.', { tone: 'danger' }); return; }
+    if (!(await confirmAction(
+      `Agree with this report? This applies the next warning/suspension step for ${commentUserName} automatically.`,
+      { danger: true, confirmText: 'Agree' }
+    ))) return;
     await decide('agree');
   };
 
   const disagree = () => decide('disagree');
 
   const deleteComment = async () => {
-    if (!review?._id) { alert('This comment no longer exists.'); return; }
-    if (!confirm('Delete this comment permanently?')) return;
+    if (!review?._id) { notify('This comment no longer exists.', { tone: 'danger' }); return; }
+    if (!(await confirmAction('Delete this comment permanently?', { danger: true, confirmText: 'Delete' }))) return;
     setActing(report._id);
     try {
       const data = await commentAPI.delete(review._id);
-      if (data?.success === false) alert('Failed: ' + (data?.message || 'Unknown error'));
+      if (data?.success === false) notify('Failed: ' + (data?.message || 'Unknown error'), { tone: 'danger' });
       else onUpdated();
-    } catch { alert('Network error'); }
+    } catch { notify('Network error', { tone: 'danger' }); }
+    setActing(null);
+  };
+
+  // Manual override — skips the 3-warning ladder and bans the reported user
+  // immediately. Separate from "Agree" (which only ever issues the next
+  // warning/suspension step).
+  const banUser = async () => {
+    if (!report.reportedClerkUserId) { notify('No reported user on this report.', { tone: 'danger' }); return; }
+    if (!(await confirmAction(
+      `Permanently ban ${commentUserName}? This is immediate — it does not go through the usual warning/suspension steps.`,
+      { danger: true, confirmText: 'Ban Permanently' }
+    ))) return;
+    setActing(report._id);
+    try {
+      const data = await reportAPI.ban(report._id, adminNote);
+      if (data?.success === false) notify('Failed: ' + (data?.message || 'Unknown error'), { tone: 'danger' });
+      else onUpdated();
+    } catch (err) {
+      notify(err?.response?.data?.message || 'Network error', { tone: 'danger' });
+    }
     setActing(null);
   };
 
   return (
-    <div style={s.card}>
+    <div style={s.card} className="modern-card">
       <div style={s.cardTop} onClick={onToggle}>
         <div style={s.avatar}>{initialsOf(commentUserName)}</div>
 
@@ -186,6 +210,7 @@ function ReportRow({ report, expanded, acting, setActing, onToggle, onUpdated })
             onChange={e => setAdminNote(e.target.value)}
             placeholder="Internal note about this report…"
             style={s.textarea}
+            className="modern-input"
             rows={2}
           />
 
@@ -200,17 +225,28 @@ function ReportRow({ report, expanded, acting, setActing, onToggle, onUpdated })
           <div style={s.actions}>
             {isPending && (
               <>
-                <button disabled={acting || !report.reportedClerkUserId} onClick={agree} style={{ ...s.btn, ...s.btnAgree, opacity: (acting || !report.reportedClerkUserId) ? 0.6 : 1 }}>
+                <button disabled={acting || !report.reportedClerkUserId} onClick={agree} style={{ ...s.btn, ...s.btnAgree, opacity: (acting || !report.reportedClerkUserId) ? 0.6 : 1 }} className="modern-btn">
                   ✓ Agree
                 </button>
-                <button disabled={acting} onClick={disagree} style={{ ...s.btn, ...s.btnDisagree, opacity: acting ? 0.6 : 1 }}>
+                <button disabled={acting} onClick={disagree} style={{ ...s.btn, ...s.btnDisagree, opacity: acting ? 0.6 : 1 }} className="modern-btn">
                   ✕ Disagree
                 </button>
               </>
             )}
-            <button disabled={acting || !review} onClick={deleteComment} style={{ ...s.btn, ...s.btnDelete, opacity: (acting || !review) ? 0.6 : 1 }}>
+            <button disabled={acting || !review} onClick={deleteComment} style={{ ...s.btn, ...s.btnDelete, opacity: (acting || !review) ? 0.6 : 1 }} className="modern-btn">
               🗑 Delete Comment
             </button>
+            {!report.banApproved && (
+              <button
+                disabled={acting || !report.reportedClerkUserId}
+                onClick={banUser}
+                style={{ ...s.btn, ...s.btnBan, opacity: (acting || !report.reportedClerkUserId) ? 0.6 : 1 }}
+                className="modern-btn"
+                title="Skips the warning ladder — bans the user immediately"
+              >
+                🔨 Ban Permanently
+              </button>
+            )}
           </div>
         </div>
       )}
@@ -228,7 +264,7 @@ const s = {
   filterRow:    { marginBottom: 18 },
   filterSelect: { padding: '10px 14px', borderRadius: 10, border: `1px solid ${t.border}`, fontSize: 13, color: t.textPrimary, background: t.cardBg, outline: 'none', cursor: 'pointer' },
 
-  card:       { background: t.cardBg, border: `1px solid ${t.border}`, borderRadius: 14, marginBottom: 10, overflow: 'hidden' },
+  card:       { background: t.cardBg, border: `1px solid ${t.border}`, borderRadius: radius.xl, marginBottom: 12, overflow: 'hidden', boxShadow: shadow.sm },
   cardTop:    { display: 'flex', alignItems: 'flex-start', gap: 14, padding: '16px 18px', cursor: 'pointer' },
   avatar:     { width: 38, height: 38, borderRadius: '50%', background: t.brandSoft, color: t.brand, fontWeight: 700, fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   metaRow:    { display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 6 },
@@ -255,6 +291,7 @@ const s = {
   btnAgree:     { background: t.successBg, color: t.success },
   btnDisagree:  { background: t.sidebarBg, color: t.textSecondary, border: `1px solid ${t.border}` },
   btnDelete:    { background: t.dangerBg, color: t.danger },
+  btnBan:       { background: t.danger, color: '#fff' },
 
   empty:      { padding: 60, textAlign: 'center', color: t.textSecondary },
   emptyState: { textAlign: 'center', padding: '70px 20px' },
