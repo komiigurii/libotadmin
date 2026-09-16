@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { inactiveUsersAPI, accountActionAPI } from '../api/api';
-import { theme as t } from '../theme';
+import { notify, confirmAction } from '../components/AppAlert';
+import { theme as t, radius, shadow } from '../theme';
 
 const role = () => localStorage.getItem('role');
 
@@ -29,31 +30,34 @@ export default function InactiveUsers() {
   const pendingCount = users.filter(u => u.status === 'pending').length;
 
   const archive = async (clerkUserId) => {
-    if (!confirm('Approve archival for this user? They will be permanently deleted after 30 days.')) return;
+    if (!(await confirmAction(
+      'Approve archival for this user? They will be permanently deleted after 30 days.',
+      { danger: true, confirmText: 'Approve Archival' }
+    ))) return;
     setActing(clerkUserId);
     try {
       await inactiveUsersAPI.archive(clerkUserId);
       load();
     } catch {
-      alert('Failed to archive user.');
+      notify('Failed to archive user.', { tone: 'danger' });
     }
     setActing(null);
   };
 
   const submitProposal = async (clerkUserId) => {
-    if (!proposeReason.trim()) { alert('Add a reason for the suspension request'); return; }
+    if (!proposeReason.trim()) { notify('Add a reason for the suspension request'); return; }
     setActing(clerkUserId);
     try {
       const data = await accountActionAPI.propose(clerkUserId, proposeReason.trim());
       if (data?.success !== false) {
         setProposingId(null);
         setProposeReason('');
-        alert('Suspension request sent to admin for approval.');
+        notify('Suspension request sent to admin for approval.', { tone: 'success' });
       } else {
-        alert('Failed: ' + (data?.message || 'Unknown error'));
+        notify('Failed: ' + (data?.message || 'Unknown error'), { tone: 'danger' });
       }
     } catch (err) {
-      alert(err?.response?.data?.message || 'Network error');
+      notify(err?.response?.data?.message || 'Network error', { tone: 'danger' });
     }
     setActing(null);
   };
@@ -117,6 +121,7 @@ export default function InactiveUsers() {
                             disabled={acting === u.clerkUserId}
                             onClick={() => { setProposingId(proposingId === u.clerkUserId ? null : u.clerkUserId); setProposeReason(''); }}
                             style={{ ...s.btnPropose, opacity: acting === u.clerkUserId ? 0.6 : 1 }}
+                            className="modern-btn"
                           >
                             ⏸ Propose Suspension
                           </button>
@@ -125,6 +130,7 @@ export default function InactiveUsers() {
                             disabled={acting === u.clerkUserId}
                             onClick={() => archive(u.clerkUserId)}
                             style={{ ...s.btnArchive, opacity: acting === u.clerkUserId ? 0.6 : 1 }}
+                            className="modern-btn"
                           >
                             🗂 Approve Archival
                           </button>
@@ -139,6 +145,7 @@ export default function InactiveUsers() {
                             onChange={e => setProposeReason(e.target.value)}
                             placeholder={`Why should ${u.name} be temporarily suspended?`}
                             style={s.textarea}
+                            className="modern-input"
                             rows={2}
                           />
                           <div style={s.proposeActions}>
@@ -146,10 +153,11 @@ export default function InactiveUsers() {
                               disabled={acting === u.clerkUserId}
                               onClick={() => submitProposal(u.clerkUserId)}
                               style={{ ...s.btn, ...s.btnPrimary, opacity: acting === u.clerkUserId ? 0.6 : 1 }}
+                              className="modern-btn"
                             >
                               Send to admin
                             </button>
-                            <button onClick={() => setProposingId(null)} style={{ ...s.btn, ...s.btnCancel }}>
+                            <button onClick={() => setProposingId(null)} style={{ ...s.btn, ...s.btnCancel }} className="modern-btn">
                               Cancel
                             </button>
                           </div>
@@ -174,7 +182,7 @@ const s = {
   pageSub:    { fontSize: 13, color: t.textSecondary },
   alertBadge: { padding: '7px 14px', background: t.warningBg, color: t.warning, borderRadius: 8, fontSize: 12, fontWeight: 700 },
 
-  card:       { background: t.cardBg, border: `1px solid ${t.border}`, borderRadius: 14, overflow: 'hidden' },
+  card:       { background: t.cardBg, border: `1px solid ${t.border}`, borderRadius: radius.xl, overflow: 'hidden', boxShadow: shadow.sm },
   tblWrap:    { overflowX: 'auto' },
   table:      { width: '100%', borderCollapse: 'collapse' },
   th:         { padding: '11px 16px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: t.textMuted, textTransform: 'uppercase', letterSpacing: '.06em', borderBottom: `1px solid ${t.border}` },

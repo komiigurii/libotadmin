@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
-import { spotAPI, accountActionAPI } from '../api/api';
-import { theme as t } from '../theme';
+import { spotAPI, accountActionAPI, missionAPI } from '../api/api';
+import { notify } from '../components/AppAlert';
+import { theme as t, radius, shadow } from '../theme';
 
 const STATUS_PILL = {
   pending:  { background: t.purpleBg,  color: t.purple,  label: 'PENDING' },
@@ -13,6 +14,15 @@ const KIND_LABELS = {
   'spot-delete': 'Spot deletion',
   'spot-proposal': 'New spot',
   account:       'Account action',
+  'mission-location': 'Food mission location',
+};
+
+const MISSION_FIELD_LABELS = {
+  locationName: 'Restaurant name',
+  image:        'Restaurant photo',
+  locationInfo: 'Restaurant info',
+  coordinates:  'Coordinates',
+  radiusMeters: 'Radius (m)',
 };
 
 const FIELD_LABELS = {
@@ -22,7 +32,7 @@ const FIELD_LABELS = {
   Badge: 'Badge', City: 'City', coordinates: 'Coordinates', modelsCoordinates: 'AR Positions', trivia: 'Trivia',
 };
 
-const LONG_FIELDS = new Set(['description', 'history', 'recommendations', 'trivia']);
+const LONG_FIELDS = new Set(['description', 'history', 'recommendations', 'trivia', 'locationInfo']);
 const THUMB_FIELDS = new Set(['image', 'Badge']);
 const FILE_LINK_FIELDS = new Set(['modelUrl', 'AR3DModelURL']);
 
@@ -80,8 +90,8 @@ function Thumb({ url, dimmed }) {
   );
 }
 
-function DiffField({ fieldKey, oldVal, newVal }) {
-  const label = FIELD_LABELS[fieldKey] || fieldKey;
+function DiffField({ fieldKey, oldVal, newVal, labelMap = FIELD_LABELS }) {
+  const label = labelMap[fieldKey] || fieldKey;
   const changed = fmtVal(fieldKey, oldVal) !== fmtVal(fieldKey, newVal);
   if (!changed) return null;
 
@@ -166,10 +176,11 @@ export default function ModRequests() {
     setLoading(true);
     setError(null);
     try {
-      const [pendingProposalsData, pendingSpotsData, accountActionsData] = await Promise.all([
+      const [pendingProposalsData, pendingSpotsData, accountActionsData, missionProposalsData] = await Promise.all([
         spotAPI.getPendingProposals(),  // { success, proposals }
         spotAPI.getPending(),           // { success, items }
         accountActionAPI.getAll(),
+        missionAPI.getProposals(),      // [] of missions with a pendingChange
       ]);
 
       const pendingProposals = toArray(pendingProposalsData.proposals || pendingProposalsData);
@@ -220,7 +231,18 @@ export default function ModRequests() {
           body: a,
         }));
 
-      const all = [...proposalItems, ...editItems, ...deleteItems, ...accountItems]
+      const missionLocationItems = toArray(missionProposalsData)
+        .map(mission => ({
+          kind: 'mission-location',
+          id: mission._id,
+          status: 'pending',
+          title: 'Food mission location',
+          subtitle: mission.spotId?.name || mission.title || '—',
+          date: mission.pendingChange?.submittedAt,
+          body: mission,
+        }));
+
+      const all = [...proposalItems, ...editItems, ...deleteItems, ...accountItems, ...missionLocationItems]
         .sort((a, b) => new Date(b.date) - new Date(a.date));
       setRequests(all);
     } catch (err) {
@@ -242,10 +264,10 @@ export default function ModRequests() {
     try {
       const data = await spotAPI.reviewProposal(id, action);
       if (data?.success !== false) await load();
-      else alert('Failed: ' + (data?.message || 'Unknown error'));
+      else notify('Failed: ' + (data?.message || 'Unknown error'), { tone: 'danger' });
     } catch (err) {
       console.error(err);
-      alert('Network error');
+      notify('Network error', { tone: 'danger' });
     }
     setActing(null);
   };
@@ -256,10 +278,10 @@ export default function ModRequests() {
     try {
       const data = await spotAPI.reviewChange(id, action);
       if (data?.success !== false) await load();
-      else alert('Failed: ' + (data?.message || 'Unknown error'));
+      else notify('Failed: ' + (data?.message || 'Unknown error'), { tone: 'danger' });
     } catch (err) {
       console.error(err);
-      alert('Network error');
+      notify('Network error', { tone: 'danger' });
     }
     setActing(null);
   };
@@ -269,8 +291,22 @@ export default function ModRequests() {
     try {
       const data = await accountActionAPI.decide(id, decision);
       if (data?.success !== false) load();
-      else alert('Failed: ' + (data?.message || 'Unknown error'));
-    } catch { alert('Network error'); }
+      else notify('Failed: ' + (data?.message || 'Unknown error'), { tone: 'danger' });
+    } catch { notify('Network error', { tone: 'danger' }); }
+    setActing(null);
+  };
+
+  // Approve/reject a proposed food-mission location change
+  const decideMissionLocation = async (id, action) => {
+    setActing(id);
+    try {
+      const data = await missionAPI.reviewLocation(id, action);
+      if (data?.success !== false) await load();
+      else notify('Failed: ' + (data?.message || 'Unknown error'), { tone: 'danger' });
+    } catch (err) {
+      console.error(err);
+      notify('Network error', { tone: 'danger' });
+    }
     setActing(null);
   };
 
@@ -279,13 +315,13 @@ export default function ModRequests() {
       <div style={s.pageHeader}>
         <div>
           <h1 style={s.pageTitle}>Mod Requests</h1>
-          <p style={s.pageSub}>Account actions and spot edit/deletion proposals submitted by moderators</p>
+          <p style={s.pageSub}>Account actions, spot edit/deletion proposals, and food mission locations submitted by moderators</p>
         </div>
         <span style={s.totalBadge}>{requests.length} total</span>
       </div>
 
       <div style={s.filterRow}>
-        <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} style={s.filterSelect}>
+        <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} style={s.filterSelect} className="modern-input">
           <option value="">All ({requests.length})</option>
           <option value="pending">Pending ({pendingCount})</option>
           <option value="approved">Approved</option>
@@ -315,22 +351,25 @@ export default function ModRequests() {
 
           const avatarName = r.subtitle;
           const primaryName = avatarName || '—';
-          const byLine = r.kind === 'spot' || r.kind === 'spot-delete' || r.kind === 'spot-proposal' ? null : r.title;
+          const isMissionLocation = r.kind === 'mission-location';
+          const byLine = r.kind === 'spot' || r.kind === 'spot-delete' || r.kind === 'spot-proposal' || isMissionLocation ? null : r.title;
 
           const handleApprove = () => {
             if (r.kind === 'account') decideAccount(r.id, 'approved');
             else if (isNewProposal) decideProposal(r.id, 'approve');
+            else if (isMissionLocation) decideMissionLocation(r.id, 'approve');
             else decideSpot(r.id, 'approve');
           };
 
           const handleReject = () => {
             if (r.kind === 'account') decideAccount(r.id, 'rejected');
             else if (isNewProposal) decideProposal(r.id, 'reject');
+            else if (isMissionLocation) decideMissionLocation(r.id, 'reject');
             else decideSpot(r.id, 'reject');
           };
 
           return (
-            <div key={key} style={s.card}>
+            <div key={key} style={s.card} className="modern-card">
               <div style={s.cardTop} onClick={() => setExpandedKey(isExpanded ? null : key)}>
                 <div style={{ ...s.avatar, ...(isDeleteRequest ? s.avatarDanger : {}) }}>
                   {isDeleteRequest ? '🗑️' : initialsOf(avatarName)}
@@ -364,6 +403,11 @@ export default function ModRequests() {
                       {r.body.pendingDeleteReason
                         ? `Reason: ${r.body.pendingDeleteReason}`
                         : 'No reason provided.'}
+                    </p>
+                  )}
+                  {isMissionLocation && (
+                    <p style={s.commentText}>
+                      Proposed food-recommendation location for this spot's 2nd mission — expand to see details.
                     </p>
                   )}
 
@@ -400,6 +444,19 @@ export default function ModRequests() {
                 </div>
               )}
 
+              {isExpanded && isMissionLocation && (
+                <div style={s.fieldList}>
+                  <p style={s.byLine}>
+                    <span style={s.byLineLabel}>Mission: </span>{r.body.title}
+                  </p>
+                  {Object.entries(r.body.pendingChange || {})
+                    .filter(([k]) => ['locationName', 'image', 'locationInfo', 'coordinates', 'radiusMeters'].includes(k))
+                    .map(([k, newVal]) => (
+                      <DiffField key={k} fieldKey={k} oldVal={r.body[k]} newVal={newVal} labelMap={MISSION_FIELD_LABELS} />
+                    ))}
+                </div>
+              )}
+
               {isPending && (
                 <div style={s.panel}>
                   <div style={s.actions}>
@@ -407,6 +464,7 @@ export default function ModRequests() {
                       disabled={isActing}
                       onClick={handleApprove}
                       style={{ ...s.btn, ...(isDeleteRequest ? s.btnApproveDelete : s.btnApprove), opacity: isActing ? 0.6 : 1 }}
+                      className="modern-btn"
                     >
                       {isDeleteRequest ? 'Approve & Delete' : 'Approve'}
                     </button>
@@ -414,6 +472,7 @@ export default function ModRequests() {
                       disabled={isActing}
                       onClick={handleReject}
                       style={{ ...s.btn, ...s.btnDisapprove, opacity: isActing ? 0.6 : 1 }}
+                      className="modern-btn"
                     >
                       Disapprove
                     </button>
@@ -438,7 +497,7 @@ const s = {
   filterRow:    { marginBottom: 18 },
   filterSelect: { padding: '10px 14px', borderRadius: 10, border: `1px solid ${t.border}`, fontSize: 13, color: t.textPrimary, background: t.cardBg, outline: 'none', cursor: 'pointer' },
 
-  card:       { background: t.cardBg, border: `1px solid ${t.border}`, borderRadius: 14, marginBottom: 10, overflow: 'hidden' },
+  card:       { background: t.cardBg, border: `1px solid ${t.border}`, borderRadius: radius.xl, marginBottom: 12, overflow: 'hidden', boxShadow: shadow.sm },
   cardTop:    { display: 'flex', alignItems: 'flex-start', gap: 14, padding: '16px 18px', cursor: 'pointer' },
   avatar:     { width: 38, height: 38, borderRadius: '50%', background: t.brandSoft, color: t.brand, fontWeight: 700, fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   avatarDanger: { background: t.dangerBg, color: t.danger, fontSize: 16 },
@@ -458,7 +517,7 @@ const s = {
 
   panel:      { borderTop: `1px solid ${t.divider}`, padding: '14px 18px 18px', background: t.sidebarBg },
   actions:    { display: 'flex', gap: 8, marginTop: 10 },
-  btn:        { padding: '8px 18px', borderRadius: 8, fontWeight: 600, fontSize: 13, cursor: 'pointer', border: 'none' },
+  btn:        { padding: '8px 18px', borderRadius: radius.md, fontWeight: 600, fontSize: 13, cursor: 'pointer', border: 'none' },
   btnApprove: { background: t.successBg, color: t.success },
   btnApproveDelete: { background: t.dangerBg, color: t.danger },
   btnDisapprove: { background: t.dangerBg, color: t.danger },
