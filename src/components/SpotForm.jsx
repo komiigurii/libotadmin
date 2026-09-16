@@ -658,6 +658,11 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
                   Clear pin
                 </button>
               )}
+              {addingAr && arModels.length > 0 && (
+                <button type="button" onClick={() => setArModels([])} style={styles.clearPinBtn}>
+                  Clear all AR pins
+                </button>
+              )}
             </div>
 
             <SpotMapPicker
