@@ -89,6 +89,28 @@ tbody tr:hover td {
   box-shadow: 0 0 0 3px rgba(79,208,220,0.18);
 }
 
+/* ── Login page ────────────────────────────────────────────────
+   The sign-in card deliberately does NOT use .modern-card: that class
+   lifts on hover, which is right for a grid of clickable cards and
+   wrong for a form — the card would jump every time the pointer
+   travels to the password field. It gets the entrance animation only. */
+.login-card {
+  animation: fadeInUp 0.35s ease both;
+}
+
+@keyframes captionFade {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.login-caption {
+  animation: captionFade 0.9s ease both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .login-card,
+  .login-caption { animation: none; }
+}
+
 /* For div-based list rows (not <table> — those already get the
    `tbody tr:hover td` rule above) */
 .modern-row {

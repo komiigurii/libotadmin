@@ -3,6 +3,8 @@ import { spotAPI } from '../api/api';
 import SpotForm from '../components/SpotForm';
 import { notify } from '../components/AppAlert';
 import { theme as t, radius, shadow } from '../theme';
+import { pageStyles, Loading, EmptyState } from '../components/Layout';
+import Icon from '../components/Icon';
 
 const role = () => localStorage.getItem('role');
 const modCity = () => localStorage.getItem('city') || '';
@@ -111,8 +113,8 @@ export default function Spots() {
 
       {error && (
         <div style={s.errorBanner}>
-          ⚠ {error}
-          <button onClick={() => setError('')} style={s.errorClose}>✕</button>
+          <Icon name="alert-triangle" size={13} /> {error}
+          <button onClick={() => setError('')} style={s.errorClose} aria-label="Dismiss error"><Icon name="x" size={12} /></button>
         </div>
       )}
 
@@ -164,9 +166,15 @@ export default function Spots() {
       </div>
 
       {loading ? (
-        <div style={s.emptyCard}>Loading spots…</div>
+        <Loading label="Loading spots…" />
       ) : filtered.length === 0 ? (
-        <div style={s.emptyCard}>No spots found</div>
+        <EmptyState
+          icon="map-pin"
+          title={spots.length === 0 ? 'No spots yet' : 'No spots match your search'}
+          subtitle={spots.length === 0
+            ? 'Spots you add will appear here.'
+            : 'Try a different name or category.'}
+        />
       ) : (
         <div style={s.grid}>
           {filtered.map(spot => (
@@ -190,24 +198,24 @@ export default function Spots() {
 
                 <div style={s.detailList}>
                   <div style={s.detailRow}>
-                    <span style={s.detailIcon}>📍</span>
+                    <span style={s.detailIcon}><Icon name="map-pin" size={12} /></span>
                     <span style={s.detailText}>{spot.city || '—'}</span>
                   </div>
                   <div style={s.detailRow}>
-                    <span style={s.detailIcon}>🕒</span>
+                    <span style={s.detailIcon}><Icon name="clock" size={12} /></span>
                     <span style={s.detailText}>{spot.visitingHours || 'Hours not set'}</span>
                   </div>
                   <div style={s.detailRow}>
-                    <span style={s.detailIcon}>🎟️</span>
+                    <span style={s.detailIcon}><Icon name="star" size={12} /></span>
                     <span style={s.detailText}>{spot.entranceFee || 'Free'}</span>
                   </div>
                 </div>
 
                 {spot.pendingChange && (
-                  <div style={s.pendingNotice}>⏳ Edit pending admin approval</div>
+                  <div style={s.pendingNotice}><Icon name="clock" size={11} /> Edit pending admin approval</div>
                 )}
                 {spot.pendingDelete && (
-                  <div style={s.pendingNoticeDanger}>🗑️ Deletion pending admin approval</div>
+                  <div style={s.pendingNoticeDanger}><Icon name="trash" size={11} /> Deletion pending admin approval</div>
                 )}
 
                 <div style={s.cardFooter}>
@@ -245,23 +253,20 @@ export default function Spots() {
 }
 
 const s = {
-  page:        { padding: '28px 32px', maxWidth: 1100, margin: '0 auto' },
-  pageHeader:  { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 },
-  pageTitle:   { fontSize: 22, fontWeight: 600, color: t.textPrimary, marginBottom: 4 },
-  pageSub:     { fontSize: 13, color: t.textSecondary },
-  btnPrimary:  { padding: '9px 20px', background: t.brandSolid, color: '#fff', border: 'none', borderRadius: radius.lg, fontWeight: 600, fontSize: 14, cursor: 'pointer', boxShadow: shadow.sm },
-  errorBanner: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: t.dangerBg, border: `1px solid ${t.danger}44`, borderRadius: 10, padding: '12px 16px', marginBottom: 16, color: t.danger, fontSize: 14, fontWeight: 500 },
-  errorClose:  { background: 'none', border: 'none', color: t.danger, cursor: 'pointer', fontWeight: 700, fontSize: 16 },
+  // Page shell, header, toolbar, states and table cells come from
+  // components/Layout so every page is spaced identically.
+  ...pageStyles,
+  // Page-specific: the shared card has no padding, overflow or margin,
+  // because those differ by how each page uses a card.
+  card: { background: t.cardBg, border: `1px solid ${t.border}`, borderRadius: radius.xl, overflow: 'hidden', display: 'flex', flexDirection: 'column', boxShadow: shadow.sm },
+  btnPrimary:  { padding: '9px 20px', background: t.accent, color: t.onAccent, border: 'none', borderRadius: radius.lg, fontWeight: 700, fontSize: 14, cursor: 'pointer', boxShadow: shadow.sm },
   modalOverlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 },
   modalBox:     { background: t.cardBg, borderRadius: radius.xl, padding: 20, width: 360, boxShadow: shadow.lg, border: `1px solid ${t.border}` },
   modalTextarea:{ width: '100%', padding: 10, borderRadius: 8, border: `1px solid ${t.border}`, fontSize: 13, resize: 'vertical', boxSizing: 'border-box', fontFamily: 'inherit', color: t.textPrimary, background: t.cardBg },
   formWrap:    { marginBottom: 18 },
-  filterRow:   { marginBottom: 18 },
-  searchInput: { width: '100%', padding: '10px 14px', borderRadius: 10, border: `1px solid ${t.border}`, fontSize: 14, background: t.cardBg, outline: 'none', color: t.textPrimary, boxSizing: 'border-box' },
 
   grid:        { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 18 },
 
-  card:        { background: t.cardBg, border: `1px solid ${t.border}`, borderRadius: radius.xl, overflow: 'hidden', display: 'flex', flexDirection: 'column', boxShadow: shadow.sm, cursor: 'default' },
 
   cardImgWrap: { position: 'relative', width: '100%', height: 140, background: t.sidebarBg },
   cardImg:     { width: '100%', height: '100%', objectFit: 'cover', display: 'block' },
@@ -296,5 +301,4 @@ const s = {
   btnEdit:     { padding: '5px 13px', background: t.brandSoft, color: t.brand, border: 'none', borderRadius: 7, fontWeight: 600, fontSize: 12, cursor: 'pointer' },
   btnDelete:   { padding: '5px 13px', background: t.dangerBg, color: t.danger, border: 'none', borderRadius: 7, fontWeight: 600, fontSize: 12, cursor: 'pointer' },
 
-  emptyCard:   { padding: 60, textAlign: 'center', color: t.textSecondary, background: t.cardBg, border: `1px solid ${t.border}`, borderRadius: 14 },
 };
