@@ -3,7 +3,7 @@ import { theme as t, radius, shadow } from '../theme';
 import Icon from './Icon';
 
 /*
- * Themed replacement for the browser's native `alert()` / `confirm()`.
+ * Themed replacement for the browser's native `alert()` / `confirm()`..
  * Those render as unstyled OS dialogs that clash with the rest of this
  * app's custom dark UI — this component gives every page the same look
  * the mobile app's components/AppAlert.js already uses.
