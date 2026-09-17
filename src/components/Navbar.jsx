@@ -23,14 +23,15 @@ export default function Navbar() {
       ]
     : [
         //Admin
-        { label: 'Review Proposed Spot Changes',      path: '/mod-requests' },
-        { label: 'All Comments',                      path: '/comments' },
+        { label: 'Requests',      path: '/mod-requests' },
+        { label: 'Comments',                      path: '/comments' },
         { label: 'Reported Comments',                 path: '/reported-comments' },
         { label: 'Banned Accounts',                   path: '/banned-accounts' },
         { label: 'Inactive Users',                    path: '/inactive-users' },
+        { label: 'User Progress',                     path: '/user-progress' },
       ];
 
-  const home = isModerator ? '/my-review-requests' : '/comments';
+  const home = isModerator ? '/spots' : '/mod-requests';
 
   return (
     <nav style={s.sidebar}>
@@ -42,7 +43,6 @@ export default function Navbar() {
         />
         <div>
           <div style={s.brandName}>Libot</div>
-          <div style={s.brandSub}>Admin Console</div>
         </div>
       </div>
 

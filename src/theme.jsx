@@ -18,8 +18,11 @@ export const theme = {
   brandSolidHover:'#129AA6',
   brandSoft:      'rgba(79,208,220,0.14)',  // pill / active-state tint
 
-  // Yellow accent — the app's CTA/highlight colour. Fills & highlights only,
-  // paired with a dark `onAccent` text (never white — not enough contrast).
+  // Yellow accent — the app's CTA colour (ThemeContext `accent`). Same split of
+  // work as the app: yellow is the ONE "do the thing" button on a screen (save,
+  // sign in, add, confirm); teal/cyan stays on selection + active states, icons
+  // and small accents. Always paired with dark `onAccent` text — white on this
+  // yellow fails contrast.
   accent:        '#F2CE1B',
   accentBg:      'rgba(242,206,27,0.16)',
   onAccent:      '#2C2810',

@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { bannedAccountsAPI, appealAPI } from '../api/api';
 import { notify, confirmAction } from '../components/AppAlert';
 import { theme as t, radius, shadow } from '../theme';
+import { pageStyles, Loading, EmptyState, Avatar } from '../components/Layout';
+import Icon from '../components/Icon';
 
 function formatRemaining(expiresAt) {
   if (!expiresAt) return 'Permanent';
@@ -86,8 +88,8 @@ export default function BannedAccounts() {
 
       {error && (
         <div style={s.errorBanner}>
-          ⚠ {error}
-          <button onClick={() => setError('')} style={s.errorClose}>✕</button>
+          <Icon name="alert-triangle" size={13} /> {error}
+          <button onClick={() => setError('')} style={s.errorClose} aria-label="Dismiss error"><Icon name="x" size={12} /></button>
         </div>
       )}
 
@@ -104,11 +106,19 @@ export default function BannedAccounts() {
       )}
 
       {loading ? (
-        <div style={s.emptyCard}>Loading banned accounts…</div>
+        <Loading label="Loading banned accounts…" />
       ) : users.length === 0 ? (
-        <div style={s.emptyCard}>No banned accounts found.</div>
+        <EmptyState
+          icon="check"
+          title="No banned accounts"
+          subtitle="Nobody is currently suspended or banned."
+        />
       ) : filtered.length === 0 ? (
-        <div style={s.emptyCard}>No banned accounts match your search.</div>
+        <EmptyState
+          icon="users"
+          title="No accounts match your search"
+          subtitle="Try a different name or email."
+        />
       ) : (
         <div style={s.list}>
           <div style={s.listHead}>
@@ -133,7 +143,7 @@ export default function BannedAccounts() {
                   onClick={() => hasAppeal && setExpandedId(expanded ? null : u.clerkUserId)}
                 >
                   <div style={s.colUser}>
-                    <div style={s.avatar}>{u.name?.[0]?.toUpperCase() || '?'}</div>
+                    <Avatar src={u.profileImage} name={u.name} size={34} />
                     <div>
                       <div style={s.userName}>{u.name || 'Unknown'}</div>
                       <div style={s.userEmail}>{u.email}</div>
@@ -154,7 +164,7 @@ export default function BannedAccounts() {
                     </span>
                     {appealPill && (
                       <span style={{ ...s.badgeAppeal, background: appealPill.background, color: appealPill.color }}>
-                        {appealPill.label} {hasAppeal ? (expanded ? '▲' : '▼') : ''}
+                        {appealPill.label} {hasAppeal ? <Icon name={expanded ? 'chevron-up' : 'chevron-down'} size={11} /> : null}
                       </span>
                     )}
                   </div>
@@ -194,7 +204,7 @@ export default function BannedAccounts() {
                           style={{ ...s.btn, ...s.btnApprove, opacity: busy ? 0.6 : 1 }}
                           className="modern-btn"
                         >
-                          ✓ Approve &amp; Unban
+                          <Icon name="check" size={12} /> Approve &amp; Unban
                         </button>
                         <button
                           disabled={busy}
@@ -202,7 +212,7 @@ export default function BannedAccounts() {
                           style={{ ...s.btn, ...s.btnReject, opacity: busy ? 0.6 : 1 }}
                           className="modern-btn"
                         >
-                          ✕ Reject
+                          <Icon name="x" size={12} /> Reject
                         </button>
                       </div>
                     ) : (
@@ -220,17 +230,12 @@ export default function BannedAccounts() {
 }
 
 const s = {
-  page:        { padding: '28px 32px', maxWidth: 1100, margin: '0 auto' },
-  pageHeader:  { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 },
-  pageTitle:   { fontSize: 22, fontWeight: 600, color: t.textPrimary, marginBottom: 4 },
-  pageSub:     { fontSize: 13, color: t.textSecondary },
-
-  errorBanner: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: t.dangerBg, border: `1px solid ${t.danger}44`, borderRadius: 10, padding: '12px 16px', marginBottom: 16, color: t.danger, fontSize: 14, fontWeight: 500 },
-  errorClose:  { background: 'none', border: 'none', color: t.danger, cursor: 'pointer', fontWeight: 700, fontSize: 16 },
-
-  filterRow:   { marginBottom: 18 },
-  searchInput: { width: '100%', padding: '10px 14px', borderRadius: 10, border: `1px solid ${t.border}`, fontSize: 14, background: t.cardBg, outline: 'none', color: t.textPrimary, boxSizing: 'border-box' },
-
+  // Page shell, header, toolbar, states and table cells come from
+  // components/Layout so every page is spaced identically.
+  ...pageStyles,
+  // Page shell, header, toolbar, states and table cells come from
+  // components/Layout so every page is spaced identically.
+  ...pageStyles,
   list:        { background: t.cardBg, border: `1px solid ${t.border}`, borderRadius: radius.xl, overflow: 'hidden', boxShadow: shadow.sm },
   listHead:    { display: 'grid', gridTemplateColumns: '2fr 2fr 0.7fr 1.3fr 100px', gap: 12, alignItems: 'center', padding: '10px 18px', fontSize: 11, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: t.textMuted, borderBottom: `1px solid ${t.border}` },
   rowWrap:     { borderBottom: `1px solid ${t.divider}` },
@@ -242,7 +247,6 @@ const s = {
   colStatus:   { fontSize: 13, display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-start' },
   colActions:  { display: 'flex', justifyContent: 'flex-end' },
 
-  avatar:      { width: 34, height: 34, borderRadius: '50%', background: t.brandSoft, color: t.brand, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 14, flexShrink: 0 },
   userName:    { fontWeight: 600, fontSize: 13.5, color: t.textPrimary },
   userEmail:   { fontSize: 12, color: t.textMuted },
 
@@ -263,5 +267,4 @@ const s = {
   btnApprove:    { background: t.successBg, color: t.success },
   btnReject:     { background: t.dangerBg, color: t.danger },
 
-  emptyCard:   { padding: 70, textAlign: 'center', color: t.textSecondary, fontSize: 14, background: t.cardBg, border: `1px solid ${t.border}`, borderRadius: 14 },
 };

@@ -1,9 +1,10 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { theme as t, radius, shadow } from '../theme';
-import { uploadAPI, missionAPI } from '../api/api';
+import { uploadAPI, missionAPI, categoryAPI } from '../api/api';
 import { notify, confirmAction } from './AppAlert';
+import Icon from './Icon';
 
 // Fix default marker icons breaking under Vite/webpack bundling
 import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
@@ -16,7 +17,21 @@ L.Icon.Default.mergeOptions({
   shadowUrl: markerShadow,
 });
 
-const CATEGORIES = ['Historical', 'Religious', 'Nature', 'Festivals'];
+// Fallback only — the real list comes from GET /api/categories, so an admin can
+// add or rename one without a code change. Kept so the form still works if that
+// call fails; a spot form with no category chips can't be submitted at all.
+const FALLBACK_CATEGORIES = ['Historical', 'Religious', 'Nature', 'Festivals'];
+
+// Map pin colours. Leaflet divIcons are raw HTML strings, so they can't read
+// the theme object directly — this is the one place the three map colours are
+// written down, and the legend dots below read from it too so a pin and its
+// legend swatch can never drift apart. Teal and yellow are the app's own brand
+// and accent; blue is just a third hue that stays distinct from both.
+const MAP_PIN = {
+  spot:    t.brandSolid,  // the tourist spot itself
+  mission: t.accent,      // the recommended eatery (mission 2)
+  ar:      t.info,        // an AR model's placement
+};
 
 const makeId = () =>
   (typeof crypto !== 'undefined' && crypto.randomUUID)
@@ -25,6 +40,101 @@ const makeId = () =>
 
 // Default map center: Malolos City, Bulacan
 const DEFAULT_CENTER = { lat: 14.8433, lng: 120.8114 };
+
+// ── Coordinate helpers ────────────────────────────────────────────
+// Coordinates live in state as raw strings while they're being typed, so
+// everything that consumes them has to cope with "", "-", "14." and other
+// half-finished input. `toNum` is the single gate: a usable number, or null.
+// Never use a bare parseFloat on these — parseFloat("-") is NaN, and handing
+// NaN to Leaflet's setLatLng throws.
+const toNum = (v) => {
+  if (v === '' || v == null) return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+};
+
+// Coordinates are almost always copied around as one "14.8433, 120.8114"
+// string (that's what Google Maps' "copy coordinates" gives you), so pasting
+// that into either box fills both rather than making the user split it by hand.
+const parseCoordPair = (text) => {
+  const m = String(text).trim().match(/^(-?\d+(?:\.\d+)?)\s*[,\s]\s*(-?\d+(?:\.\d+)?)$/);
+  if (!m) return null;
+  const lat = Number(m[1]);
+  const lng = Number(m[2]);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+  if (Math.abs(lat) > 90 || Math.abs(lng) > 180) return null;
+  return { lat, lng };
+};
+
+// Derived, not stored — so the message can never get out of step with the
+// values it describes.
+function coordError(lat, lng) {
+  const check = (v, max, label) => {
+    if (v === '' || v == null) return '';
+    // Mid-typing states aren't errors yet — don't scold someone for the first
+    // keystroke of a negative number.
+    if (v === '-' || v === '.' || v === '-.') return '';
+    const n = Number(v);
+    if (!Number.isFinite(n)) return `${label} must be a number.`;
+    if (Math.abs(n) > max) return `${label} must be between -${max} and ${max}.`;
+    return '';
+  };
+  return check(lat, 90, 'Latitude') || check(lng, 180, 'Longitude');
+}
+
+// ── Editable lat/lng pair ─────────────────────────────────────────
+// Clicking the map is the quick way to drop a pin, but coordinates often
+// arrive as text — from a tourism office's list, a Google Maps share, or a
+// GPS reading taken on site — and hunting for that exact point by clicking is
+// both slow and imprecise. These inputs take the numbers directly; the pin on
+// the map follows them, and dragging the pin writes back here.
+function CoordFields({ lat, lng, onChange, compact = false, disabled = false }) {
+  const err = coordError(lat, lng);
+
+  const handle = (which) => (e) => {
+    const raw = e.target.value;
+    const pair = parseCoordPair(raw);
+    if (pair) { onChange(String(pair.lat), String(pair.lng)); return; }
+    if (which === 'lat') onChange(raw, lng);
+    else onChange(lat, raw);
+  };
+
+  const inputStyle = compact ? styles.coordInputSm : styles.coordInput;
+
+  return (
+    <div style={compact ? styles.coordWrapSm : styles.coordWrap}>
+      <div style={styles.coordRow}>
+        <div style={styles.coordField}>
+          {!compact && <label style={styles.coordLabel}>Latitude</label>}
+          <input
+            value={lat ?? ''}
+            onChange={handle('lat')}
+            disabled={disabled}
+            inputMode="decimal"
+            placeholder={compact ? 'lat' : '14.8433'}
+            aria-label="Latitude"
+            style={{ ...inputStyle, ...(err ? styles.coordInputError : {}) }}
+            className="modern-input"
+          />
+        </div>
+        <div style={styles.coordField}>
+          {!compact && <label style={styles.coordLabel}>Longitude</label>}
+          <input
+            value={lng ?? ''}
+            onChange={handle('lng')}
+            disabled={disabled}
+            inputMode="decimal"
+            placeholder={compact ? 'lng' : '120.8114'}
+            aria-label="Longitude"
+            style={{ ...inputStyle, ...(err ? styles.coordInputError : {}) }}
+            className="modern-input"
+          />
+        </div>
+      </div>
+      {err && <p style={styles.coordErrorText}>{err}</p>}
+    </div>
+  );
+}
 
 // Downscales an oversized image client-side before upload. Skips files
 // already under the target size — no pointless re-encoding of small
@@ -67,6 +177,16 @@ function resizeImageFile(file, maxDimension = 1600, quality = 0.85) {
   });
 }
 
+// Must match SPOT_UPLOAD_MAX_BYTES in the backend's routes/uploadRoutes.js.
+// Checking here as well isn't belt-and-braces — it's the only check that gives
+// a usable message. Server-side, multer stops reading as soon as the limit
+// trips, so the response goes out while the browser is still uploading and the
+// browser reports the reset connection as a bare "Network Error" with no clue
+// that the file was simply too big.
+const UPLOAD_MAX_BYTES = 20 * 1024 * 1024;
+const formatBytes = (n) =>
+  n >= 1024 * 1024 ? `${(n / (1024 * 1024)).toFixed(1)} MB` : `${Math.round(n / 1024)} KB`;
+
 // ── Reusable file upload field ────────────────────────────────────
 function FileUploadField({ label, required, hint, accept, uploadType, value, onUploaded, previewType = 'image' }) {
   const [uploading, setUploading] = useState(false);
@@ -84,10 +204,30 @@ function FileUploadField({ label, required, hint, accept, uploadType, value, onU
         ? await resizeImageFile(file, uploadType === 'badge' ? 512 : 1600)
         : file;
 
+      // Images are downscaled above, so this realistically only catches 3D
+      // models — which is exactly where it's needed, since a .glb straight out
+      // of Blender or Sketchfab is routinely far over the limit.
+      if (fileToUpload.size > UPLOAD_MAX_BYTES) {
+        setError(
+          `This file is ${formatBytes(fileToUpload.size)}, over the ${formatBytes(UPLOAD_MAX_BYTES)} limit. ` +
+          `Reduce the model's polygon count or export it with Draco compression, then try again.`
+        );
+        return;
+      }
+
       const { url } = await uploadAPI.spotMedia(fileToUpload, uploadType);
       onUploaded(url);
     } catch (err) {
-      setError(err?.response?.data?.message || err.message || 'Upload failed');
+      // axios reports anything that never got a response as "Network Error",
+      // which on its own tells the moderator nothing they can act on.
+      const isNetwork = !err?.response && /network/i.test(err?.message || '');
+      setError(
+        err?.response?.data?.message ||
+        (isNetwork
+          ? 'Could not reach the server. Check your connection, and if the file is large try a smaller one — you may also need to sign in again.'
+          : err.message) ||
+        'Upload failed'
+      );
     } finally {
       setUploading(false);
       if (inputRef.current) inputRef.current.value = '';
@@ -108,7 +248,7 @@ function FileUploadField({ label, required, hint, accept, uploadType, value, onU
         <div style={styles.thumbEmpty}>—</div>
       )
     ) : (
-      <div style={styles.thumbEmpty}>{value ? '📦' : '—'}</div>
+      <div style={styles.thumbEmpty}>{value ? <Icon name="box" size={18} color={t.textSecondary} /> : '—'}</div>
     );
 
   return (
@@ -130,8 +270,8 @@ function FileUploadField({ label, required, hint, accept, uploadType, value, onU
           <input ref={inputRef} type="file" accept={accept} onChange={handleFile} style={{ display: 'none' }} />
         </div>
 
-        {error && <p style={styles.warningText}>⚠️ {error}</p>}
-        {value && previewType === 'file' && !error && <p style={styles.okText}>✅ {value.split('/').pop()}</p>}
+        {error && <p style={styles.warningText}><Icon name="alert-triangle" size={12} /> {error}</p>}
+        {value && previewType === 'file' && !error && <p style={styles.okText}><Icon name="check-circle" size={12} /> {value.split('/').pop()}</p>}
       </div>
     </div>
   );
@@ -209,7 +349,7 @@ function MapSearch({ mapRef }) {
         />
         {loading && <span style={styles.searchSpinner}>…</span>}
         {query && !loading && (
-          <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={handleClear} style={styles.searchClearBtn} className="modern-btn">✕</button>
+          <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={handleClear} style={styles.searchClearBtn} className="modern-btn"><Icon name="x" size={12} /></button>
         )}
       </div>
 
@@ -258,7 +398,7 @@ function SpotMapPicker({
 
   const spotIcon = useRef(
     L.divIcon({
-      html: '<div style="background:#8b4440;width:26px;height:26px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);border:3px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,0.4);"></div>',
+      html: `<div style="background:${MAP_PIN.spot};width:26px;height:26px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);border:3px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,0.4);"></div>`,
       className: '',
       iconSize: [26, 26],
       iconAnchor: [13, 26],
@@ -267,7 +407,12 @@ function SpotMapPicker({
 
   const missionIcon = useRef(
     L.divIcon({
-      html: '<div style="background:#d4a017;width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;border:3px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,0.4);font-size:13px;">🍽️</div>',
+      // Leaflet divIcons are raw HTML strings, so this can't use the <Icon>
+      // component — the same Feather "map-pin" path is inlined instead of the
+      // fork-and-knife emoji that used to sit here.
+      html: `<div style="background:${MAP_PIN.mission};width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;border:3px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,0.4);">`
+          + `<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#2C2810" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">`
+          + `<path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg></div>`,
       className: '',
       iconSize: [26, 26],
       iconAnchor: [13, 13],
@@ -276,7 +421,7 @@ function SpotMapPicker({
 
   const makeArIcon = (num) =>
     L.divIcon({
-      html: `<div style="background:#2c5f9e;width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;border:3px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,0.4);color:#fff;font-weight:700;font-size:12px;">${num}</div>`,
+      html: `<div style="background:${MAP_PIN.ar};width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;border:3px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,0.4);color:#0B2233;font-weight:700;font-size:12px;">${num}</div>`,
       className: '',
       iconSize: [26, 26],
       iconAnchor: [13, 13],
@@ -286,11 +431,12 @@ function SpotMapPicker({
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
 
-    const hasSpot  = spotLat !== '' && spotLat != null && spotLng !== '' && spotLng != null;
-    const startLat = hasSpot ? parseFloat(spotLat) : DEFAULT_CENTER.lat;
-    const startLng = hasSpot ? parseFloat(spotLng) : DEFAULT_CENTER.lng;
+    const startLat = toNum(spotLat);
+    const startLng = toNum(spotLng);
+    const hasSpot  = startLat !== null && startLng !== null;
 
-    const map = L.map(containerRef.current, { zoomControl: false }).setView([startLat, startLng], hasSpot ? 16 : 13);
+    const map = L.map(containerRef.current, { zoomControl: false })
+      .setView([hasSpot ? startLat : DEFAULT_CENTER.lat, hasSpot ? startLng : DEFAULT_CENTER.lng], hasSpot ? 16 : 13);
     mapRef.current = map;
 
     // Zoom +/- control, moved down to the bottom-right corner instead of
@@ -325,18 +471,18 @@ function SpotMapPicker({
   // Keep the spot marker in sync with props (set, moved, dragged, or cleared)
   useEffect(() => {
     if (!mapRef.current) return;
-    const hasSpot = spotLat !== '' && spotLat != null && spotLng !== '' && spotLng != null;
+    const la = toNum(spotLat);
+    const ln = toNum(spotLng);
 
-    if (!hasSpot) {
-      if (spotMarkerRef.current) {
+    // Also covers a half-typed value ("-", "14.") — leave the last good pin
+    // on the map rather than tearing it down and rebuilding it per keystroke.
+    if (la === null || ln === null) {
+      if (spotLat === '' && spotLng === '' && spotMarkerRef.current) {
         mapRef.current.removeLayer(spotMarkerRef.current);
         spotMarkerRef.current = null;
       }
       return;
     }
-
-    const la = parseFloat(spotLat);
-    const ln = parseFloat(spotLng);
 
     if (spotMarkerRef.current) {
       const cur = spotMarkerRef.current.getLatLng();
@@ -358,7 +504,12 @@ function SpotMapPicker({
         stateRef.current.onSpotChange(pos.lat, pos.lng);
       });
 
-      mapRef.current.setView([la, ln], mapRef.current.getZoom());
+      // Only recentre if the new pin would otherwise be off-screen. A pin
+      // created by clicking the map is already in view, so this no longer
+      // jumps the map out from under the click.
+      if (!mapRef.current.getBounds().contains([la, ln])) {
+        mapRef.current.setView([la, ln], mapRef.current.getZoom());
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [spotLat, spotLng]);
@@ -377,11 +528,9 @@ function SpotMapPicker({
     });
 
     arModels.forEach((model, index) => {
-      const hasCoords = model.lat !== '' && model.lat != null && model.lng !== '' && model.lng != null;
-      if (!hasCoords) return;
-
-      const la  = parseFloat(model.lat);
-      const ln  = parseFloat(model.lng);
+      const la  = toNum(model.lat);
+      const ln  = toNum(model.lng);
+      if (la === null || ln === null) return;
       const num = index + 1;
 
       let marker = arMarkersRef.current[model.id];
@@ -413,18 +562,16 @@ function SpotMapPicker({
   // same pattern as the spot marker, just a second independent single pin.
   useEffect(() => {
     if (!mapRef.current) return;
-    const hasMission = missionLat !== '' && missionLat != null && missionLng !== '' && missionLng != null;
+    const la = toNum(missionLat);
+    const ln = toNum(missionLng);
 
-    if (!hasMission) {
-      if (missionMarkerRef.current) {
+    if (la === null || ln === null) {
+      if (missionLat === '' && missionLng === '' && missionMarkerRef.current) {
         mapRef.current.removeLayer(missionMarkerRef.current);
         missionMarkerRef.current = null;
       }
       return;
     }
-
-    const la = parseFloat(missionLat);
-    const ln = parseFloat(missionLng);
 
     if (missionMarkerRef.current) {
       const cur = missionMarkerRef.current.getLatLng();
@@ -443,6 +590,29 @@ function SpotMapPicker({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [missionLat, missionLng]);
+
+  // Follow a typed coordinate that lands off-screen, so the pin doesn't
+  // silently move somewhere the user can't see.
+  //
+  // Debounced on purpose: typing "14.8433" passes through 1 -> 14 -> 14.8, and
+  // recentring on each of those would fling the map across the planet and
+  // back. Waiting for a pause means one move, to the final value. Pins placed
+  // by clicking or dragging are in view already, so the bounds check makes
+  // this a no-op for them.
+  useEffect(() => {
+    const la = toNum(mode === 'mission' ? missionLat : spotLat);
+    const ln = toNum(mode === 'mission' ? missionLng : spotLng);
+    if (la === null || ln === null) return;
+
+    const id = setTimeout(() => {
+      const map = mapRef.current;
+      if (!map) return;
+      if (!map.getBounds().contains([la, ln])) {
+        map.setView([la, ln], Math.max(map.getZoom(), 15));
+      }
+    }, 700);
+    return () => clearTimeout(id);
+  }, [spotLat, spotLng, missionLat, missionLng, mode]);
 
   // Lock dragging to the active mode — only the pin(s) for the current mode
   // are draggable, so a stray drag doesn't move the wrong pin.
@@ -473,7 +643,12 @@ function SpotMapPicker({
 export default function SpotForm({ initial, onSave, onCancel, saving = false, isModerator = false, lockedCity = '' }) {
   const [form, setForm] = useState({
     name:            initial?.name             || '',
-    category:        (Array.isArray(initial?.category) ? initial.category : (initial?.category ? [initial.category] : [])).filter(c => CATEGORIES.includes(c)),
+    // Deliberately NOT filtered against the known category list any more.
+    // That filter ran at initial-state time, and now the list arrives from the
+    // server a moment later — so filtering here would silently wipe a spot's
+    // existing categories before the fetch landed, and saving would persist
+    // the loss. Anything unrecognised is shown as a chip below instead.
+    category:        Array.isArray(initial?.category) ? initial.category : (initial?.category ? [initial.category] : []),
     description:     initial?.description      || '',
     city:            initial?.city             || lockedCity || '',
     entranceFee:     initial?.entranceFee      || '',
@@ -495,6 +670,29 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
     }
     return [];
   });
+
+  // Categories now come from the database. Seeded with the fallback so the
+  // chips render on first paint rather than popping in.
+  const [categories, setCategories] = useState(FALLBACK_CATEGORIES);
+  useEffect(() => {
+    let cancelled = false;
+    categoryAPI.getAll()
+      .then((rows) => {
+        if (cancelled) return;
+        const names = (rows || []).map((c) => c.name).filter(Boolean);
+        if (names.length) setCategories(names);
+      })
+      .catch(() => { /* keep the fallback */ });
+    return () => { cancelled = true; };
+  }, []);
+
+  // Any category already on this spot that isn't in the list still gets a chip,
+  // so an older or since-renamed value stays visible and removable instead of
+  // vanishing from the UI while remaining on the record.
+  const categoryOptions = useMemo(
+    () => [...new Set([...categories, ...(form.category || [])])],
+    [categories, form.category]
+  );
 
   // Pinning mode: 'spot' (drag/click moves the spot pin only), 'ar' (click
   // adds a new AR pin, existing AR pins draggable), or 'mission' (click/drag
@@ -524,9 +722,12 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
   // submit button below only proposes a mission-location change when one of
   // these actually changed — editing just the spot's name shouldn't also
   // silently re-submit an identical mission proposal.
+  // Coordinates go through toNum for the same reason as the spot snapshot
+  // below: the map writes numbers, the inputs write strings, and "14.8433"
+  // must not count as a change from 14.8433.
   const missionSnapshotRef = useRef(null);
   const snapshotMission = (lat, lng, name, image, info, radius) =>
-    JSON.stringify({ lat, lng, name, image, info, radius });
+    JSON.stringify({ lat: toNum(lat), lng: toNum(lng), name, image, info, radius: Number(radius) || 60 });
 
   useEffect(() => {
     if (!initial?._id) { setLoadingMission(false); return; }
@@ -616,12 +817,23 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
     const currentSnapshot = snapshotMission(missionLat, missionLng, locationName, missionImage, locationInfo, radiusMeters);
     if (currentSnapshot === missionSnapshotRef.current) return 'skipped';
 
+    // A half-typed coordinate would otherwise be sent as null, silently
+    // clearing a pin the moderator was in the middle of editing.
+    const missionErr = coordError(missionLat, missionLng);
+    if (missionErr) { setMissionError(missionErr); return 'failed'; }
+    const missionLatNum = toNum(missionLat);
+    const missionLngNum = toNum(missionLng);
+    if ((missionLatNum === null) !== (missionLngNum === null)) {
+      setMissionError('Enter both the latitude and the longitude, or clear both.');
+      return 'failed';
+    }
+
     setSavingMission(true);
     setMissionError('');
     try {
       const data = await missionAPI.proposeLocation(locationMission._id, {
-        lat: missionLat === '' ? null : Number(missionLat),
-        lng: missionLng === '' ? null : Number(missionLng),
+        lat: missionLatNum,
+        lng: missionLngNum,
         locationName: locationName.trim(),
         image: missionImage,
         locationInfo: locationInfo.trim(),
@@ -638,10 +850,22 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
     }
   };
 
-  // Snapshot of the form's starting values, used to detect unsaved changes on Cancel
+  // Snapshot of the form's starting values, used to detect unsaved changes on
+  // Cancel and — more importantly — to decide whether to submit a spot edit at
+  // all. Coordinates are normalised through toNum first: the map writes them as
+  // numbers and the inputs write them as strings, so without this, typing a
+  // coordinate back to the value it already had would look like a change and
+  // raise a pointless second mod request for the admin to review.
+  const snapshotSpot = (formValue, models) => JSON.stringify({
+    ...formValue,
+    coordinates_lat: toNum(formValue.coordinates_lat),
+    coordinates_lng: toNum(formValue.coordinates_lng),
+    arModels: models.map((m) => ({ id: m.id, lat: toNum(m.lat), lng: toNum(m.lng) })),
+  });
+
   const initialSnapshotRef = useRef(null);
   if (initialSnapshotRef.current === null) {
-    initialSnapshotRef.current = JSON.stringify({ form, arModels });
+    initialSnapshotRef.current = snapshotSpot(form, arModels);
   }
 
   const handleChange = (e) =>
@@ -673,7 +897,7 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
   const removeArModel = (id) => setArModels(prev => prev.filter(m => m.id !== id));
 
   const handleCancelClick = async () => {
-    const currentSnapshot = JSON.stringify({ form, arModels });
+    const currentSnapshot = snapshotSpot(form, arModels);
     if (currentSnapshot !== initialSnapshotRef.current) {
       if (!(await confirmAction('You have unsaved changes. Discard them and close this form?', { danger: true, confirmText: 'Discard' }))) return;
     }
@@ -693,11 +917,21 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
   if (!form.image) {
     return notify('Image is required');
   }
-  if (
-    form.coordinates_lat === '' ||
-    form.coordinates_lng === ''
-  ) {
-    return notify('Spot location is required');
+  // Typed coordinates can be blank, half-finished ("14.") or out of range, so
+  // this checks for a usable number rather than just a non-empty string.
+  const spotLatNum = toNum(form.coordinates_lat);
+  const spotLngNum = toNum(form.coordinates_lng);
+  if (spotLatNum === null || spotLngNum === null) {
+    return notify('Spot location is required — pin it on the map or type valid coordinates.');
+  }
+  const spotCoordErr = coordError(form.coordinates_lat, form.coordinates_lng);
+  if (spotCoordErr) return notify(spotCoordErr);
+
+  const badAr = arModels.findIndex(
+    (m) => (m.lat !== '' || m.lng !== '') && (toNum(m.lat) === null || toNum(m.lng) === null)
+  );
+  if (badAr !== -1) {
+    return notify(`AR ${badAr + 1} has an incomplete coordinate — fix or remove it.`);
   }
 
   const payload = {
@@ -711,23 +945,10 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
     modelUrl: form.modelUrl || null,
     AR3DModelURL: form.ARModelUrl || null,
     Badge: form.Badge || null,
-    coordinates: {
-      lat: Number(form.coordinates_lat),
-      lng: Number(form.coordinates_lng),
-    },
+    coordinates: { lat: spotLatNum, lng: spotLngNum },
     modelsCoordinates: arModels
-      .filter(
-        model =>
-          model.lat !== '' &&
-          model.lat != null &&
-          model.lng !== '' &&
-          model.lng != null
-      )
-      .map(model => ({
-        label: model.label || 'Model',
-        lat: Number(model.lat),
-        lng: Number(model.lng),
-      })),
+      .map(model => ({ label: model.label || 'Model', lat: toNum(model.lat), lng: toNum(model.lng) }))
+      .filter(model => model.lat !== null && model.lng !== null),
   };
 
   // One submit button covers both: the food-mission location proposal (if
@@ -741,7 +962,7 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
   // it's a brand-new spot, which must always go through) — otherwise a
   // mission-only edit would also create a spurious, unchanged spot-edit
   // request alongside the real mission-location one.
-  const spotChanged = JSON.stringify({ form, arModels }) !== initialSnapshotRef.current;
+  const spotChanged = snapshotSpot(form, arModels) !== initialSnapshotRef.current;
   if (!initial || spotChanged) {
     onSave(payload);
     return;
@@ -751,20 +972,34 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
     notify('Food mission location submitted for admin review.', { tone: 'success' });
     onCancel();
   } else {
-    notify('No changes to submit.');
+    // Spelled out, because this is the one path where pressing Save sends
+    // nothing at all. A bare "No changes to submit." reads like a confirmation
+    // and leaves someone believing a request is now waiting for the admin when
+    // none was ever created — e.g. after a file upload silently failed, so the
+    // field they thought they'd filled is still empty.
+    notify(
+      'Nothing was sent — this form has no changes compared to when you opened it. ' +
+      'If you meant to attach a file, check that it finished uploading (it should be listed under the upload button).',
+      { tone: 'warning', title: 'No request created' }
+    );
   }
 };
 
+  // Derived rather than stored, and via toNum rather than truthiness — a bare
+  // `missionLat && missionLng` reads a legitimate 0 as "not pinned".
+  const spotPinned    = toNum(form.coordinates_lat) !== null && toNum(form.coordinates_lng) !== null;
+  const missionPinned = toNum(missionLat) !== null && toNum(missionLng) !== null;
+
   const mapHint =
     mode === 'ar'
-      ? `Click the map to drop AR ${arModels.length + 1}. Drag any AR pin to fine-tune it.`
+      ? `Click the map to drop AR ${arModels.length + 1}. Drag any AR pin to fine-tune it, or edit its numbers below.`
       : mode === 'mission'
-        ? (missionLat && missionLng
-            ? 'Click the map or drag the pin to move the food mission location.'
-            : 'Click the map to pin where the food recommendation actually is.')
-        : form.coordinates_lat && form.coordinates_lng
-          ? 'Click the map or drag the pin to move the spot location.'
-          : 'Click the map to set the spot location.';
+        ? (missionPinned
+            ? 'Click the map, drag the pin, or type the coordinates below to move the food mission location.'
+            : 'Click the map to pin where the food recommendation actually is — or type its coordinates below.')
+        : spotPinned
+          ? 'Click the map, drag the pin, or type the coordinates below to move the spot location.'
+          : 'Click the map to set the spot location — or type its coordinates below.';
 
   return (
     <div style={styles.overlay}>
@@ -776,7 +1011,7 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
               ? (isModerator ? 'Propose Edit' : 'Edit Spot')
               : 'Add New Spot'}
           </h2>
-          <button onClick={handleCancelClick} style={styles.closeBtn} className="modern-btn" disabled={saving || savingMission}>✕</button>
+          <button onClick={handleCancelClick} style={styles.closeBtn} className="modern-btn" disabled={saving || savingMission} aria-label="Close"><Icon name="x" size={13} /></button>
         </div>
 
         <div style={styles.body}>
@@ -806,7 +1041,7 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
             <div style={styles.field}>
               <label style={styles.label}>Category <span style={styles.required}>*</span></label>
               <div style={styles.categoryChips}>
-                {CATEGORIES.map(cat => {
+                {categoryOptions.map(cat => {
                   const active = form.category.includes(cat);
                   return (
                     <button
@@ -871,7 +1106,7 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
                   style={{ ...styles.modeBtn, ...(mode === 'spot' ? styles.modeBtnActiveSpot : {}) }}
                   className="modern-btn"
                 >
-                  <span style={{ ...styles.modeDot, background: '#8b4440' }} />
+                  <span style={{ ...styles.modeDot, background: MAP_PIN.spot }} />
                   Spot
                 </button>
                 <button
@@ -880,7 +1115,7 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
                   style={{ ...styles.modeBtn, ...(mode === 'ar' ? styles.modeBtnActiveAr : {}) }}
                   className="modern-btn"
                 >
-                  <span style={{ ...styles.modeDot, background: '#2c5f9e' }} />
+                  <span style={{ ...styles.modeDot, background: MAP_PIN.ar }} />
                   AR position
                 </button>
                 <button
@@ -900,7 +1135,7 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
                   }}
                   className="modern-btn"
                 >
-                  <span style={{ ...styles.modeDot, background: '#d4a017' }} />
+                  <span style={{ ...styles.modeDot, background: MAP_PIN.mission }} />
                   {!initial?._id ? 'Food mission (save spot first)'
                     : loadingMission ? 'Food mission (checking…)'
                     : locationMission ? 'Food mission'
@@ -911,12 +1146,12 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
 
             <div style={styles.mapHintRow}>
               <p style={styles.mapHint}>{mapHint}</p>
-              {mode === 'spot' && form.coordinates_lat && form.coordinates_lng && (
+              {mode === 'spot' && spotPinned && (
                 <button type="button" onClick={handleClearSpot} style={styles.clearPinBtn} className="modern-btn">
                   Clear pin
                 </button>
               )}
-              {mode === 'mission' && missionLat && missionLng && (
+              {mode === 'mission' && missionPinned && (
                 <button type="button" onClick={handleClearMissionPin} style={styles.clearPinBtn} className="modern-btn">
                   Clear pin
                 </button>
@@ -936,6 +1171,20 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
               onMissionChange={handleMissionChange}
             />
 
+            <div style={styles.coordBlock}>
+              <p style={styles.coordBlockTitle}>Spot coordinates <span style={styles.required}>*</span></p>
+              <CoordFields
+                lat={form.coordinates_lat}
+                lng={form.coordinates_lng}
+                onChange={handleSpotChange}
+                disabled={saving || savingMission}
+              />
+              <p style={styles.hint}>
+                Type or paste them if you already have the numbers — pasting
+                "14.8433, 120.8114" into either box fills both. The pin follows.
+              </p>
+            </div>
+
             {arModels.length === 0 ? (
               <div style={styles.emptyAr}>No AR positions yet. Switch to "AR position" mode above, then tap the map.</div>
             ) : (
@@ -943,9 +1192,13 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
                 {arModels.map((model, index) => (
                   <div key={model.id} style={styles.arListRow}>
                     <span style={styles.arBadge}>AR {index + 1}</span>
-                    <span style={styles.arListCoords}>
-                      {model.lat && model.lng ? `${parseFloat(model.lat).toFixed(6)}, ${parseFloat(model.lng).toFixed(6)}` : 'Not set'}
-                    </span>
+                    <CoordFields
+                      lat={model.lat}
+                      lng={model.lng}
+                      onChange={(lat, lng) => handleArMove(model.id, lat, lng)}
+                      compact
+                      disabled={saving || savingMission}
+                    />
                     <button onClick={() => removeArModel(model.id)} style={styles.removeBtn} className="modern-btn">Remove</button>
                   </div>
                 ))}
@@ -961,7 +1214,7 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
                 (including this one) created automatically, so this one likely predates that.
                 Create them now and its location can be pinned right here.
               </p>
-              {missionError && <p style={styles.warningText}>⚠️ {missionError}</p>}
+              {missionError && <p style={styles.warningText}><Icon name="alert-triangle" size={12} /> {missionError}</p>}
               <button
                 type="button"
                 onClick={handleCreateDefaultMissions}
@@ -969,7 +1222,7 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
                 style={{ ...styles.saveMissionBtn, opacity: creatingMissions ? 0.7 : 1 }}
                 className="modern-btn"
               >
-                {creatingMissions ? 'Creating…' : '✨ Create missions for this spot'}
+                {creatingMissions ? 'Creating…' : <><Icon name="sparkle" size={13} /> Create missions for this spot</>}
               </button>
             </section>
           )}
@@ -985,22 +1238,29 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
                 admin review, same as spot edits, only going live once approved.
               </p>
 
-              {missionError && <p style={styles.warningText}>⚠️ {missionError}</p>}
+              {missionError && <p style={styles.warningText}><Icon name="alert-triangle" size={12} /> {missionError}</p>}
 
               <div style={styles.missionStatusRow}>
-                <span style={missionLat && missionLng ? styles.badgeOk : styles.badgeWarn}>
-                  {missionLat && missionLng ? '📍 Location pinned' : '⚠ Not pinned yet'}
+                <span style={missionPinned ? styles.badgeOk : styles.badgeWarn}>
+                  {missionPinned
+                    ? <><Icon name="map-pin" size={12} /> Location pinned</>
+                    : <><Icon name="alert-triangle" size={12} /> Not pinned yet</>}
                 </span>
-                {missionLat && missionLng && (
-                  <span style={styles.arListCoords}>
-                    {parseFloat(missionLat).toFixed(6)}, {parseFloat(missionLng).toFixed(6)}
-                  </span>
-                )}
+              </div>
+
+              <div style={styles.coordBlock}>
+                <p style={styles.coordBlockTitle}>Restaurant coordinates</p>
+                <CoordFields
+                  lat={missionLat}
+                  lng={missionLng}
+                  onChange={handleMissionChange}
+                  disabled={saving || savingMission}
+                />
               </div>
 
               {locationMission.pendingChange && (
                 <div style={styles.missionPendingNote}>
-                  ⏳ A change is already awaiting admin review for this mission
+                  <Icon name="clock" size={12} /> A change is already awaiting admin review for this mission
                   {locationMission.pendingChange.locationName ? ` ("${locationMission.pendingChange.locationName}")` : ''}.
                   Submitting again replaces that pending proposal.
                 </div>
@@ -1086,6 +1346,21 @@ const styles = {
   input:    { width: '100%', padding: '10px 12px', borderRadius: radius.md, border: `1px solid ${t.border}`, fontSize: 14, color: t.textPrimary, outline: 'none', background: t.sidebarBg, boxSizing: 'border-box' },
   textarea: { width: '100%', padding: '10px 12px', borderRadius: radius.md, border: `1px solid ${t.border}`, fontSize: 14, color: t.textPrimary, outline: 'none', background: t.sidebarBg, resize: 'vertical', boxSizing: 'border-box', fontFamily: 'inherit' },
 
+  // ── Editable coordinates ──
+  coordBlock:      { display: 'flex', flexDirection: 'column', gap: 8, padding: 12, borderRadius: radius.lg, border: `1px solid ${t.border}`, background: t.sidebarBg },
+  coordBlockTitle: { fontSize: 12, fontWeight: 700, color: t.textSecondary, textTransform: 'uppercase', letterSpacing: '0.06em', margin: 0 },
+  coordWrap:       { display: 'flex', flexDirection: 'column', gap: 6 },
+  // In an AR row the fields sit between the badge and the Remove button, so
+  // this one flexes to fill instead of setting its own width.
+  coordWrapSm:     { display: 'flex', flexDirection: 'column', gap: 4, flex: 1, minWidth: 0 },
+  coordRow:        { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 },
+  coordField:      { display: 'flex', flexDirection: 'column', gap: 5, minWidth: 0 },
+  coordLabel:      { fontSize: 11.5, fontWeight: 600, color: t.textMuted, letterSpacing: '0.02em' },
+  coordInput:      { width: '100%', padding: '9px 12px', borderRadius: radius.md, border: `1px solid ${t.border}`, fontSize: 14, color: t.textPrimary, outline: 'none', background: t.cardBg, boxSizing: 'border-box', fontVariantNumeric: 'tabular-nums' },
+  coordInputSm:    { width: '100%', padding: '5px 8px', borderRadius: radius.sm, border: `1px solid ${t.border}`, fontSize: 12.5, color: t.textPrimary, outline: 'none', background: t.cardBg, boxSizing: 'border-box', fontVariantNumeric: 'tabular-nums' },
+  coordInputError: { borderColor: t.danger },
+  coordErrorText:  { fontSize: 11.5, color: t.danger, margin: 0 },
+
   categoryChips:      { display: 'flex', flexWrap: 'wrap', gap: 8 },
   categoryChip:       { padding: '7px 14px', borderRadius: radius.pill, border: `1px solid ${t.border}`, background: t.sidebarBg, color: t.textSecondary, fontWeight: 600, fontSize: 13, cursor: 'pointer' },
   categoryChipActive: { background: t.brandSolid, borderColor: t.brandSolid, color: '#fff' },
@@ -1135,15 +1410,16 @@ const styles = {
 
   arList:       { display: 'flex', flexDirection: 'column', gap: 6 },
   arListRow:    { display: 'flex', alignItems: 'center', gap: 10, background: t.sidebarBg, borderRadius: 8, padding: '8px 12px', border: `1px solid ${t.border}` },
-  arBadge:      { fontSize: 12, fontWeight: 700, color: '#2c5f9e', background: '#2c5f9e1a', borderRadius: 6, padding: '3px 8px', flexShrink: 0 },
-  arListCoords: { flex: 1, fontSize: 12, color: t.textSecondary, fontVariantNumeric: 'tabular-nums' },
+  arBadge:      { fontSize: 12, fontWeight: 700, color: t.info, background: t.infoBg, borderRadius: 6, padding: '3px 8px', flexShrink: 0 },
   removeBtn:    { padding: '5px 10px', background: t.dangerBg, color: t.danger, border: 'none', borderRadius: 6, fontWeight: 600, fontSize: 12, cursor: 'pointer', flexShrink: 0 },
 
   footer:      { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 24px', borderTop: `1px solid ${t.divider}`, flexShrink: 0 },
   footerRight: { display: 'flex', alignItems: 'center', gap: 10 },
   requiredNote: { fontSize: 12, color: t.textSecondary },
   cancelBtn: { padding: '9px 18px', borderRadius: radius.md, border: `1px solid ${t.border}`, background: 'transparent', color: t.textSecondary, fontWeight: 600, fontSize: 13, cursor: 'pointer' },
-  saveBtn:   { padding: '9px 18px', borderRadius: radius.md, border: 'none', background: t.brandSolid, color: '#fff', fontWeight: 600, fontSize: 13, cursor: 'pointer', boxShadow: shadow.sm },
+  // The one primary CTA on this form — yellow, like the app's accent. The
+  // mission backfill button above stays teal so there's never two "the" buttons.
+  saveBtn:   { padding: '9px 18px', borderRadius: radius.md, border: 'none', background: t.accent, color: t.onAccent, fontWeight: 700, fontSize: 13, cursor: 'pointer', boxShadow: shadow.sm },
 
   warningText: { fontSize: 12, color: t.danger, fontWeight: 500, margin: 0 },
   okText:      { fontSize: 12, color: t.success, fontWeight: 500, margin: 0 },

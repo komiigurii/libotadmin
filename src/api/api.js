@@ -119,6 +119,22 @@ export const authAPI = {
     api.post('/api/auth/admin-login', { email, password }).then(r => r.data),
 };
 
+// Spot categories. The list used to be hardcoded in both this panel and the
+// mobile app; it now lives in the database so it can be changed without a
+// release. GET is public; create/update/delete are admin-only.
+export const categoryAPI = {
+  getAll: () => api.get('/api/categories').then(r => r.data.categories || []),
+  create: (data)     => api.post('/api/categories', data).then(r => r.data),
+  update: (id, data) => api.put(`/api/categories/${id}`, data).then(r => r.data),
+  remove: (id)       => api.delete(`/api/categories/${id}`).then(r => r.data),
+};
+
+// Traveler leaderboard + engagement figures. Read-only, and open to
+// moderators as well as admins.
+export const userProgressAPI = {
+  getAll: () => api.get('/api/user-progress').then(r => r.data),
+};
+
 // type: 'image' | 'badge' | 'model'
 export const uploadAPI = {
   spotMedia: (file, type = 'image') => {

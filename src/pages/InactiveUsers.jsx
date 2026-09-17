@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { inactiveUsersAPI, accountActionAPI } from '../api/api';
 import { notify, confirmAction } from '../components/AppAlert';
 import { theme as t, radius, shadow } from '../theme';
+import { pageStyles, Loading, EmptyState } from '../components/Layout';
+import Icon from '../components/Icon';
 
 const role = () => localStorage.getItem('role');
 
@@ -74,15 +76,19 @@ export default function InactiveUsers() {
           </p>
         </div>
         {pendingCount > 0 && (
-          <span style={s.alertBadge}>🔔 {pendingCount} pending archival</span>
+          <span style={s.alertBadge}><Icon name="bell" size={11} /> {pendingCount} pending archival</span>
         )}
       </div>
 
       <div style={s.card}>
         {loading ? (
-          <div style={s.empty}>Loading…</div>
+          <Loading />
         ) : users.length === 0 ? (
-          <div style={s.empty}>No inactive users found.</div>
+          <EmptyState
+            icon="check"
+            title="No inactive users"
+            subtitle="Nobody has been away for 30 days or more."
+          />
         ) : (
           <div style={s.tblWrap}>
             <table style={s.table}>
@@ -106,7 +112,7 @@ export default function InactiveUsers() {
                       <td style={s.td}>{u.lastActiveAt ? new Date(u.lastActiveAt).toISOString().slice(0, 10) : '—'}</td>
                       <td style={s.td}>
                         <span style={{ ...s.daysPill, ...(u.daysInactive >= 45 ? s.daysUrgent : {}) }}>
-                          ⏱ {u.daysInactive}d
+                          <Icon name="clock" size={11} /> {u.daysInactive == null ? 'Never active' : `${u.daysInactive}d`}
                         </span>
                       </td>
                       <td style={s.td}>{u.commentCount}</td>
@@ -123,7 +129,7 @@ export default function InactiveUsers() {
                             style={{ ...s.btnPropose, opacity: acting === u.clerkUserId ? 0.6 : 1 }}
                             className="modern-btn"
                           >
-                            ⏸ Propose Suspension
+                            <Icon name="pause" size={12} /> Propose Suspension
                           </button>
                         ) : (
                           <button
@@ -132,7 +138,7 @@ export default function InactiveUsers() {
                             style={{ ...s.btnArchive, opacity: acting === u.clerkUserId ? 0.6 : 1 }}
                             className="modern-btn"
                           >
-                            🗂 Approve Archival
+                            <Icon name="archive" size={12} /> Approve Archival
                           </button>
                         )}
                       </td>
@@ -176,18 +182,16 @@ export default function InactiveUsers() {
 }
 
 const s = {
-  page:       { padding: '28px 32px', maxWidth: 1200, margin: '0 auto' },
-  pageHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 22 },
-  pageTitle:  { fontSize: 22, fontWeight: 600, color: t.textPrimary, marginBottom: 4 },
-  pageSub:    { fontSize: 13, color: t.textSecondary },
+  // Page shell, header, toolbar, states and table cells come from
+  // components/Layout so every page is spaced identically.
+  ...pageStyles,
+  // Page-specific: the shared card has no padding, overflow or margin,
+  // because those differ by how each page uses a card.
+  card: { background: t.cardBg, border: `1px solid ${t.border}`, borderRadius: radius.xl, overflow: 'hidden', boxShadow: shadow.sm },
   alertBadge: { padding: '7px 14px', background: t.warningBg, color: t.warning, borderRadius: 8, fontSize: 12, fontWeight: 700 },
 
-  card:       { background: t.cardBg, border: `1px solid ${t.border}`, borderRadius: radius.xl, overflow: 'hidden', boxShadow: shadow.sm },
   tblWrap:    { overflowX: 'auto' },
-  table:      { width: '100%', borderCollapse: 'collapse' },
-  th:         { padding: '11px 16px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: t.textMuted, textTransform: 'uppercase', letterSpacing: '.06em', borderBottom: `1px solid ${t.border}` },
   tr:         { borderTop: `1px solid ${t.divider}` },
-  td:         { padding: '13px 16px', fontSize: 13, color: t.textPrimary },
   name:       { fontWeight: 600 },
 
   daysPill:      { padding: '3px 10px', borderRadius: 20, fontSize: 12, fontWeight: 600, background: t.warningBg, color: t.warning },
@@ -198,12 +202,11 @@ const s = {
 
   btnArchive: { padding: '6px 14px', background: t.successBg, color: t.success, border: 'none', borderRadius: 8, fontWeight: 600, fontSize: 12, cursor: 'pointer' },
   btnPropose: { padding: '6px 14px', background: t.warningBg, color: t.warning, border: 'none', borderRadius: 8, fontWeight: 600, fontSize: 12, cursor: 'pointer' },
-  empty:      { padding: 60, textAlign: 'center', color: t.textSecondary },
 
   proposeRow:     { padding: '12px 16px 16px', background: t.sidebarBg, borderTop: `1px solid ${t.divider}` },
   textarea:       { width: '100%', padding: '9px 12px', borderRadius: 8, border: `1.5px solid ${t.border}`, fontSize: 13, color: t.textPrimary, background: t.cardBg, resize: 'vertical', outline: 'none', boxSizing: 'border-box' },
   proposeActions: { display: 'flex', gap: 8, marginTop: 8 },
   btn:            { padding: '7px 16px', borderRadius: 8, fontWeight: 600, fontSize: 12.5, cursor: 'pointer', border: 'none' },
-  btnPrimary:     { background: t.brandSolid, color: '#fff' },
+  btnPrimary:     { background: t.accent, color: t.onAccent, fontWeight: 700 },
   btnCancel:      { background: 'transparent', color: t.textMuted, border: `1px solid ${t.border}` },
 };

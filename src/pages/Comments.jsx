@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { commentAPI, bannedAccountsAPI } from '../api/api';
 import { notify, confirmAction } from '../components/AppAlert';
 import { theme as t, radius, shadow } from '../theme';
+import { pageStyles, Loading, ErrorBanner, EmptyState, Avatar } from '../components/Layout';
+import Icon from '../components/Icon';
 
 const role = () => localStorage.getItem('role');
 
@@ -22,8 +24,6 @@ function toArray(data) {
   return [];
 }
 
-const initialsOf = (name) =>
-  (name || '?').trim().split(/\s+/).slice(0, 2).map(w => w[0]?.toUpperCase()).join('');
 
 export default function Comments() {
   const isModerator = role() === 'moderator';
@@ -83,15 +83,17 @@ export default function Comments() {
       </div>
 
       {loading ? (
-        <div style={s.empty}>Loading…</div>
+        <Loading />
       ) : error ? (
-        <div style={{ ...s.empty, color: t.danger }}>{error}</div>
+        <ErrorBanner>{error}</ErrorBanner>
       ) : visible.length === 0 ? (
-        <div style={s.emptyState}>
-          <div style={s.emptyIcon}>✓</div>
-          <div style={s.emptyText}>No comments found</div>
-          <div style={s.emptySub}>Nothing matches your search.</div>
-        </div>
+        <EmptyState
+          icon="check"
+          title={comments.length === 0 ? 'No comments yet' : 'No comments found'}
+          subtitle={comments.length === 0
+            ? 'Reviews left in the app will appear here.'
+            : 'Nothing matches your search.'}
+        />
       ) : (
         visible.map(c => (
           <CommentRow
@@ -148,7 +150,7 @@ function CommentRow({ comment, isModerator, expanded, onToggle, onUpdated }) {
     setSaving(false);
   };
 
-  // Suspend applies whatever the *next* escalation step is (7d → 14d →
+  // Suspend applies whatever the *next* escalation step is (7d -> 14d ->
   // auto-ban on the 3rd) — the backend decides the duration, not the admin.
   const suspendUser = async () => {
     if (!banReason.trim()) { notify('Add a reason for suspending this user'); return; }
@@ -191,7 +193,7 @@ function CommentRow({ comment, isModerator, expanded, onToggle, onUpdated }) {
   return (
     <div style={s.card} className="modern-card">
       <div style={s.cardTop} onClick={onToggle}>
-        <div style={s.avatar}>{initialsOf(userName)}</div>
+        <Avatar src={comment.userImage} name={userName} size={38} />
 
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={s.metaRow}>
@@ -207,18 +209,18 @@ function CommentRow({ comment, isModerator, expanded, onToggle, onUpdated }) {
           </div>
           <p style={s.commentText}>{comment.comment}</p>
           <div style={s.reactRow}>
-            <span style={s.react}>👍 {comment.likes || 0}</span>
-            <span style={s.react}>👎 {comment.dislikes || 0}</span>
+            <span style={s.react}><Icon name="thumbs-up" size={11} /> {comment.likes || 0}</span>
+            <span style={s.react}><Icon name="thumbs-down" size={11} /> {comment.dislikes || 0}</span>
           </div>
         </div>
 
         {!isModerator && (
           <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
             <button onClick={(e) => { e.stopPropagation(); onToggle(); }} style={s.btnBanToggle} className="modern-btn">
-              🚫 Suspend / Ban
+              <Icon name="slash" size={12} /> Suspend / Ban
             </button>
             <button onClick={(e) => { e.stopPropagation(); remove(); }} disabled={saving} style={s.btnDelete} className="modern-btn">
-              🗑 Delete
+              <Icon name="trash" size={12} /> Delete
             </button>
           </div>
         )}
@@ -272,10 +274,10 @@ function CommentRow({ comment, isModerator, expanded, onToggle, onUpdated }) {
 
           <div style={s.actions}>
             <button disabled={saving} onClick={suspendUser} style={{ ...s.btn, ...s.btnWarn, opacity: saving ? 0.6 : 1 }} className="modern-btn">
-              ⏳ Suspend
+              <Icon name="clock" size={12} /> Suspend
             </button>
             <button disabled={saving} onClick={banUser} style={{ ...s.btn, ...s.btnDanger, opacity: saving ? 0.6 : 1 }} className="modern-btn">
-              🚫 Ban Permanently
+              <Icon name="slash" size={12} /> Ban Permanently
             </button>
           </div>
         </div>
@@ -285,18 +287,16 @@ function CommentRow({ comment, isModerator, expanded, onToggle, onUpdated }) {
 }
 
 const s = {
-  page:       { padding: '28px 32px', maxWidth: 1100, margin: '0 auto' },
-  pageHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 },
-  pageTitle:  { fontSize: 22, fontWeight: 600, color: t.textPrimary, marginBottom: 4 },
-  pageSub:    { fontSize: 13, color: t.textSecondary },
+  // Page shell, header, toolbar, states and table cells come from
+  // components/Layout so every page is spaced identically.
+  ...pageStyles,
+  // Page-specific: the shared card has no padding, overflow or margin,
+  // because those differ by how each page uses a card.
+  card: { background: t.cardBg, border: `1px solid ${t.border}`, borderRadius: radius.xl, marginBottom: 12, overflow: 'hidden', boxShadow: shadow.sm },
   totalBadge: { fontSize: 13, color: t.textMuted, fontWeight: 500, paddingTop: 4 },
 
-  filterRow:   { marginBottom: 18 },
-  searchInput: { width: '100%', padding: '10px 14px', borderRadius: 10, border: `1px solid ${t.border}`, fontSize: 14, background: t.cardBg, outline: 'none', color: t.textPrimary, boxSizing: 'border-box' },
 
-  card:       { background: t.cardBg, border: `1px solid ${t.border}`, borderRadius: radius.xl, marginBottom: 12, overflow: 'hidden', boxShadow: shadow.sm },
   cardTop:    { display: 'flex', alignItems: 'flex-start', gap: 14, padding: '16px 18px', cursor: 'pointer' },
-  avatar:     { width: 38, height: 38, borderRadius: '50%', background: t.brandSoft, color: t.brand, fontWeight: 700, fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   metaRow:    { display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 6 },
   userName:   { fontSize: 14, fontWeight: 700, color: t.textPrimary },
   dateText:   { fontSize: 12, color: t.textMuted },
@@ -317,13 +317,8 @@ const s = {
   escalationNote: { fontSize: 11.5, color: t.textMuted, lineHeight: 1.5, margin: '10px 0 0' },
   actions:    { display: 'flex', gap: 8, marginTop: 10 },
   btn:        { padding: '8px 18px', borderRadius: 8, fontWeight: 600, fontSize: 13, cursor: 'pointer', border: 'none' },
-  btnPrimary: { background: t.brandSolid, color: '#fff' },
+  btnPrimary: { background: t.accent, color: t.onAccent, fontWeight: 700 },
   btnWarn:    { background: t.warningBg, color: t.warning },
   btnDanger:  { background: t.dangerBg, color: t.danger },
 
-  empty:      { padding: 60, textAlign: 'center', color: t.textSecondary },
-  emptyState: { textAlign: 'center', padding: '70px 20px' },
-  emptyIcon:  { width: 52, height: 52, borderRadius: '50%', background: t.brandSoft, color: t.brand, fontSize: 22, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 14px' },
-  emptyText:  { fontSize: 16, fontWeight: 600, color: t.textPrimary, marginBottom: 6 },
-  emptySub:   { fontSize: 13, color: t.textSecondary },
 };

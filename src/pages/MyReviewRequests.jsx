@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { spotAPI, accountActionAPI } from '../api/api';
 import { theme as t, radius, shadow } from '../theme';
+import { pageStyles, Loading, EmptyState, ErrorBanner } from '../components/Layout';
+import Icon from '../components/Icon';
 
 const STATUS_PILL = {
   pending:  { background: t.warningBg, color: t.warning, label: 'Pending' },
@@ -87,7 +89,7 @@ function DiffField({ fieldKey, oldVal, newVal }) {
         <span style={s.fieldLabel}>{label}</span>
         <div style={s.thumbPair}>
           <Thumb url={oldVal} dimmed />
-          <span style={s.arrow}>→</span>
+          <span style={s.arrow}><Icon name="arrow-right" size={12} /></span>
           <Thumb url={newVal} />
         </div>
       </div>
@@ -101,7 +103,7 @@ function DiffField({ fieldKey, oldVal, newVal }) {
         <span style={s.fieldLabel}>{label}</span>
         <div style={s.linkPair}>
           {hasOld ? <a href={oldVal} target="_blank" rel="noreferrer" style={s.linkOld}>{fileNameOf(oldVal)}</a> : <span style={s.emptyDash}>—</span>}
-          <span style={s.arrow}>→</span>
+          <span style={s.arrow}><Icon name="arrow-right" size={12} /></span>
           {hasNew ? <a href={newVal} target="_blank" rel="noreferrer" style={s.linkNew}>{fileNameOf(newVal)}</a> : <span style={s.emptyDash}>—</span>}
         </div>
       </div>
@@ -122,7 +124,7 @@ function DiffField({ fieldKey, oldVal, newVal }) {
     <div style={s.fieldRow}>
       <span style={s.fieldLabel}>{label}</span>
       <span style={s.oldText}>{fmtVal(fieldKey, oldVal)}</span>
-      <span style={s.arrow}>→</span>
+      <span style={s.arrow}><Icon name="arrow-right" size={12} /></span>
       <span style={s.newText}>{fmtVal(fieldKey, newVal)}</span>
     </div>
   );
@@ -182,7 +184,10 @@ export default function MyReviewRequests() {
           kind: 'account',
           id: a._id,
           status: a.status,
-          subtitle: a.targetName || a.clerkUserId,
+          // Never the raw Clerk id — the backend resolves this to a real
+          // name, falling back to 'Deleted user' when the account is gone.
+          subtitle: a.targetName || 'Deleted user',
+          image: a.targetImage || null,
           date: a.proposedAt || a.createdAt,
           body: a,
         }));
@@ -232,11 +237,15 @@ export default function MyReviewRequests() {
       </div>
 
       {loading ? (
-        <div style={s.emptyCard}>Loading…</div>
+        <Loading />
       ) : error ? (
-        <div style={{ ...s.emptyCard, color: t.danger }}>{error}</div>
+        <ErrorBanner>{error}</ErrorBanner>
       ) : visible.length === 0 ? (
-        <div style={s.emptyCard}>No requests found</div>
+        <EmptyState
+          icon="check"
+          title="No requests found"
+          subtitle="Edits and account actions you submit will appear here."
+        />
       ) : (
         <div style={s.grid}>
           {visible.map(r => {
@@ -285,18 +294,18 @@ export default function MyReviewRequests() {
 
                   <div style={s.detailList}>
                     <div style={s.detailRow}>
-                      <span style={s.detailIcon}>🕒</span>
+                      <span style={s.detailIcon}><Icon name="clock" size={12} /></span>
                       <span style={s.detailText}>{dateStr}</span>
                     </div>
                     {r.kind === 'spot' && (
                       <div style={s.detailRow}>
-                        <span style={s.detailIcon}>✏️</span>
+                        <span style={s.detailIcon}><Icon name="edit" size={12} /></span>
                         <span style={s.detailText}>{changedFields.length} field{changedFields.length === 1 ? '' : 's'} changed</span>
                       </div>
                     )}
                     {r.kind === 'account' && r.status !== 'pending' && r.body.resultSummary && (
                       <div style={s.detailRow}>
-                        <span style={s.detailIcon}>✅</span>
+                        <span style={s.detailIcon}><Icon name="check-circle" size={12} /></span>
                         <span style={s.detailText}>{r.body.resultSummary}</span>
                       </div>
                     )}
@@ -338,17 +347,16 @@ export default function MyReviewRequests() {
 }
 
 const s = {
-  page:       { padding: '20px 24px', maxWidth: 1100, margin: '0 auto', width: '100%', boxSizing: 'border-box', textAlign: 'left' },
-  pageHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 },
-  pageTitle:  { fontSize: 19, fontWeight: 600, color: t.textPrimary, marginBottom: 3 },
-  pageSub:    { fontSize: 12, color: t.textSecondary },
-
-  filterRow:  { marginBottom: 14, display: 'flex' },
+  // Page shell, header, toolbar, states and table cells come from
+  // components/Layout so every page is spaced identically.
+  ...pageStyles,
+  // Page-specific: the shared card has no padding, overflow or margin,
+  // because those differ by how each page uses a card.
+  card: { background: t.cardBg, border: `1px solid ${t.border}`, borderRadius: radius.lg, overflow: 'hidden', display: 'flex', flexDirection: 'column', boxShadow: shadow.sm },
   select:     { padding: '7px 12px', borderRadius: 8, border: `1px solid ${t.border}`, fontSize: 12.5, color: t.textPrimary, background: t.cardBg, outline: 'none', cursor: 'pointer' },
 
   grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 14 },
 
-  card: { background: t.cardBg, border: `1px solid ${t.border}`, borderRadius: radius.lg, overflow: 'hidden', display: 'flex', flexDirection: 'column', boxShadow: shadow.sm },
 
   cardImgWrap: { position: 'relative', width: '100%', height: 100, background: t.sidebarBg },
   cardImg:     { width: '100%', height: '100%', objectFit: 'cover', display: 'block' },
@@ -402,5 +410,4 @@ const s = {
   longOldBox: { fontSize: 11.5, color: t.textMuted, textDecoration: 'line-through', lineHeight: 1.5, marginTop: 4, whiteSpace: 'pre-wrap' },
   longNewBox: { fontSize: 11.5, color: t.brand, lineHeight: 1.5, marginTop: 4, whiteSpace: 'pre-wrap', fontWeight: 500 },
 
-  emptyCard:  { padding: 44, textAlign: 'center', color: t.textSecondary, background: t.cardBg, border: `1px solid ${t.border}`, borderRadius: 12, width: '100%', boxSizing: 'border-box' },
 };

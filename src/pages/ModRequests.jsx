@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { spotAPI, accountActionAPI, missionAPI } from '../api/api';
 import { notify } from '../components/AppAlert';
 import { theme as t, radius, shadow } from '../theme';
+import { pageStyles, Loading, ErrorBanner, EmptyState, Avatar, SpotThumb } from '../components/Layout';
+import Icon from '../components/Icon';
 
 const STATUS_PILL = {
   pending:  { background: t.purpleBg,  color: t.purple,  label: 'PENDING' },
@@ -44,8 +46,6 @@ function toArray(data) {
   return [];
 }
 
-const initialsOf = (name) =>
-  (name || '?').trim().split(/\s+/).slice(0, 2).map(w => w[0]?.toUpperCase()).join('');
 
 function fmtCoord(c) {
   if (!c || c.lat == null || c.lng == null) return '—';
@@ -101,7 +101,7 @@ function DiffField({ fieldKey, oldVal, newVal, labelMap = FIELD_LABELS }) {
         <span style={s.fieldLabel}>{label}</span>
         <div style={s.thumbPair}>
           <Thumb url={oldVal} dimmed />
-          <span style={s.arrow}>→</span>
+          <span style={s.arrow}><Icon name="arrow-right" size={12} /></span>
           <Thumb url={newVal} />
         </div>
       </div>
@@ -115,7 +115,7 @@ function DiffField({ fieldKey, oldVal, newVal, labelMap = FIELD_LABELS }) {
         <span style={s.fieldLabel}>{label}</span>
         <div style={s.linkPair}>
           {hasOld ? <a href={oldVal} target="_blank" rel="noreferrer" style={s.linkOld}>{fileNameOf(oldVal)}</a> : <span style={s.emptyDash}>—</span>}
-          <span style={s.arrow}>→</span>
+          <span style={s.arrow}><Icon name="arrow-right" size={12} /></span>
           {hasNew ? <a href={newVal} target="_blank" rel="noreferrer" style={s.linkNew}>{fileNameOf(newVal)}</a> : <span style={s.emptyDash}>—</span>}
         </div>
       </div>
@@ -136,7 +136,7 @@ function DiffField({ fieldKey, oldVal, newVal, labelMap = FIELD_LABELS }) {
     <div style={s.fieldRow}>
       <span style={s.fieldLabel}>{label}</span>
       <span style={s.oldText}>{fmtVal(fieldKey, oldVal)}</span>
-      <span style={s.arrow}>→</span>
+      <span style={s.arrow}><Icon name="arrow-right" size={12} /></span>
       <span style={s.newText}>{fmtVal(fieldKey, newVal)}</span>
     </div>
   );
@@ -176,12 +176,39 @@ export default function ModRequests() {
     setLoading(true);
     setError(null);
     try {
-      const [pendingProposalsData, pendingSpotsData, accountActionsData, missionProposalsData] = await Promise.all([
-        spotAPI.getPendingProposals(),  // { success, proposals }
-        spotAPI.getPending(),           // { success, items }
-        accountActionAPI.getAll(),
-        missionAPI.getProposals(),      // [] of missions with a pendingChange
-      ]);
+      // allSettled, NOT all. This queue is assembled from four independent
+      // endpoints, and with Promise.all a single one failing rejected the whole
+      // thing — the catch below then blanked the list and showed "Failed to
+      // load mod requests". A moderator's spot edit could be sitting in the
+      // database, correctly saved, and the admin would still see an empty
+      // queue because an unrelated call (account actions, say) had errored.
+      // Now each section fails on its own and the rest still render.
+      const [pendingProposalsRes, pendingSpotsRes, accountActionsRes, missionProposalsRes] =
+        await Promise.allSettled([
+          spotAPI.getPendingProposals(),  // { success, proposals }
+          spotAPI.getPending(),           // { success, items }
+          accountActionAPI.getAll(),
+          missionAPI.getProposals(),      // [] of missions with a pendingChange
+        ]);
+
+      const failed = [];
+      const valueOf = (res, label, fallback) => {
+        if (res.status === 'fulfilled') return res.value;
+        console.error(`[ModRequests] ${label} failed:`, res.reason);
+        failed.push(label);
+        return fallback;
+      };
+
+      const pendingProposalsData = valueOf(pendingProposalsRes, 'New spot proposals', {});
+      const pendingSpotsData     = valueOf(pendingSpotsRes,     'Spot edits',         {});
+      const accountActionsData   = valueOf(accountActionsRes,   'Account actions',    []);
+      const missionProposalsData = valueOf(missionProposalsRes, 'Food mission locations', []);
+
+      setError(
+        failed.length
+          ? `Couldn't load: ${failed.join(', ')}. Everything else is shown below.`
+          : null
+      );
 
       const pendingProposals = toArray(pendingProposalsData.proposals || pendingProposalsData);
       const pendingSpots     = toArray(pendingSpotsData.items || pendingSpotsData);
@@ -192,6 +219,7 @@ export default function ModRequests() {
         status: proposal.status || 'pending',
         title: 'New Spot Proposal',
         subtitle: proposal.name || '—',
+        image: proposal.image || null,
         date: proposal.submittedAt || proposal.createdAt,
         body: proposal,
       }));
@@ -204,6 +232,7 @@ export default function ModRequests() {
           status: 'pending',
           title: 'Spot edit request',
           subtitle: spot.name || '—',
+          image: spot.image || null,
           date: spot.pendingChange?.submittedAt,
           body: spot,
         }));
@@ -216,6 +245,7 @@ export default function ModRequests() {
           status: 'pending',
           title: 'Spot deletion request',
           subtitle: spot.name || '—',
+          image: spot.image || null,
           date: spot.pendingDeleteAt,
           body: spot,
         }));
@@ -226,7 +256,10 @@ export default function ModRequests() {
           id: a._id,
           status: a.status,
           title: a.proposedByName || 'Moderator',
-          subtitle: a.targetName || a.clerkUserId,
+          // Never the raw Clerk id — the backend resolves this to a real
+          // name, and falls back to 'Deleted user' when the account is gone.
+          subtitle: a.targetName || 'Deleted user',
+          image: a.targetImage || null,
           date: a.proposedAt || a.createdAt,
           body: a,
         }));
@@ -238,6 +271,7 @@ export default function ModRequests() {
           status: 'pending',
           title: 'Food mission location',
           subtitle: mission.spotId?.name || mission.title || '—',
+          image: mission.spotId?.image || null,
           date: mission.pendingChange?.submittedAt,
           body: mission,
         }));
@@ -330,15 +364,17 @@ export default function ModRequests() {
       </div>
 
       {loading ? (
-        <div style={s.empty}>Loading…</div>
+        <Loading />
       ) : error ? (
-        <div style={{ ...s.empty, color: t.danger }}>{error}</div>
+        <ErrorBanner>{error}</ErrorBanner>
       ) : visible.length === 0 ? (
-        <div style={s.emptyState}>
-          <div style={s.emptyIcon}>✓</div>
-          <div style={s.emptyText}>No requests found</div>
-          <div style={s.emptySub}>All caught up for this filter.</div>
-        </div>
+        <EmptyState
+          icon="check"
+          title={requests.length === 0 ? 'Nothing awaiting review' : 'No requests found'}
+          subtitle={requests.length === 0
+            ? 'Moderator submissions will appear here.'
+            : 'All caught up for this filter.'}
+        />
       ) : (
         visible.map(r => {
           const pill = STATUS_PILL[r.status] || STATUS_PILL.pending;
@@ -371,9 +407,13 @@ export default function ModRequests() {
           return (
             <div key={key} style={s.card} className="modern-card">
               <div style={s.cardTop} onClick={() => setExpandedKey(isExpanded ? null : key)}>
-                <div style={{ ...s.avatar, ...(isDeleteRequest ? s.avatarDanger : {}) }}>
-                  {isDeleteRequest ? '🗑️' : initialsOf(avatarName)}
-                </div>
+                {isDeleteRequest ? (
+                  <div style={{ ...s.avatar, ...s.avatarDanger }}><Icon name="trash" size={14} /></div>
+                ) : r.kind === 'account' ? (
+                  <Avatar src={r.image} name={avatarName} size={38} />
+                ) : (
+                  <SpotThumb src={r.image} size={38} />
+                )}
 
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={s.metaRow}>
@@ -413,10 +453,12 @@ export default function ModRequests() {
 
                   <div style={s.reactRow}>
                     {r.kind === 'account' && (
-                      <span style={s.react}>{r.body.sourceType === 'inactivity' ? '⏱ Account inactivity' : '✋ Manual'}</span>
+                      <span style={s.react}>{r.body.sourceType === 'inactivity'
+                          ? <><Icon name="clock" size={11} /> Account inactivity</>
+                          : <><Icon name="hand" size={11} /> Manual</>}</span>
                     )}
                     {r.status !== 'pending' && r.body.resultSummary && (
-                      <span style={s.react}>✅ {r.body.resultSummary}</span>
+                      <span style={s.react}><Icon name="check-circle" size={11} /> {r.body.resultSummary}</span>
                     )}
                   </div>
                 </div>
@@ -488,16 +530,16 @@ export default function ModRequests() {
 }
 
 const s = {
-  page:       { padding: '28px 32px', maxWidth: 1100, margin: '0 auto' },
-  pageHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 },
-  pageTitle:  { fontSize: 22, fontWeight: 600, color: t.textPrimary, marginBottom: 4 },
-  pageSub:    { fontSize: 13, color: t.textSecondary },
+  // Page shell, header, toolbar, states and table cells come from
+  // components/Layout so every page is spaced identically.
+  ...pageStyles,
+  // Page-specific: the shared card has no padding, overflow or margin,
+  // because those differ by how each page uses a card.
+  card: { background: t.cardBg, border: `1px solid ${t.border}`, borderRadius: radius.xl, marginBottom: 12, overflow: 'hidden', boxShadow: shadow.sm },
   totalBadge: { fontSize: 13, color: t.textMuted, fontWeight: 500, paddingTop: 4 },
 
-  filterRow:    { marginBottom: 18 },
   filterSelect: { padding: '10px 14px', borderRadius: 10, border: `1px solid ${t.border}`, fontSize: 13, color: t.textPrimary, background: t.cardBg, outline: 'none', cursor: 'pointer' },
 
-  card:       { background: t.cardBg, border: `1px solid ${t.border}`, borderRadius: radius.xl, marginBottom: 12, overflow: 'hidden', boxShadow: shadow.sm },
   cardTop:    { display: 'flex', alignItems: 'flex-start', gap: 14, padding: '16px 18px', cursor: 'pointer' },
   avatar:     { width: 38, height: 38, borderRadius: '50%', background: t.brandSoft, color: t.brand, fontWeight: 700, fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   avatarDanger: { background: t.dangerBg, color: t.danger, fontSize: 16 },
@@ -546,9 +588,4 @@ const s = {
   longOldBox: { fontSize: 11.5, color: t.textMuted, textDecoration: 'line-through', lineHeight: 1.5, marginTop: 4, whiteSpace: 'pre-wrap' },
   longNewBox: { fontSize: 11.5, color: t.brand, lineHeight: 1.5, marginTop: 4, whiteSpace: 'pre-wrap', fontWeight: 500 },
 
-  empty:      { padding: 60, textAlign: 'center', color: t.textSecondary },
-  emptyState: { textAlign: 'center', padding: '70px 20px' },
-  emptyIcon:  { width: 52, height: 52, borderRadius: '50%', background: t.brandSoft, color: t.brand, fontSize: 22, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 14px' },
-  emptyText:  { fontSize: 16, fontWeight: 600, color: t.textPrimary, marginBottom: 6 },
-  emptySub:   { fontSize: 13, color: t.textSecondary },
 };

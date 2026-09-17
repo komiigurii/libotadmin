@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { theme as t, radius, shadow } from '../theme';
+import Icon from './Icon';
 
 /*
  * Themed replacement for the browser's native `alert()` / `confirm()`.
@@ -43,10 +44,10 @@ export function useAppAlert() {
 }
 
 const TONE = {
-  danger:  { icon: '⚠', color: t.danger,  bg: t.dangerBg },
-  warning: { icon: '⚠', color: t.warning, bg: t.warningBg },
-  success: { icon: '✓', color: t.success, bg: t.successBg },
-  info:    { icon: 'ℹ', color: t.brand,   bg: t.brandSoft },
+  danger:  { icon: 'alert-triangle', color: t.danger,  bg: t.dangerBg },
+  warning: { icon: 'alert-triangle', color: t.warning, bg: t.warningBg },
+  success: { icon: 'check',          color: t.success, bg: t.successBg },
+  info:    { icon: 'info',           color: t.brand,   bg: t.brandSoft },
 };
 
 function AlertModal({ data, onClose }) {
@@ -66,7 +67,9 @@ function AlertModal({ data, onClose }) {
   return (
     <div style={s.overlay} onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(false); }}>
       <div style={s.card} role="alertdialog" aria-modal="true">
-        <div style={{ ...s.iconWrap, background: tone.bg, color: tone.color }}>{tone.icon}</div>
+        <div style={{ ...s.iconWrap, background: tone.bg, color: tone.color }}>
+          <Icon name={tone.icon} size={22} strokeWidth={2.2} />
+        </div>
         {data.title && <h2 style={s.title}>{data.title}</h2>}
         {data.message && <p style={s.message}>{data.message}</p>}
 
@@ -150,6 +153,8 @@ const s = {
 
   actions: { display: 'flex', gap: 10, marginTop: 22 },
   btnCancel:  { flex: 1, padding: '10px 16px', borderRadius: radius.md, border: `1px solid ${t.border}`, background: 'transparent', color: t.textSecondary, fontWeight: 600, fontSize: 13.5, cursor: 'pointer' },
-  btnPrimary: { flex: 1, padding: '10px 16px', borderRadius: radius.md, border: 'none', background: t.brandSolid, color: '#fff', fontWeight: 700, fontSize: 13.5, cursor: 'pointer' },
-  btnDanger:  { background: t.danger },
+  btnPrimary: { flex: 1, padding: '10px 16px', borderRadius: radius.md, border: 'none', background: t.accent, color: t.onAccent, fontWeight: 700, fontSize: 13.5, cursor: 'pointer' },
+  // Spread over btnPrimary, so it has to re-set `color` too — the dark
+  // `onAccent` text that reads on yellow is unreadable on red.
+  btnDanger:  { background: t.danger, color: '#2A0E0E' },
 };
