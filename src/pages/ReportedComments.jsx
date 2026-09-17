@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { reportAPI, commentAPI } from '../api/api';
 import { notify, confirmAction } from '../components/AppAlert';
 import { theme as t, radius, shadow } from '../theme';
+import { pageStyles, Loading, ErrorBanner, EmptyState, Avatar } from '../components/Layout';
+import Icon from '../components/Icon';
 
 const STATUS_PILL = {
   pending:   { background: t.purpleBg,  color: t.purple,  label: 'PENDING' },
@@ -27,10 +29,7 @@ function toArray(data) {
   return [];
 }
 
-const initialsOf = (name) =>
-  (name || '?').trim().split(/\s+/).slice(0, 2).map(w => w[0]?.toUpperCase()).join('');
 
-const shortId = (id) => (id ? `${id.slice(0, 6)}…${id.slice(-4)}` : '—');
 
 export default function ReportedComments() {
   const [reports, setReports] = useState([]);
@@ -78,15 +77,15 @@ export default function ReportedComments() {
       </div>
 
       {loading ? (
-        <div style={s.empty}>Loading…</div>
+        <Loading />
       ) : error ? (
-        <div style={{ ...s.empty, color: t.danger }}>{error}</div>
+        <ErrorBanner>{error}</ErrorBanner>
       ) : visible.length === 0 ? (
-        <div style={s.emptyState}>
-          <div style={s.emptyIcon}>✓</div>
-          <div style={s.emptyText}>No reported comments</div>
-          <div style={s.emptySub}>Nothing matches your search.</div>
-        </div>
+        <EmptyState
+          icon="check"
+          title="No reported comments"
+          subtitle="Comments flagged by app users will appear here."
+        />
       ) : (
         visible.map(r => (
           <ReportRow
@@ -170,7 +169,7 @@ function ReportRow({ report, expanded, acting, setActing, onToggle, onUpdated })
   return (
     <div style={s.card} className="modern-card">
       <div style={s.cardTop} onClick={onToggle}>
-        <div style={s.avatar}>{initialsOf(commentUserName)}</div>
+        <Avatar src={review?.userImage || report.reportedUser?.profileImage} name={commentUserName} size={38} />
 
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={s.metaRow}>
@@ -188,8 +187,8 @@ function ReportRow({ report, expanded, acting, setActing, onToggle, onUpdated })
           </p>
 
           <div style={s.reactRow}>
-            {review?.rating != null && <span style={s.react}>⭐ {review.rating}/5</span>}
-            <span style={s.react}>🚩 Reported by user {shortId(report.clerkUserId)}</span>
+            {review?.rating != null && <span style={s.react}><Icon name="star" size={11} /> {review.rating}/5</span>}
+            <span style={s.react}><Icon name="flag" size={11} /> Reported by {report.reporter?.name || 'a user'}</span>
           </div>
 
           {report.details && (
@@ -226,15 +225,15 @@ function ReportRow({ report, expanded, acting, setActing, onToggle, onUpdated })
             {isPending && (
               <>
                 <button disabled={acting || !report.reportedClerkUserId} onClick={agree} style={{ ...s.btn, ...s.btnAgree, opacity: (acting || !report.reportedClerkUserId) ? 0.6 : 1 }} className="modern-btn">
-                  ✓ Agree
+                  <Icon name="check" size={12} /> Agree
                 </button>
                 <button disabled={acting} onClick={disagree} style={{ ...s.btn, ...s.btnDisagree, opacity: acting ? 0.6 : 1 }} className="modern-btn">
-                  ✕ Disagree
+                  <Icon name="x" size={12} /> Disagree
                 </button>
               </>
             )}
             <button disabled={acting || !review} onClick={deleteComment} style={{ ...s.btn, ...s.btnDelete, opacity: (acting || !review) ? 0.6 : 1 }} className="modern-btn">
-              🗑 Delete Comment
+              <Icon name="trash" size={12} /> Delete Comment
             </button>
             {!report.banApproved && (
               <button
@@ -244,7 +243,7 @@ function ReportRow({ report, expanded, acting, setActing, onToggle, onUpdated })
                 className="modern-btn"
                 title="Skips the warning ladder — bans the user immediately"
               >
-                🔨 Ban Permanently
+                <Icon name="tool" size={12} /> Ban Permanently
               </button>
             )}
           </div>
@@ -255,18 +254,17 @@ function ReportRow({ report, expanded, acting, setActing, onToggle, onUpdated })
 }
 
 const s = {
-  page:       { padding: '28px 32px', maxWidth: 1100, margin: '0 auto' },
-  pageHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 },
-  pageTitle:  { fontSize: 22, fontWeight: 600, color: t.textPrimary, marginBottom: 4 },
-  pageSub:    { fontSize: 13, color: t.textSecondary },
+  // Page shell, header, toolbar, states and table cells come from
+  // components/Layout so every page is spaced identically.
+  ...pageStyles,
+  // Page-specific: the shared card has no padding, overflow or margin,
+  // because those differ by how each page uses a card.
+  card: { background: t.cardBg, border: `1px solid ${t.border}`, borderRadius: radius.xl, marginBottom: 12, overflow: 'hidden', boxShadow: shadow.sm },
   totalBadge: { fontSize: 13, color: t.textMuted, fontWeight: 500, paddingTop: 4 },
 
-  filterRow:    { marginBottom: 18 },
   filterSelect: { padding: '10px 14px', borderRadius: 10, border: `1px solid ${t.border}`, fontSize: 13, color: t.textPrimary, background: t.cardBg, outline: 'none', cursor: 'pointer' },
 
-  card:       { background: t.cardBg, border: `1px solid ${t.border}`, borderRadius: radius.xl, marginBottom: 12, overflow: 'hidden', boxShadow: shadow.sm },
   cardTop:    { display: 'flex', alignItems: 'flex-start', gap: 14, padding: '16px 18px', cursor: 'pointer' },
-  avatar:     { width: 38, height: 38, borderRadius: '50%', background: t.brandSoft, color: t.brand, fontWeight: 700, fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   metaRow:    { display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 6 },
   userName:   { fontSize: 14, fontWeight: 700, color: t.textPrimary },
   dateText:   { fontSize: 12, color: t.textMuted },
@@ -293,9 +291,4 @@ const s = {
   btnDelete:    { background: t.dangerBg, color: t.danger },
   btnBan:       { background: t.danger, color: '#fff' },
 
-  empty:      { padding: 60, textAlign: 'center', color: t.textSecondary },
-  emptyState: { textAlign: 'center', padding: '70px 20px' },
-  emptyIcon:  { width: 52, height: 52, borderRadius: '50%', background: t.brandSoft, color: t.brand, fontSize: 22, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 14px' },
-  emptyText:  { fontSize: 16, fontWeight: 600, color: t.textPrimary, marginBottom: 6 },
-  emptySub:   { fontSize: 13, color: t.textSecondary },
 };

@@ -14,6 +14,7 @@ const ModRequests      = lazy(() => import('./pages/ModRequests'));
 const MyReviewRequests = lazy(() => import('./pages/MyReviewRequests'));
 const InactiveUsers    = lazy(() => import('./pages/InactiveUsers'));
 const BannedAccounts   = lazy(() => import('./pages/BannedAccounts'));
+const UserProgress     = lazy(() => import('./pages/UserProgress'));
 import { AppAlertProvider } from './components/AppAlert';
 import { theme as t } from './theme';
 import './App.css';
@@ -57,11 +58,21 @@ export default function App() {
 
                       <Route path="/mod-requests"       element={<AdminRoute><ModRequests /></AdminRoute>} />
                       <Route path="/reported-comments"  element={<AdminRoute><ReportedComments /></AdminRoute>} />
-                      <Route path="/inactive-users"     element={<AdminRoute><InactiveUsers /></AdminRoute>} />
+                      {/* Both roles. The page already renders role-aware
+                          actions — moderators get "Propose Suspension",
+                          admins get "Approve Archival" — and the backend
+                          enforces that split, so the guard here only ever
+                          blocked moderators from a module the spec gives
+                          them. */}
+                      <Route path="/inactive-users"     element={<InactiveUsers />} />
                       <Route path="/banned-accounts"    element={<AdminRoute><BannedAccounts /></AdminRoute>} />
 
                       <Route path="/spots"     element={<Spots />} />
                       <Route path="/comments"  element={<Comments />} />
+                      {/* Both roles: the spec gives admins and moderators the
+                          same read-only User Progress module, so this is
+                          deliberately not wrapped in a role guard. */}
+                      <Route path="/user-progress" element={<UserProgress />} />
 
                       <Route
                         path="*"
