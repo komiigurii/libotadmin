@@ -1,16 +1,46 @@
-# React + Vite
+# Libot Admin
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+The web panel where admins and moderators manage Libot's spots, missions,
+reviews, reports and accounts. React 19 + Vite, deployed on Vercel, talking to
+the LibotBackend API.
 
-Currently, two official plugins are available:
+## Run it locally
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+```bash
+npm install
+npm run dev        # http://localhost:5173
+```
 
-## React Compiler
+`VITE_API_URL` in `.env` sets which backend the panel uses (production by
+default). It is compiled into the public JavaScript, so it must never hold a
+secret.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+| Command | What it does |
+|---|---|
+| `npm run dev` | Dev server with hot reload |
+| `npm run build` | Production build into `dist/` |
+| `npm test` | Unit tests (Vitest) |
+| `npm run lint` | ESLint |
 
-## Expanding the ESLint configuration
+## Sessions
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+Signing in stores the admin token (valid 12 hours) with the role and city.
+`src/auth/session.js` ends the session and returns to sign-in with "Your session
+expired" when the token lapses or the API answers 401 — for example after
+`JWT_SECRET` is rotated on the backend.
+
+## Deploying (Vercel)
+
+Pushing to `main` deploys. `vercel.json` sets:
+
+- a rewrite so deep links such as `/spots` load the app instead of a 404;
+- security headers, including a **Content-Security-Policy** that only allows
+  scripts from this site and network calls to the API and OpenStreetMap's
+  address search.
+
+**If you add a new external service** (another API, a font or script CDN), add
+its origin to the matching directive in `vercel.json` — `connect-src` for
+fetch/XHR, `script-src` for scripts, `font-src` for fonts — or the browser will
+block it. Images from any `https:` source are already allowed. Blocked requests
+show in the browser console as "Refused to … because it violates the Content
+Security Policy".
