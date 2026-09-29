@@ -2,6 +2,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { theme as t, radius, shadow, fonts, useThemePref } from '../theme';
 import Icon from './Icon';
 import logo from '../assets/logo.png';
+import { clearSession } from '../auth/session';
 
 /*
  * Persistent left rail.
@@ -20,8 +21,7 @@ export default function Navbar() {
   const [pref, setPref] = useThemePref();
 
   const logout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('role');
+    clearSession(); // token, role and city — city used to be left behind
     navigate('/login');
   };
 

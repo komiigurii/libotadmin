@@ -17,6 +17,7 @@ const BannedAccounts   = lazy(() => import('./pages/BannedAccounts'));
 const UserProgress     = lazy(() => import('./pages/UserProgress'));
 import { AppAlertProvider } from './components/AppAlert';
 import { theme as t } from './theme';
+import { hasValidSession, getToken, clearSession } from './auth/session';
 import './App.css';
 
 function PageFallback() {
@@ -24,8 +25,11 @@ function PageFallback() {
 }
 
 const PrivateRoute = ({ children }) => {
-  const token = localStorage.getItem('token');
-  return token ? children : <Navigate to="/login" replace />;
+  if (hasValidSession()) return children;
+  // A stored-but-expired token gets the "session expired" note on sign-in.
+  const reason = getToken() ? '?reason=expired' : '';
+  clearSession();
+  return <Navigate to={`/login${reason}`} replace />;
 };
 
 const ModeratorRoute = ({ children }) => {
