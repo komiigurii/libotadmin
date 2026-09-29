@@ -547,7 +547,7 @@ const s = {
   userName:   { fontSize: 14, fontWeight: 700, color: t.textPrimary },
   dateText:   { fontSize: 12, color: t.textMuted },
   locPill:    { padding: '3px 10px', background: t.sidebarBg, border: `1px solid ${t.border}`, borderRadius: 20, fontSize: 11, fontWeight: 500, color: t.textSecondary },
-  locPillDanger: { background: t.dangerBg, border: `1px solid ${t.danger}44`, color: t.danger },
+  locPillDanger: { background: t.dangerBg, border: `1px solid ${t.dangerBorder}`, color: t.danger },
   statusPill: { padding: '3px 10px', borderRadius: 6, fontSize: 10, fontWeight: 700, letterSpacing: '0.03em' },
 
   byLine:      { fontSize: 11.5, color: t.textMuted, margin: '0 0 4px' },

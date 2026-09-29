@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { getToken, isExpired, endSession } from '../auth/session';
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL,
@@ -6,10 +7,31 @@ const api = axios.create({
 });
 
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('token');
-  if (token) config.headers.Authorization = `Bearer ${token}`;
+  const token = getToken();
+  if (token) {
+    // Don't send a request the server will reject; end the session instead.
+    if (isExpired(token)) {
+      endSession('expired');
+      return Promise.reject(new axios.Cancel('Session expired'));
+    }
+    config.headers.Authorization = `Bearer ${token}`;
+  }
   return config;
 });
+
+// A 401 on any call made with a token means the server no longer accepts it
+// (expired, or JWT_SECRET was rotated). Sign-in itself is excluded: a 401
+// there is just a wrong password.
+api.interceptors.response.use(
+  (res) => res,
+  (err) => {
+    const url = err?.config?.url || '';
+    if (err?.response?.status === 401 && getToken() && !url.includes('/api/auth/admin-login')) {
+      endSession('expired');
+    }
+    return Promise.reject(err);
+  },
+);
 
 export const spotAPI = {
   getAll:        ()             => api.get('/api/spots').then(r => r.data.spots),

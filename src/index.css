@@ -1,27 +1,189 @@
-/* Document-level base only.
+/* Document shell + the theme's single source of truth.
  *
- * This file used to be the Vite React starter template's stylesheet — it still
- * carried that scaffold's PURPLE `--accent: #aa3bff`, a 56px <h1> rule, code-
- * block styling and a `#social` selector, none of which this admin panel ever
- * used (every page styles its own headings inline). Those CSS variables were
- * also the only purple left in the project after the rebrand, so they're gone.
+ * WHY CSS VARIABLES
+ * -----------------
+ * This panel styles everything with inline style objects, and most of those are
+ * defined at MODULE scope (`const s = { card: { background: t.cardBg } }`).
+ * Module scope can't read a React hook, so making the theme switchable through
+ * context would have meant converting all 13 style objects and ~480 `t.*`
+ * references into factory functions.
  *
- * Colours live in src/theme.jsx (mirrors the mobile app's ThemeContext) and
- * interaction styles live in App.css. Keep this file to the document shell.
+ * Instead every token below is a CSS custom property, and `src/theme.jsx`
+ * exports `var(--token)` strings. Existing code keeps working untouched, and
+ * switching themes is one attribute flip on <html> — no React re-render at all.
+ *
+ * Add a colour here AND in theme.jsx. Never hardcode a hex in a component.
  */
+
+/* Self-hosted so there's no external request and no flash of fallback text.
+   Newsreader is the display serif; Schibsted Grotesk carries the UI. Same pair
+   as the mobile app and the download site, so all three speak with one voice.
+   Both are variable fonts, so the sans is a single file covering 400..900
+   instead of the four fixed weights this used to import. */
+@import '@fontsource-variable/newsreader';
+@import '@fontsource-variable/schibsted-grotesk';
+
+/* ── LIGHT (default) ─────────────────────────────────────────────────────────
+   The warm capiz-cream page from the mobile app, so the admin reads as the same
+   brand rather than a separate product. */
 :root {
-  color-scheme: dark;
+  --bg:              #FBF8F2;
+  --sidebar-bg:      #F4EFE4;
+  --card-bg:         #FFFFFF;
+  --card-bg-hover:   #F7F3EA;
+  --border:          #E4DCCB;
+  --divider:         #EDE6D8;
+
+  --text-primary:    #1C2426;
+  --text-secondary:  #455254;
+  --text-muted:      #56686A;
+
+  --brand:           #0A6F78;
+  --brand-solid:     #0A6F78;
+  --brand-solid-hover:#08585F;
+  --brand-soft:      rgba(10,111,120,0.10);
+
+  --accent:          #F2CE1B;
+  --accent-bg:       rgba(242,206,27,0.20);
+  --on-accent:       #2C2810;
+
+  --danger:          #B3352C;
+  --danger-bg:       rgba(179,53,44,0.10);
+  --danger-border:   rgba(179,53,44,0.35);
+  /* Text ON a solid danger fill. Flips with the theme because --danger itself
+     flips lightness: a dark red in light mode, a pale red in dark mode. */
+  --on-danger:       #FFFFFF;
+  --success:         #16764F;
+  --success-bg:      rgba(22,118,79,0.10);
+  --warning:         #8A5610;
+  --warning-bg:      rgba(138,86,16,0.12);
+  --info:            #1D5FA8;
+  --info-bg:         rgba(29,95,168,0.10);
+  --flagged:         #A8324B;
+  --flagged-bg:      rgba(168,50,75,0.10);
+  --purple:          #5B3FA8;
+  --purple-bg:       rgba(91,63,168,0.10);
+
+  --shadow-sm:       0 1px 2px rgba(28,36,38,0.05), 0 4px 14px rgba(28,36,38,0.05);
+  --shadow-md:       0 4px 10px rgba(28,36,38,0.06), 0 10px 28px rgba(28,36,38,0.07);
+  --shadow-lg:       0 10px 20px rgba(28,36,38,0.08), 0 18px 48px rgba(28,36,38,0.10);
+
+  --scrollbar-thumb:       #D8CFBC;
+  --scrollbar-thumb-hover: #C2B69E;
+
+  color-scheme: light;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* ── DARK ────────────────────────────────────────────────────────────────────
+   Warmed from the previous #0E1C1E so it sits in the same family as the cream
+   light mode instead of reading as a different product's palette. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --bg:              #12191B;
+    --sidebar-bg:      #0E2A2D;
+    --card-bg:         #1A2426;
+    --card-bg-hover:   #212D30;
+    --border:          #2E403F;
+    --divider:         #263635;
+
+    --text-primary:    #EDF4F4;
+    --text-secondary:  #AFC4C5;
+    --text-muted:      #90A8A9;
+
+    --brand:           #56D6E2;
+    --brand-solid:     #0C7A84;
+    --brand-solid-hover:#129AA6;
+    --brand-soft:      rgba(86,214,226,0.14);
+
+    --accent:          #F2CE1B;
+    --accent-bg:       rgba(242,206,27,0.16);
+    --on-accent:       #2C2810;
+
+    --danger:          #F58E8E;
+    --danger-bg:       rgba(245,142,142,0.14);
+    --danger-border:   rgba(245,142,142,0.34);
+    --on-danger:       #2A0E0E;
+    --success:         #5FD69A;
+    --success-bg:      rgba(95,214,154,0.14);
+    --warning:         #F0C264;
+    --warning-bg:      rgba(240,194,100,0.14);
+    --info:            #7FB4F5;
+    --info-bg:         rgba(127,180,245,0.14);
+    --flagged:         #FB7185;
+    --flagged-bg:      rgba(251,113,133,0.16);
+    --purple:          #B39BFB;
+    --purple-bg:       rgba(179,155,251,0.16);
+
+    --shadow-sm:       0 4px 14px rgba(0,0,0,0.30);
+    --shadow-md:       0 10px 28px rgba(0,0,0,0.38);
+    --shadow-lg:       0 18px 48px rgba(0,0,0,0.46);
+
+    --scrollbar-thumb:       #2E403F;
+    --scrollbar-thumb-hover: #415B59;
+
+    color-scheme: dark;
+  }
+}
+
+/* Explicit choice always wins over the OS preference. Duplicated rather than
+   shared because a :is() / :where() list would lose to the media-query block
+   above on specificity grounds in some browsers. */
+:root[data-theme='dark'] {
+  --bg:              #12191B;
+  --sidebar-bg:      #0E2A2D;
+  --card-bg:         #1A2426;
+  --card-bg-hover:   #212D30;
+  --border:          #2E403F;
+  --divider:         #263635;
+
+  --text-primary:    #EDF4F4;
+  --text-secondary:  #AFC4C5;
+  --text-muted:      #90A8A9;
+
+  --brand:           #56D6E2;
+  --brand-solid:     #0C7A84;
+  --brand-solid-hover:#129AA6;
+  --brand-soft:      rgba(86,214,226,0.14);
+
+  --accent:          #F2CE1B;
+  --accent-bg:       rgba(242,206,27,0.16);
+  --on-accent:       #2C2810;
+
+  --danger:          #F58E8E;
+  --danger-bg:       rgba(245,142,142,0.14);
+  --danger-border:   rgba(245,142,142,0.34);
+  --on-danger:       #2A0E0E;
+  --success:         #5FD69A;
+  --success-bg:      rgba(95,214,154,0.14);
+  --warning:         #F0C264;
+  --warning-bg:      rgba(240,194,100,0.14);
+  --info:            #7FB4F5;
+  --info-bg:         rgba(127,180,245,0.14);
+  --flagged:         #FB7185;
+  --flagged-bg:      rgba(251,113,133,0.16);
+  --purple:          #B39BFB;
+  --purple-bg:       rgba(179,155,251,0.16);
+
+  --shadow-sm:       0 4px 14px rgba(0,0,0,0.30);
+  --shadow-md:       0 10px 28px rgba(0,0,0,0.38);
+  --shadow-lg:       0 18px 48px rgba(0,0,0,0.46);
+
+  --scrollbar-thumb:       #2E403F;
+  --scrollbar-thumb-hover: #415B59;
+
+  color-scheme: dark;
+}
+
 body {
   margin: 0;
 }
 
-/* The app shell is a full-height flex column (sidebar + scrolling page). */
+/* The app shell is a full-height flex column (sidebar + scrolling page).
+   svh, not vh — vh is wrong on mobile browsers, where the URL bar is counted. */
 #root {
   width: 100%;
   max-width: 100%;
