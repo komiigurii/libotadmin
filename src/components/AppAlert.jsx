@@ -68,7 +68,9 @@ function AlertModal({ data, onClose }) {
     <div style={s.overlay} onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(false); }}>
       <div style={s.card} role="alertdialog" aria-modal="true">
         <div style={{ ...s.iconWrap, background: tone.bg, color: tone.color }}>
-          <Icon name={tone.icon} size={22} strokeWidth={2.2} />
+          {/* `weight` is Phosphor's stroke control — the inline SVG set this
+              replaced took a numeric strokeWidth, which no longer applies. */}
+          <Icon name={tone.icon} size={22} weight="bold" />
         </div>
         {data.title && <h2 style={s.title}>{data.title}</h2>}
         {data.message && <p style={s.message}>{data.message}</p>}
@@ -156,5 +158,5 @@ const s = {
   btnPrimary: { flex: 1, padding: '10px 16px', borderRadius: radius.md, border: 'none', background: t.accent, color: t.onAccent, fontWeight: 700, fontSize: 13.5, cursor: 'pointer' },
   // Spread over btnPrimary, so it has to re-set `color` too — the dark
   // `onAccent` text that reads on yellow is unreadable on red.
-  btnDanger:  { background: t.danger, color: '#2A0E0E' },
+  btnDanger:  { background: t.danger, color: t.onDanger },
 };

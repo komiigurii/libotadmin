@@ -1156,8 +1156,11 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
                   Clear pin
                 </button>
               )}
-              {addingAr && arModels.length > 0 && (
-                <button type="button" onClick={() => setArModels([])} style={styles.clearPinBtn}>
+              {/* Was `addingAr`, which is declared nowhere in this file — the
+                  reference threw the moment this block rendered. The two
+                  branches above establish the pattern; this is AR mode. */}
+              {mode === 'ar' && arModels.length > 0 && (
+                <button type="button" onClick={() => setArModels([])} style={styles.clearPinBtn} className="modern-btn">
                   Clear all AR pins
                 </button>
               )}

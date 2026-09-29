@@ -42,6 +42,9 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [error, setError]       = useState('');
   const [loading, setLoading]   = useState(false);
+  // Seconds left on a server-side account lockout (HTTP 423). Purely a UX
+  // affordance — the backend enforces the lock regardless of what this says.
+  const [lockedFor, setLockedFor] = useState(0);
   const navigate = useNavigate();
 
   // ── Background carousel ────────────────────────────────────────────────
@@ -102,9 +105,27 @@ export default function Login() {
     return () => clearInterval(timerRef.current);
   }, [slides.length]);
 
+  // Tick the lockout down once a second and clear the banner when it expires.
+  useEffect(() => {
+    if (lockedFor <= 0) return;
+    const t = setInterval(() => {
+      setLockedFor((s) => {
+        if (s <= 1) { setError(''); return 0; }
+        return s - 1;
+      });
+    }, 1000);
+    return () => clearInterval(t);
+  }, [lockedFor > 0]);
+
   const current = slides[index];
 
+  const lockLabel = (s) => {
+    const m = Math.floor(s / 60), r = s % 60;
+    return m > 0 ? `${m}m ${String(r).padStart(2, '0')}s` : `${r}s`;
+  };
+
   const handleLogin = async () => {
+    if (lockedFor > 0) return;
     if (!email || !password) { setError('Please fill in all fields'); return; }
     try {
       setError('');
@@ -119,7 +140,14 @@ export default function Login() {
         setError(data.message || 'Login failed');
       }
     } catch (err) {
-      setError(err?.response?.data?.message || 'Login failed');
+      const body = err?.response?.data;
+      // 423 Locked — the account hit the failed-attempt threshold. Start a
+      // countdown so the button doesn't just sit there rejecting every press
+      // with the same message.
+      if (err?.response?.status === 423 && body?.retryAfterSeconds) {
+        setLockedFor(body.retryAfterSeconds);
+      }
+      setError(body?.message || 'Login failed');
     } finally {
       setLoading(false);
     }
@@ -153,8 +181,14 @@ export default function Login() {
         <p style={styles.subtitle}>Sign in to manage spots, reviews and travellers</p>
 
         {error && (
-          <div style={styles.error}>
-            <Icon name="alert-triangle" size={13} /> {error}
+          <div style={styles.error} role="alert">
+            <Icon name={lockedFor > 0 ? 'slash' : 'alert-triangle'} size={13} />
+            <span>
+              {error}
+              {lockedFor > 0 && (
+                <> {' '}<strong>Try again in {lockLabel(lockedFor)}.</strong></>
+              )}
+            </span>
           </div>
         )}
 
@@ -162,7 +196,7 @@ export default function Login() {
           <label style={styles.label}>Username</label>
           <input
             type="email"
-            placeholder="admin123"
+            placeholder="admin"
             value={email}
             onChange={e => setEmail(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && handleLogin()}
@@ -188,11 +222,17 @@ export default function Login() {
 
         <button
           onClick={handleLogin}
-          disabled={loading}
-          style={{ ...styles.btn, opacity: loading ? 0.7 : 1 }}
+          disabled={loading || lockedFor > 0}
+          style={{
+            ...styles.btn,
+            opacity: loading || lockedFor > 0 ? 0.55 : 1,
+            cursor: lockedFor > 0 ? 'not-allowed' : 'pointer',
+          }}
           className="modern-btn"
         >
-          {loading ? 'Signing in…' : 'Sign In'}
+          {lockedFor > 0
+            ? `Locked — ${lockLabel(lockedFor)}`
+            : loading ? 'Signing in…' : 'Sign In'}
         </button>
       </div>
 
@@ -270,7 +310,7 @@ const styles = {
 
   error: {
     display: 'flex', alignItems: 'center', gap: 8,
-    background: t.dangerBg, border: `1px solid ${t.danger}44`, borderRadius: radius.md,
+    background: t.dangerBg, border: `1px solid ${t.dangerBorder}`, borderRadius: radius.md,
     padding: '10px 14px', color: t.danger, fontSize: 13, marginBottom: 16,
   },
 
