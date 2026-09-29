@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { theme as t, radius, shadow } from '../theme';
+import { theme as t, radius, shadow, type } from '../theme';
 import Icon from './Icon';
 
 /*
@@ -31,7 +31,9 @@ export const layout = {
    sets its own margins between sections — they come from one `gap`. */
 export function Page({ children, wide = false }) {
   return (
-    <div style={{
+    // `admin-page` is the hook the responsive rules in App.css use to shrink
+    // the gutter on narrow viewports — inline styles can't hold a media query.
+    <div className="admin-page" style={{
       padding:       `${layout.padY}px ${layout.padX}px`,
       maxWidth:      wide ? 1400 : layout.maxWidth,
       margin:        '0 auto',
@@ -54,7 +56,11 @@ export function PageHeader({ title, subtitle, count, actions }) {
       <div style={{ minWidth: 0 }}>
         <div style={s.titleRow}>
           <h1 style={s.title}>{title}</h1>
-          {count != null && <span style={s.countPill}>{count}</span>}
+          {count != null && (
+            // The bare number was read out as a loose digit next to the
+            // heading; this says what it counts.
+            <span style={s.countPill} aria-label={`${count} items`}>{count}</span>
+          )}
         </div>
         {subtitle && <p style={s.subtitle}>{subtitle}</p>}
       </div>
@@ -126,11 +132,16 @@ export function EmptyState({ icon = 'check', title, subtitle }) {
 /* ── Table ────────────────────────────────────────────────────────
    One cell padding and one header treatment, rather than 13px here and 10px
    there. `align="right"` for numeric columns. */
-export function Table({ head, children }) {
+export function Table({ head, children, caption }) {
   return (
     <Card pad={false} style={{ overflow: 'hidden' }}>
-      <div style={{ overflowX: 'auto' }}>
+      {/* A 7-column moderation table has no sensible 360px layout, so on narrow
+          viewports it scrolls sideways inside its card rather than reflowing
+          into unreadable stacks. tabIndex makes that region keyboard-scrollable,
+          which is a WCAG requirement for any scrollable container. */}
+      <div className="table-scroll" style={{ overflowX: 'auto' }} tabIndex={0} role="region" aria-label={caption || 'Data table'}>
         <table style={s.table}>
+          {caption && <caption style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0 0 0 0)' }}>{caption}</caption>}
           {head && <thead><tr>{head}</tr></thead>}
           <tbody>{children}</tbody>
         </table>
@@ -140,7 +151,9 @@ export function Table({ head, children }) {
 }
 
 export function Th({ children, align = 'left', width }) {
-  return <th style={{ ...s.th, textAlign: align, width }}>{children}</th>;
+  // scope="col" is what lets a screen reader announce the column name when it
+  // reads a cell — without it a data table is just a grid of loose values.
+  return <th scope="col" style={{ ...s.th, textAlign: align, width }}>{children}</th>;
 }
 
 export function Td({ children, align = 'left', muted = false, strong = false, style }) {
@@ -228,7 +241,13 @@ export function Pill({ children, color = t.textSecondary, background = t.brandSo
    so the page shell, header, toolbar, states and table cells are defined in
    exactly one place. A page may still override a key by listing it after the
    spread — but if it does, that should be a deliberate exception. */
-export const pageStyles = {
+/* ONE canonical definition. These used to be written out twice — an exported
+   `pageStyles` and a private `s` — with the same values under different names
+   (`pageHeader`/`header`, `pageTitle`/`title`, `filterRow`/`toolbar`,
+   `errorBanner`/`error`, `emptyState`/`empty`, `emptyText`/`emptyTitle`). Two
+   copies of the same numbers is exactly the drift this file exists to prevent,
+   so the aliases below now point at the SAME objects. */
+const base = {
   page: {
     padding:   `${layout.padY}px ${layout.padX}px`,
     maxWidth:  layout.maxWidth,
@@ -241,72 +260,25 @@ export const pageStyles = {
   },
   // No bottom margin: the page's `gap` owns the spacing between sections, so
   // headers can't each pick their own (they used to range from 16 to 24).
-  pageHeader:  { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16 },
-  pageTitle:   { fontSize: 22, fontWeight: 700, color: t.textPrimary, letterSpacing: '-0.02em', margin: 0 },
+  pageHeader:  { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, flexWrap: 'wrap' },
+  titleRow:    { display: 'flex', alignItems: 'center', gap: 10 },
+  // The one serif on the page. A dashboard's headings are the only place a
+  // display face earns its keep — tables and controls stay in the sans.
+  pageTitle:   { ...type.pageTitle, color: t.textPrimary, margin: 0 },
+  countPill: {
+    fontSize: 12, fontWeight: 700, color: t.textSecondary, background: t.sidebarBg,
+    border: `1px solid ${t.border}`, borderRadius: radius.pill, padding: '2px 9px',
+    ...type.num,
+  },
   pageSub:     { fontSize: 13.5, color: t.textSecondary, margin: '5px 0 0', maxWidth: 680, lineHeight: 1.45 },
+  actions:     { display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 },
+
   filterRow:   { display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' },
   searchInput: {
     flex: 1, minWidth: 220, padding: '9px 13px', borderRadius: radius.md,
     border: `1px solid ${t.border}`, fontSize: 13.5, color: t.textPrimary,
-    outline: 'none', background: t.sidebarBg, boxSizing: 'border-box',
-  },
-  card: {
-    background: t.cardBg, border: `1px solid ${t.border}`,
-    borderRadius: radius.lg, boxShadow: shadow.sm,
-  },
-  empty: {
-    background: t.cardBg, border: `1px solid ${t.border}`, borderRadius: radius.lg,
-    padding: 48, textAlign: 'center', color: t.textSecondary, fontSize: 14,
-  },
-  emptyState: {
-    background: t.cardBg, border: `1px dashed ${t.border}`, borderRadius: radius.lg,
-    padding: '48px 24px', textAlign: 'center',
-  },
-  emptyIcon: {
-    width: 46, height: 46, borderRadius: '50%', background: t.sidebarBg,
-    display: 'flex', alignItems: 'center', justifyContent: 'center',
-    margin: '0 auto 12px', color: t.textMuted,
-  },
-  emptyText: { fontSize: 15, fontWeight: 600, color: t.textPrimary },
-  emptySub:  { fontSize: 13, color: t.textMuted, marginTop: 4 },
-  errorBanner: {
-    display: 'flex', alignItems: 'center', gap: 9,
-    background: t.dangerBg, border: `1px solid ${t.danger}44`, borderRadius: radius.md,
-    padding: '10px 14px', color: t.danger, fontSize: 13,
-  },
-  errorClose: {
-    background: 'none', border: 'none', color: t.danger, cursor: 'pointer',
-    display: 'flex', alignItems: 'center', padding: 2, marginLeft: 'auto',
-  },
-  table: { width: '100%', borderCollapse: 'collapse' },
-  th: {
-    padding: `11px ${layout.rowPadX}px`, textAlign: 'left', fontSize: 11, fontWeight: 700,
-    color: t.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em',
-    borderBottom: `1px solid ${t.divider}`, whiteSpace: 'nowrap', background: t.sidebarBg,
-  },
-  td: {
-    padding: `${layout.rowPadY}px ${layout.rowPadX}px`, fontSize: 13.5,
-    color: t.textPrimary, borderBottom: `1px solid ${t.divider}`,
-  },
-};
-
-const s = {
-  header:    { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16 },
-  titleRow:  { display: 'flex', alignItems: 'center', gap: 10 },
-  title:     { fontSize: 22, fontWeight: 700, color: t.textPrimary, letterSpacing: '-0.02em', margin: 0 },
-  countPill: {
-    fontSize: 12, fontWeight: 700, color: t.textSecondary, background: t.sidebarBg,
-    border: `1px solid ${t.border}`, borderRadius: radius.pill, padding: '2px 9px',
-    fontVariantNumeric: 'tabular-nums',
-  },
-  subtitle:  { fontSize: 13.5, color: t.textSecondary, margin: '5px 0 0', maxWidth: 680, lineHeight: 1.45 },
-  actions:   { display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 },
-
-  toolbar:   { display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' },
-  search:    {
-    flex: 1, minWidth: 220, padding: '9px 13px', borderRadius: radius.md,
-    border: `1px solid ${t.border}`, fontSize: 13.5, color: t.textPrimary,
-    outline: 'none', background: t.sidebarBg, boxSizing: 'border-box',
+    outline: 'none', background: t.cardBg, boxSizing: 'border-box',
+    fontFamily: 'inherit',
   },
 
   card: {
@@ -319,31 +291,32 @@ const s = {
     padding: 48, textAlign: 'center', color: t.textSecondary, fontSize: 14,
   },
 
-  error: {
+  errorBanner: {
     display: 'flex', alignItems: 'center', gap: 9,
-    background: t.dangerBg, border: `1px solid ${t.danger}44`, borderRadius: radius.md,
+    background: t.dangerBg, border: `1px solid ${t.dangerBorder}`, borderRadius: radius.md,
     padding: '10px 14px', color: t.danger, fontSize: 13,
   },
   errorClose: {
     background: 'none', border: 'none', color: t.danger, cursor: 'pointer',
-    display: 'flex', alignItems: 'center', padding: 2,
+    display: 'flex', alignItems: 'center', padding: 2, marginLeft: 'auto',
   },
 
-  empty: {
+  emptyState: {
     background: t.cardBg, border: `1px dashed ${t.border}`, borderRadius: radius.lg,
     padding: '48px 24px', textAlign: 'center',
   },
   emptyIcon: {
     width: 46, height: 46, borderRadius: '50%', background: t.sidebarBg,
-    display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    margin: '0 auto 12px', color: t.textMuted,
   },
-  emptyTitle: { fontSize: 15, fontWeight: 600, color: t.textPrimary },
-  emptySub:   { fontSize: 13, color: t.textMuted, marginTop: 4 },
+  emptyText: { fontSize: 15, fontWeight: 600, color: t.textPrimary },
+  emptySub:  { fontSize: 13, color: t.textMuted, marginTop: 4 },
 
   table: { width: '100%', borderCollapse: 'collapse' },
   th: {
-    padding: `11px ${layout.rowPadX}px`, fontSize: 11, fontWeight: 700, color: t.textMuted,
-    textTransform: 'uppercase', letterSpacing: '0.06em',
+    padding: `11px ${layout.rowPadX}px`, textAlign: 'left', fontSize: 11, fontWeight: 700,
+    color: t.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em',
     borderBottom: `1px solid ${t.divider}`, whiteSpace: 'nowrap', background: t.sidebarBg,
   },
   td: {
@@ -357,3 +330,19 @@ const s = {
     fontSize: 11.5, fontWeight: 700, letterSpacing: '0.02em', whiteSpace: 'nowrap',
   },
 };
+
+// Both naming vocabularies are in use across the pages, so both resolve to the
+// same object rather than to a second copy of the same numbers.
+export const pageStyles = {
+  ...base,
+  header:     base.pageHeader,
+  title:      base.pageTitle,
+  subtitle:   base.pageSub,
+  toolbar:    base.filterRow,
+  search:     base.searchInput,
+  error:      base.errorBanner,
+  empty:      base.emptyState,
+  emptyTitle: base.emptyText,
+};
+
+const s = pageStyles;

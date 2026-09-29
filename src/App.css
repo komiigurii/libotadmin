@@ -1,3 +1,13 @@
+/* Interaction + responsive layer.
+ *
+ * Inline style objects (used everywhere in this panel) can't express :hover,
+ * :focus, media queries or keyframes — this file layers those on top without
+ * rewriting every page into CSS modules.
+ *
+ * NOTHING here may hardcode a colour. Every value is a custom property from
+ * index.css, which is what lets the theme switch with one attribute flip.
+ */
+
 /* ── Reset & base ── */
 *, *::before, *::after {
   box-sizing: border-box;
@@ -10,24 +20,62 @@ html, body, #root {
 }
 
 body {
-  font-family: 'DM Sans', system-ui, -apple-system, sans-serif;
-  background: #0E1C1E;
-  color: #EAF6F7;
+  font-family: 'Schibsted Grotesk Variable', 'Schibsted Grotesk', system-ui, -apple-system, sans-serif;
+  background: var(--bg);
+  color: var(--text-primary);
   font-size: 14px;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
 }
 
-/* ── Scrollbar ── */
-::-webkit-scrollbar       { width: 5px; height: 5px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #2A4443; border-radius: 10px; }
-::-webkit-scrollbar-thumb:hover { background: #3C5F5E; }
+/* Newsreader carries the page titles. Applied by class so pages that build
+   their own heading markup opt in explicitly rather than inheriting a serif
+   into places that want the sans (buttons, table headers, pills). */
+.display-type {
+  font-family: 'Newsreader Variable', 'Newsreader', Georgia, serif;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+}
 
-/* ── Focus ring ── */
+/* ── Skip link ──
+   Off-screen until focused, then pinned to the top-left. */
+.skip-link {
+  position: absolute;
+  left: 8px;
+  top: -60px;
+  z-index: 100;
+  padding: 10px 16px;
+  border-radius: 10px;
+  background: var(--accent);
+  color: var(--on-accent);
+  font-weight: 700;
+  font-size: 13px;
+  text-decoration: none;
+  transition: top 0.15s ease;
+}
+.skip-link:focus {
+  top: 8px;
+}
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar       { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: 10px;
+  /* Inset the thumb so it reads as a floating bar rather than a filled gutter. */
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+::-webkit-scrollbar-thumb:hover { background: var(--scrollbar-thumb-hover); background-clip: content-box; }
+
+/* ── Focus ring ──
+   :focus-visible only, so a mouse click doesn't leave a ring behind but every
+   keyboard path stays visible. */
 *:focus-visible {
-  outline: 2px solid #4FD0DC;
+  outline: 2px solid var(--brand);
   outline-offset: 2px;
+  border-radius: 4px;
 }
 
 /* ── Table hover row ── */
@@ -35,25 +83,22 @@ tbody td {
   transition: background 0.12s ease;
 }
 tbody tr:hover td {
-  background: #1D3538;
+  background: var(--card-bg-hover);
 }
 
-/* ── Nav link hover (can't do :hover in inline styles) ── */
+/* ── Nav ── */
 .nav-link-btn:hover {
-  background: rgba(79, 208, 220, 0.14) !important;
-  color: #EAF6F7 !important;
+  background: var(--brand-soft) !important;
+  color: var(--text-primary) !important;
 }
 
 .logout-btn:hover {
-  border-color: rgba(255,255,255,0.25) !important;
-  color: rgba(255,255,255,0.75) !important;
-  background: rgba(255,255,255,0.06) !important;
+  border-color: var(--danger-border) !important;
+  color: var(--danger) !important;
+  background: var(--danger-bg) !important;
 }
 
-/* ── Modern interactive utilities ──────────────────────────────
-   Inline style objects (used everywhere in this app) can't express
-   :hover/:focus/animation — these classes layer that on top without
-   having to rewrite every page's styles into CSS modules. */
+/* ── Modern interactive utilities ── */
 @keyframes fadeInUp {
   from { opacity: 0; transform: translateY(6px); }
   to   { opacity: 1; transform: translateY(0); }
@@ -65,35 +110,34 @@ tbody tr:hover td {
 }
 .modern-card:hover {
   transform: translateY(-3px);
-  box-shadow: 0 14px 32px rgba(0,0,0,0.36);
-  border-color: #3C5F5E;
+  box-shadow: var(--shadow-md);
+  border-color: var(--brand);
 }
 
 .modern-btn {
   transition: filter 0.15s ease, transform 0.1s ease, box-shadow 0.15s ease;
 }
 .modern-btn:hover:not(:disabled) {
-  filter: brightness(1.14);
+  filter: brightness(1.08);
   transform: translateY(-1px);
 }
 .modern-btn:active:not(:disabled) {
   transform: translateY(0);
-  filter: brightness(0.92);
+  filter: brightness(0.94);
 }
 
 .modern-input {
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 .modern-input:focus {
-  border-color: #4FD0DC !important;
-  box-shadow: 0 0 0 3px rgba(79,208,220,0.18);
+  border-color: var(--brand) !important;
+  box-shadow: 0 0 0 3px var(--brand-soft);
 }
 
 /* ── Login page ────────────────────────────────────────────────
-   The sign-in card deliberately does NOT use .modern-card: that class
-   lifts on hover, which is right for a grid of clickable cards and
-   wrong for a form — the card would jump every time the pointer
-   travels to the password field. It gets the entrance animation only. */
+   The sign-in card deliberately does NOT use .modern-card: that class lifts on
+   hover, which is right for a grid of clickable cards and wrong for a form —
+   the card would jump every time the pointer travels to the password field. */
 .login-card {
   animation: fadeInUp 0.35s ease both;
 }
@@ -106,16 +150,84 @@ tbody tr:hover td {
   animation: captionFade 0.9s ease both;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .login-card,
-  .login-caption { animation: none; }
-}
-
-/* For div-based list rows (not <table> — those already get the
-   `tbody tr:hover td` rule above) */
+/* For div-based list rows (not <table> — those get `tbody tr:hover td` above) */
 .modern-row {
   transition: background 0.12s ease;
 }
 .modern-row:hover {
-  background: #1D3538;
+  background: var(--card-bg-hover);
+}
+
+/* ── Responsive ───────────────────────────────────────────────────────────
+   There were NO breakpoints at all before: a fixed 240px sidebar plus an
+   1180px content column needs ~1420px to breathe, so this panel was unusable
+   on a 1366px laptop and broken on a tablet. */
+
+/* Tablet / small laptop: the sidebar collapses to an icon rail. Labels are
+   hidden rather than removed so the accessible name survives for screen
+   readers (see .nav-label in Navbar). */
+@media (max-width: 1100px) {
+  .admin-sidebar {
+    width: 68px !important;
+    min-width: 68px !important;
+  }
+  .admin-sidebar .nav-label,
+  .admin-sidebar .sidebar-text {
+    position: absolute;
+    width: 1px; height: 1px;
+    padding: 0; margin: -1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+    border: 0;
+  }
+  .admin-sidebar .nav-link-btn {
+    justify-content: center !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+  .admin-sidebar .sidebar-brand { justify-content: center; padding-left: 0; padding-right: 0; }
+  .admin-page { padding-left: 20px !important; padding-right: 20px !important; }
+}
+
+/* Phone: the sidebar becomes a horizontal bar across the top so the content
+   column gets the full width. */
+@media (max-width: 720px) {
+  .admin-shell { flex-direction: column !important; }
+  .admin-sidebar {
+    width: 100% !important;
+    min-width: 0 !important;
+    height: auto !important;
+    flex-direction: row !important;
+    align-items: center;
+    overflow-x: auto;
+    position: sticky; top: 0; z-index: 20;
+    border-right: none !important;
+    border-bottom: 1px solid var(--divider);
+    gap: 6px;
+    padding: 8px 12px;
+  }
+  .admin-sidebar .sidebar-section { padding: 0 !important; border: none !important; overflow: visible !important; }
+  .admin-sidebar .sidebar-links { flex-direction: row !important; gap: 4px; }
+  .admin-sidebar .sidebar-footer { margin-top: 0 !important; margin-left: auto; padding: 0 !important; border: none !important; display: flex; align-items: center; gap: 8px; }
+  .admin-sidebar .sidebar-version { display: none; }
+  .admin-page { padding: 18px 16px !important; }
+}
+
+/* Tables are the one thing that genuinely cannot reflow — a 7-column
+   moderation table has no sensible 360px layout. They scroll horizontally
+   inside their card instead, which keeps the row intact. */
+@media (max-width: 720px) {
+  .table-scroll { -webkit-overflow-scrolling: touch; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .modern-card:hover { transform: none; }
+  .modern-btn:hover:not(:disabled) { transform: none; }
 }
