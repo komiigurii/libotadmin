@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { authAPI, spotAPI } from '../api/api';
+import { saveSession } from '../auth/session';
 import { theme as t, radius, shadow } from '../theme';
 import Icon from '../components/Icon';
 import logo from '../assets/logo.png';
@@ -40,7 +41,13 @@ function backdropUrl(url) {
 export default function Login() {
   const [email, setEmail]       = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError]       = useState('');
+  // Arriving from an expired or rejected session (see auth/session.js) shows
+  // why, instead of an unexplained sign-in screen.
+  const [error, setError]       = useState(() =>
+    new URLSearchParams(window.location.search).get('reason') === 'expired'
+      ? 'Your session expired. Please sign in again.'
+      : ''
+  );
   const [loading, setLoading]   = useState(false);
   // Seconds left on a server-side account lockout (HTTP 423). Purely a UX
   // affordance — the backend enforces the lock regardless of what this says.
@@ -132,10 +139,8 @@ export default function Login() {
       setLoading(true);
       const data = await authAPI.login(email, password);
       if (data.success && data.token) {
-        localStorage.setItem('token', data.token);
-        localStorage.setItem('role', data.role || 'admin');
-        localStorage.setItem('city', data.city || '');
-        navigate(data.role === 'moderator' ? '/spots' : '/mod-requests');
+        saveSession({ token: data.token, role: data.role, city: data.city });
+        navigate(data.role === 'moderator' ? '/spots' : '/mod-requests', { replace: true });
       } else {
         setError(data.message || 'Login failed');
       }
