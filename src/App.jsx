@@ -49,9 +49,14 @@ export default function App() {
           path="/*"
           element={
             <PrivateRoute>
-              <div style={shell.wrap}>
+              <div className="admin-shell" style={shell.wrap}>
+                {/* First focusable element on the page. Without it a keyboard
+                    user tabs through the entire sidebar on every page load
+                    before reaching the table they came for. */}
+                <a href="#main" className="skip-link">Skip to content</a>
                 <Navbar />
-                <main style={shell.main}>
+                {/* id + tabIndex give the skip link below somewhere to land. */}
+                <main id="main" tabIndex={-1} style={shell.main}>
                   <Suspense fallback={<PageFallback />}>
                     <Routes>
                       <Route path="/my-review-requests" element={<ModeratorRoute><MyReviewRequests /></ModeratorRoute>} />

@@ -289,6 +289,6 @@ const s = {
   btnAgree:     { background: t.successBg, color: t.success },
   btnDisagree:  { background: t.sidebarBg, color: t.textSecondary, border: `1px solid ${t.border}` },
   btnDelete:    { background: t.dangerBg, color: t.danger },
-  btnBan:       { background: t.danger, color: '#fff' },
+  btnBan:       { background: t.danger, color: t.onDanger },
 
 };
