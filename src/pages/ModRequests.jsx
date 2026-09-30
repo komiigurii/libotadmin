@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
-import { spotAPI, accountActionAPI, missionAPI } from '../api/api';
+import { spotAPI, missionAPI } from '../api/api';
 import { notify } from '../components/AppAlert';
 import {
   Page, PageHeader, Toolbar, FilterTabs, List, Button, ApprovalPill, Tag,
-  Loading, ErrorBanner, EmptyState, Avatar, SpotThumb, pageStyles as s,
+  Loading, ErrorBanner, EmptyState, SpotThumb, pageStyles as s,
 } from '../components/Layout';
 import { ChangeList, ProposalFieldList } from '../components/ChangeDiff';
 import { MISSION_FIELD_LABELS } from '../utils/changeDiff';
@@ -14,8 +14,7 @@ const KIND_LABELS = {
   spot:               'Spot edit',
   'spot-delete':      'Spot deletion',
   'spot-proposal':    'New spot',
-  account:            'Account action',
-  'mission-location': 'Food mission location',
+  'mission-location': 'Food spot location',
 };
 
 function toArray(data) {
@@ -30,8 +29,8 @@ export default function ModRequests() {
   const [requests, setRequests] = useState([]);
   const [loading,  setLoading]  = useState(true);
   const [error,    setError]    = useState(null);
-  // Opens on what's waiting — that's what a queue is for.
-  const [statusFilter, setStatusFilter] = useState('pending');
+  // '' = every type of request.
+  const [kindFilter, setKindFilter] = useState('');
   const [acting, setActing] = useState(null);
   const [expandedKey, setExpandedKey] = useState(null);
 
@@ -39,18 +38,17 @@ export default function ModRequests() {
     setLoading(true);
     setError(null);
     try {
-      // allSettled, NOT all. This queue is assembled from four independent
+      // allSettled, NOT all. This queue is assembled from three independent
       // endpoints, and with Promise.all a single one failing rejected the whole
       // thing — the catch below then blanked the list and showed "Failed to
       // load mod requests". A moderator's spot edit could be sitting in the
       // database, correctly saved, and the admin would still see an empty
-      // queue because an unrelated call (account actions, say) had errored.
+      // queue because an unrelated call had errored.
       // Now each section fails on its own and the rest still render.
-      const [pendingProposalsRes, pendingSpotsRes, accountActionsRes, missionProposalsRes] =
+      const [pendingProposalsRes, pendingSpotsRes, missionProposalsRes] =
         await Promise.allSettled([
           spotAPI.getPendingProposals(),  // { success, proposals }
           spotAPI.getPending(),           // { success, items }
-          accountActionAPI.getAll(),
           missionAPI.getProposals(),      // [] of missions with a pendingChange
         ]);
 
@@ -64,7 +62,6 @@ export default function ModRequests() {
 
       const pendingProposalsData = valueOf(pendingProposalsRes, 'New spot proposals', {});
       const pendingSpotsData     = valueOf(pendingSpotsRes,     'Spot edits',         {});
-      const accountActionsData   = valueOf(accountActionsRes,   'Account actions',    []);
       const missionProposalsData = valueOf(missionProposalsRes, 'Food mission locations', []);
 
       setError(
@@ -113,20 +110,6 @@ export default function ModRequests() {
           body: spot,
         }));
 
-      const accountItems = toArray(accountActionsData)
-        .map(a => ({
-          kind: 'account',
-          id: a._id,
-          status: a.status,
-          title: a.proposedByName || 'Moderator',
-          // Never the raw Clerk id — the backend resolves this to a real
-          // name, and falls back to 'Deleted user' when the account is gone.
-          subtitle: a.targetName || 'Deleted user',
-          image: a.targetImage || null,
-          date: a.proposedAt || a.createdAt,
-          body: a,
-        }));
-
       const missionLocationItems = toArray(missionProposalsData)
         .map(mission => ({
           kind: 'mission-location',
@@ -139,7 +122,7 @@ export default function ModRequests() {
           body: mission,
         }));
 
-      const all = [...proposalItems, ...editItems, ...deleteItems, ...accountItems, ...missionLocationItems]
+      const all = [...proposalItems, ...editItems, ...deleteItems, ...missionLocationItems]
         .sort((a, b) => new Date(b.date) - new Date(a.date));
       setRequests(all);
     } catch (err) {
@@ -152,7 +135,7 @@ export default function ModRequests() {
 
   useEffect(() => { load(); }, []);
 
-  const visible = requests.filter(r => !statusFilter || r.status === statusFilter);
+  const visible = requests.filter(r => !kindFilter || r.kind === kindFilter);
   const pendingCount = requests.filter(r => r.status === 'pending').length;
 
   // Approve/reject a NEW spot proposal
@@ -183,16 +166,6 @@ export default function ModRequests() {
     setActing(null);
   };
 
-  const decideAccount = async (id, decision) => {
-    setActing(id);
-    try {
-      const data = await accountActionAPI.decide(id, decision);
-      if (data?.success !== false) load();
-      else notify('Failed: ' + (data?.message || 'Unknown error'), { tone: 'danger' });
-    } catch { notify('Network error', { tone: 'danger' }); }
-    setActing(null);
-  };
-
   // Approve/reject a proposed food-mission location change
   const decideMissionLocation = async (id, action) => {
     setActing(id);
@@ -207,27 +180,30 @@ export default function ModRequests() {
     setActing(null);
   };
 
-  const count = (st) => requests.filter((r) => r.status === st).length;
+  const count = (kind) => requests.filter((r) => r.kind === kind).length;
 
   return (
     <Page>
       <PageHeader
         title="Approval Queue"
         count={pendingCount}
-        subtitle="New spots, spot edits and deletions, food mission locations and account actions from moderators — nothing goes live until you approve it."
+        subtitle="New spots, spot edits and deletions, and food spot locations from moderators — nothing goes live until you approve it."
         actions={<Button icon="refresh-cw" onClick={load} disabled={loading}>Refresh</Button>}
       />
 
       <Toolbar>
+        {/* Everything here is waiting on a decision, so the tabs split by
+            what kind of request it is rather than by status. */}
         <FilterTabs
-          label="Filter by status"
-          value={statusFilter}
-          onChange={setStatusFilter}
+          label="Filter by request type"
+          value={kindFilter}
+          onChange={setKindFilter}
           options={[
-            { value: 'pending',  label: 'Pending',  count: pendingCount },
-            { value: 'approved', label: 'Approved', count: count('approved') },
-            { value: 'rejected', label: 'Rejected', count: count('rejected') },
-            { value: '',         label: 'All',      count: requests.length },
+            { value: '',                 label: 'All',        count: requests.length },
+            { value: 'spot-proposal',    label: 'New spots',  count: count('spot-proposal') },
+            { value: 'spot',             label: 'Edits',      count: count('spot') },
+            { value: 'spot-delete',      label: 'Deletions',  count: count('spot-delete') },
+            { value: 'mission-location', label: 'Food spots', count: count('mission-location') },
           ]}
         />
       </Toolbar>
@@ -239,8 +215,8 @@ export default function ModRequests() {
       ) : visible.length === 0 ? (
         <EmptyState
           icon="check"
-          title={statusFilter === 'pending' ? 'Nothing waiting for approval' : 'No requests here'}
-          subtitle={statusFilter === 'pending'
+          title={requests.length === 0 ? 'Nothing waiting for approval' : 'No requests of this type'}
+          subtitle={requests.length === 0
             ? 'Moderator submissions will appear here as they come in.'
             : 'Try another filter.'}
         />
@@ -255,18 +231,15 @@ export default function ModRequests() {
             const isNewProposal = r.kind === 'spot-proposal';
             const isMissionLocation = r.kind === 'mission-location';
             const hasDetails = r.kind === 'spot' || isNewProposal || isDeleteRequest || isMissionLocation;
-            const byLine = r.kind === 'account' ? r.title : null;
 
             const handleApprove = () => {
-              if (r.kind === 'account') decideAccount(r.id, 'approved');
-              else if (isNewProposal) decideProposal(r.id, 'approve');
+              if (isNewProposal) decideProposal(r.id, 'approve');
               else if (isMissionLocation) decideMissionLocation(r.id, 'approve');
               else decideSpot(r.id, 'approve');
             };
 
             const handleReject = () => {
-              if (r.kind === 'account') decideAccount(r.id, 'rejected');
-              else if (isNewProposal) decideProposal(r.id, 'reject');
+              if (isNewProposal) decideProposal(r.id, 'reject');
               else if (isMissionLocation) decideMissionLocation(r.id, 'reject');
               else decideSpot(r.id, 'reject');
             };
@@ -276,8 +249,6 @@ export default function ModRequests() {
                 <div style={s.itemTop}>
                   {isDeleteRequest ? (
                     <div style={{ ...s.mediaIcon, ...s.mediaIconDanger }}><Icon name="trash" size={16} /></div>
-                  ) : r.kind === 'account' ? (
-                    <Avatar src={r.image} name={r.subtitle} size={38} />
                   ) : (
                     <SpotThumb src={r.image} size={38} />
                   )}
@@ -290,8 +261,6 @@ export default function ModRequests() {
                       <ApprovalPill status={r.status} />
                     </div>
 
-                    {byLine && <p style={s.itemText}>Proposed by <strong>{byLine}</strong></p>}
-                    {r.kind === 'account' && <p style={s.itemText}>{r.body.reason}</p>}
                     {isNewProposal && <p style={s.itemText}>A new spot, submitted for review.</p>}
                     {r.kind === 'spot' && <p style={s.itemText}>Changes to this spot&rsquo;s details.</p>}
                     {isDeleteRequest && (
@@ -300,22 +269,9 @@ export default function ModRequests() {
                       </p>
                     )}
                     {isMissionLocation && (
-                      <p style={s.itemText}>A new location for this spot&rsquo;s food recommendation mission.</p>
+                      <p style={s.itemText}>A new location for this spot&rsquo;s recommended food spot.</p>
                     )}
 
-                    {(r.kind === 'account' || (r.status !== 'pending' && r.body.resultSummary)) && (
-                      <div style={s.itemFacts}>
-                        {r.kind === 'account' && (
-                          <span style={s.itemFact}>
-                            <Icon name={r.body.sourceType === 'inactivity' ? 'clock' : 'hand'} size={12} />
-                            {r.body.sourceType === 'inactivity' ? 'Account inactivity' : 'Manual'}
-                          </span>
-                        )}
-                        {r.status !== 'pending' && r.body.resultSummary && (
-                          <span style={s.itemFact}><Icon name="check-circle" size={12} /> {r.body.resultSummary}</span>
-                        )}
-                      </div>
-                    )}
                   </div>
 
                   {hasDetails && (

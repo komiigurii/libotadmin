@@ -39,7 +39,7 @@ function backdropUrl(url) {
 }
 
 export default function Login() {
-  const [email, setEmail]       = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   // Arriving from an expired or rejected session (see auth/session.js) shows
   // why, instead of an unexplained sign-in screen.
@@ -133,11 +133,11 @@ export default function Login() {
 
   const handleLogin = async () => {
     if (lockedFor > 0) return;
-    if (!email || !password) { setError('Please fill in all fields'); return; }
+    if (!username.trim() || !password) { setError('Enter your username and password.'); return; }
     try {
       setError('');
       setLoading(true);
-      const data = await authAPI.login(email, password);
+      const data = await authAPI.login(username.trim(), password);
       if (data.success && data.token) {
         saveSession({ token: data.token, role: data.role, city: data.city });
         // Both roles start on the dashboard: it shows what's waiting on them.
@@ -184,7 +184,7 @@ export default function Login() {
         </div>
 
         <h1 style={styles.title}>Libot Admin</h1>
-        <p style={styles.subtitle}>Sign in to manage spots, reviews and travellers</p>
+        <p style={styles.subtitle}>Sign in with the username and password you were assigned.</p>
 
         {error && (
           <div style={styles.error} role="alert">
@@ -199,12 +199,15 @@ export default function Login() {
         )}
 
         <div style={styles.field}>
-          <label style={styles.label}>Username</label>
+          <label style={styles.label} htmlFor="login-username">Username</label>
           <input
-            type="email"
-            placeholder="admin"
-            value={email}
-            onChange={e => setEmail(e.target.value)}
+            id="login-username"
+            type="text"
+            placeholder="e.g. maria"
+            value={username}
+            onChange={e => setUsername(e.target.value)}
+            autoCapitalize="none"
+            spellCheck={false}
             onKeyDown={e => e.key === 'Enter' && handleLogin()}
             style={styles.input}
             className="modern-input"
@@ -213,8 +216,9 @@ export default function Login() {
         </div>
 
         <div style={styles.field}>
-          <label style={styles.label}>Password</label>
+          <label style={styles.label} htmlFor="login-password">Password</label>
           <input
+            id="login-password"
             type="password"
             placeholder="••••••••"
             value={password}

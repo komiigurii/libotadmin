@@ -1,5 +1,5 @@
-import { Fragment, useEffect, useState } from 'react';
-import { inactiveUsersAPI, accountActionAPI } from '../api/api';
+import { useEffect, useState } from 'react';
+import { inactiveUsersAPI } from '../api/api';
 import { notify, confirmAction } from '../components/AppAlert';
 import {
   Page, PageHeader, Table, Th, Td, Button, StatusPill, Loading, EmptyState, ErrorBanner, Avatar,
@@ -7,17 +7,13 @@ import {
 } from '../components/Layout';
 import { fmtDay } from '../utils/format';
 
-const role = () => localStorage.getItem('role');
-
+// Admin only: moderators work on attractions and their own requests.
 export default function InactiveUsers() {
-  const isModerator = role() === 'moderator';
 
   const [users,   setUsers]   = useState([]);
   const [loading, setLoading] = useState(true);
   const [error,   setError]   = useState(null);
   const [acting,  setActing]  = useState(null);
-  const [proposingId, setProposingId] = useState(null);
-  const [proposeReason, setProposeReason] = useState('');
 
   const load = async () => {
     setLoading(true);
@@ -49,32 +45,12 @@ export default function InactiveUsers() {
     setActing(null);
   };
 
-  const submitProposal = async (clerkUserId) => {
-    if (!proposeReason.trim()) { notify('Add a reason for the suspension request'); return; }
-    setActing(clerkUserId);
-    try {
-      const data = await accountActionAPI.propose(clerkUserId, proposeReason.trim());
-      if (data?.success !== false) {
-        setProposingId(null);
-        setProposeReason('');
-        notify('Suspension request sent to an admin for approval.', { tone: 'success' });
-      } else {
-        notify('Failed: ' + (data?.message || 'Unknown error'), { tone: 'danger' });
-      }
-    } catch (err) {
-      notify(err?.response?.data?.message || 'Network error', { tone: 'danger' });
-    }
-    setActing(null);
-  };
-
   return (
     <Page>
       <PageHeader
         title="Inactive Accounts"
         count={users.length}
-        subtitle={isModerator
-          ? 'Travelers who haven’t opened the app in 30 days or more. Propose a temporary suspension for an admin to review.'
-          : 'Travelers who haven’t opened the app in 30 days or more, flagged by the system for archival review.'}
+        subtitle='Travelers who haven’t opened the app in 30 days or more. Archiving keeps their record for 30 days, then deletes the account.'
         actions={<Button icon="refresh-cw" onClick={load} disabled={loading}>Refresh</Button>}
       />
 
@@ -103,8 +79,7 @@ export default function InactiveUsers() {
           {users.map(u => {
             const busy = acting === u.clerkUserId;
             return (
-              <Fragment key={u.clerkUserId}>
-                <tr>
+                <tr key={u.clerkUserId}>
                   <Td>
                     <div style={s.person}>
                       <Avatar src={u.profileImage} name={u.name} size={32} />
@@ -127,45 +102,13 @@ export default function InactiveUsers() {
                       : <StatusPill tone="warning" icon="clock">Pending archival</StatusPill>}
                   </Td>
                   <Td align="right">
-                    {u.status !== 'pending' ? '—' : isModerator ? (
-                      <Button
-                        size="sm"
-                        variant="warning"
-                        icon="pause"
-                        disabled={busy}
-                        onClick={() => { setProposingId(proposingId === u.clerkUserId ? null : u.clerkUserId); setProposeReason(''); }}
-                      >
-                        Propose suspension
-                      </Button>
-                    ) : (
+                    {u.status !== 'pending' ? '—' : (
                       <Button size="sm" variant="success" icon="archive" disabled={busy} onClick={() => archive(u.clerkUserId)}>
                         Approve archival
                       </Button>
                     )}
                   </Td>
                 </tr>
-                {proposingId === u.clerkUserId && (
-                  <tr>
-                    <td colSpan={6} style={s.panel}>
-                      <p style={s.panelLabel}>Why should {u.name} be temporarily suspended?</p>
-                      <textarea
-                        value={proposeReason}
-                        onChange={e => setProposeReason(e.target.value)}
-                        placeholder="e.g. Inactive since signing up with a duplicate account"
-                        style={s.textarea}
-                        className="modern-input"
-                        rows={2}
-                      />
-                      <div style={s.buttonRow}>
-                        <Button variant="primary" icon="send" disabled={busy} onClick={() => submitProposal(u.clerkUserId)}>
-                          Send to admin
-                        </Button>
-                        <Button onClick={() => setProposingId(null)}>Cancel</Button>
-                      </div>
-                    </td>
-                  </tr>
-                )}
-              </Fragment>
             );
           })}
         </Table>

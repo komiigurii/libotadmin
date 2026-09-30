@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  spotAPI, missionAPI, accountActionAPI, reportAPI, appealAPI, commentAPI, userProgressAPI,
+  spotAPI, missionAPI, reportAPI, appealAPI, userProgressAPI,
 } from '../api/api';
 import { theme as t, radius, type } from '../theme';
 import {
@@ -40,26 +40,23 @@ const greeting = () => {
 // Mirrors how ModRequests.load() assembles the approval queue, so the count
 // here matches the one on that page.
 async function loadAdmin() {
-  const [progress, spots, proposals, pendingSpots, actions, missions, reports, appeals, reviews] =
+  const [progress, spots, proposals, pendingSpots, missions, reports, appeals] =
     await Promise.allSettled([
       userProgressAPI.getAll(),
       spotAPI.getAll(),
       spotAPI.getPendingProposals(),
       spotAPI.getPending(),
-      accountActionAPI.getAll(),
       missionAPI.getProposals(),
       reportAPI.getAll({ type: 'review', status: 'pending' }),
       appealAPI.getAll('pending'),
-      commentAPI.getAll(),
     ]);
   const ok = (r) => r.status === 'fulfilled';
   const val = (r) => (ok(r) ? r.value : undefined);
 
-  const approvalParts = [proposals, pendingSpots, actions, missions];
+  const approvalParts = [proposals, pendingSpots, missions];
   const approvals = approvalParts.some(ok)
     ? listOf(val(proposals), 'proposals').filter((p) => (p.status || 'pending') === 'pending').length
-      + listOf(val(pendingSpots), 'items').filter((s) => s.pendingChange || s.pendingDelete).length
-      + listOf(val(actions), 'actions').filter((a) => a.status === 'pending').length
+      + listOf(val(pendingSpots), 'items').filter((sp) => sp.pendingChange || sp.pendingDelete).length
       + listOf(val(missions), 'proposals').length
     : null;
 
@@ -71,7 +68,6 @@ async function loadAdmin() {
       approvalsPartial: approvalParts.some((r) => !ok(r)) && approvals != null,
       reports: ok(reports) ? listOf(val(reports), 'reports').length : null,
       appeals: ok(appeals) ? listOf(val(appeals), 'appeals').length : null,
-      flagged: ok(reviews) ? listOf(val(reviews), 'reviews').filter((c) => c.flagStatus === 'pending').length : null,
     },
     failed: [
       !ok(progress) && 'traveler figures',
@@ -79,53 +75,51 @@ async function loadAdmin() {
       approvalParts.some((r) => !ok(r)) && 'part of the approval queue',
       !ok(reports) && 'reported reviews',
       !ok(appeals) && 'appeals',
-      !ok(reviews) && 'reviews',
     ].filter(Boolean),
   };
 }
 
-// Mirrors MyReviewRequests.load(), so statuses match that page.
+// A moderator's dashboard is about their attractions and their requests —
+// the same sources as My Submissions, so the two always agree.
 async function loadModerator() {
-  const [progress, mySpots, myProposals, myActions, myDeletes, myReviews] =
+  const [mySpots, myProposals, myDeletes, myChanges] =
     await Promise.allSettled([
-      userProgressAPI.getAll(),
       spotAPI.getMine(),
       spotAPI.getMyProposals(),
-      accountActionAPI.getMine(),
       spotAPI.getMyDeleteRequests(),
-      commentAPI.getMine(),
+      spotAPI.getMyChangeRequests(),
     ]);
   const ok = (r) => r.status === 'fulfilled';
   const val = (r) => (ok(r) ? r.value : undefined);
 
   const spots = ok(mySpots) ? listOf(val(mySpots), 'spots') : null;
+  const history = ok(myChanges) ? val(myChanges) : [];
+  // Edits sent before the request history existed, still pending.
+  const tracked = new Set(history.filter((c) => c.kind === 'spot-edit' && c.status === 'pending').map((c) => String(c.spotId)));
+
   const submissions = [
-    ...(spots || []).filter((s) => s.pendingChange).map((s) => ({
-      kind: 'Spot edit', name: s.name, status: s.pendingChange.status || 'pending', date: s.pendingChange.submittedAt,
+    ...history.map((c) => ({
+      kind: c.kind === 'mission-location' ? 'Food spot location' : 'Spot edit',
+      name: c.targetName, status: c.status, date: c.submittedAt,
+    })),
+    ...(spots || []).filter((sp) => sp.pendingChange && !tracked.has(String(sp._id))).map((sp) => ({
+      kind: 'Spot edit', name: sp.name, status: 'pending', date: sp.pendingChange.submittedAt,
     })),
     ...listOf(val(myProposals), 'proposals').map((p) => ({
       kind: 'New spot', name: p.name, status: p.status || 'pending', date: p.submittedAt || p.createdAt,
     })),
-    ...listOf(val(myActions), 'actions').map((a) => ({
-      kind: 'Account action', name: a.targetName || 'Deleted user', status: a.status, date: a.proposedAt || a.createdAt,
-    })),
     ...listOf(val(myDeletes), 'requests').map((d) => ({
       kind: 'Deletion', name: d.spotName, status: d.status || 'pending', date: d.submittedAt,
     })),
-  ].sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
+  ].sort((x, y) => new Date(y.date || 0) - new Date(x.date || 0));
 
-  const reviews = ok(myReviews) ? listOf(val(myReviews), 'reviews') : null;
-
+  const sources = [myProposals, myDeletes, myChanges];
   return {
-    progress: val(progress),
     spots,
-    submissions: [myProposals, myActions, myDeletes].some(ok) || spots ? submissions : null,
-    reviews,
+    submissions: sources.some(ok) || spots ? submissions : null,
     failed: [
-      !ok(progress) && 'traveler figures',
       !ok(mySpots) && 'your spots',
-      ![myProposals, myActions, myDeletes].every(ok) && 'some of your submissions',
-      !ok(myReviews) && 'reviews',
+      !sources.every(ok) && 'some of your submissions',
     ].filter(Boolean),
   };
 }
@@ -154,7 +148,7 @@ export default function Dashboard() {
   const spots = data?.spots;
   // Admin only: everything waiting on a decision, or null if none of it loaded.
   const waiting = data?.attention
-    ? sumKnown(Object.values(pick(data.attention, ['approvals', 'reports', 'appeals', 'flagged'])))
+    ? sumKnown(Object.values(pick(data.attention, ['approvals', 'reports', 'appeals'])))
     : null;
 
   // Each section fades in a beat after the one before it.
@@ -169,7 +163,7 @@ export default function Dashboard() {
           eyebrow={`${greeting()} · ${new Date().toLocaleDateString('en-PH', { weekday: 'long', month: 'long', day: 'numeric' })}`}
           title="Dashboard"
           subtitle={isModerator
-            ? `Your corner of Libot${city ? ` — ${city}` : ''}: the spots you look after, what you’ve sent for approval, and how travelers are doing.`
+            ? `The spots you look after${city ? ` in ${city}` : ''}, and where each request you’ve sent for approval stands.`
             : 'An overview of what’s live in the app, what’s waiting on you, and how travelers are using it.'}
           actions={<Button icon="refresh-cw" onClick={load} disabled={refreshing}>{refreshing ? 'Refreshing…' : 'Refresh'}</Button>}
         />
@@ -191,11 +185,9 @@ export default function Dashboard() {
             <Stat icon="map-pin" label={city ? `Spots in ${city}` : 'Your spots'} to="/spots" value={loading ? '…' : fmt(spots?.length)}
               hint={loading ? null : spots ? `${fmt(spots.filter((x) => x.AR3DModelURL).length)} with an AR model` : null} />
             <Stat icon="send" label="Waiting for approval" to="/my-review-requests" value={loading ? '…' : fmt(data?.submissions?.filter((x) => x.status === 'pending').length)}
-              hint={loading ? null : data?.submissions ? `${fmt(data.submissions.filter((x) => x.status === 'approved').length)} approved · ${fmt(data.submissions.filter((x) => x.status === 'rejected').length)} rejected` : null} />
-            <Stat icon="message-square" label="Reviews in your area" to="/comments" value={loading ? '…' : fmt(data?.reviews?.length)}
-              hint={loading ? null : data?.reviews ? `${fmt(data.reviews.filter((c) => c.flagStatus === 'pending').length)} flagged for an admin` : null} />
-            <Stat icon="users" label="Travelers" to="/user-progress" value={loading ? '…' : fmt(stats?.totalUsers)}
-              hint={loading ? null : stats ? `${fmt(stats.activeLast7)} active this week` : null} />
+              hint={loading ? null : data?.submissions ? `${fmt(data.submissions.filter((x) => x.status === 'rejected').length)} rejected so far` : null} />
+            <Stat icon="check-circle" label="Approved" to="/my-review-requests" value={loading ? '…' : fmt(data?.submissions?.filter((x) => x.status === 'approved').length)}
+              hint={loading ? null : data?.submissions ? `${fmt(data.submissions.length)} requests sent in total` : null} />
           </>
         ) : (
           <>
@@ -208,7 +200,7 @@ export default function Dashboard() {
             <Stat icon="inbox" label="Waiting on you" to="/mod-requests"
               emphasis={waiting > 0}
               value={loading ? '…' : fmt(waiting)}
-              hint="approvals, reports, appeals & flags" />
+              hint="approvals, reports & appeals" />
           </>
         )}
       </section>
@@ -225,15 +217,21 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* ── Content + people ── */}
-      <div className="dash-split" style={s.split}>
+      {/* ── Content (+ travelers, for admins) ── */}
+      {isModerator ? (
         <div className="dash-reveal" style={reveal(4)}>
-          <ContentCard spots={spots} loading={loading} scope={isModerator ? (city || 'your area') : null} />
+          <ContentCard spots={spots} loading={loading} scope={city || 'your area'} />
         </div>
-        <div className="dash-reveal" style={reveal(5)}>
-          <TopTravelers rows={leaderboard} loading={loading} failed={!loading && !data?.progress} />
+      ) : (
+        <div className="dash-split" style={s.split}>
+          <div className="dash-reveal" style={reveal(4)}>
+            <ContentCard spots={spots} loading={loading} />
+          </div>
+          <div className="dash-reveal" style={reveal(5)}>
+            <TopTravelers rows={leaderboard} loading={loading} failed={!loading && !data?.progress} />
+          </div>
         </div>
-      </div>
+      )}
     </Page>
   );
 }
@@ -270,11 +268,9 @@ function CountBadge({ count, loading }) {
 function AttentionCard({ attention, loading }) {
   const rows = [
     { icon: 'inbox', label: 'Approval queue', to: '/mod-requests', count: attention?.approvals,
-      detail: 'New spots, edits, deletions, food mission pins and account actions from moderators' },
+      detail: 'New spots, edits, deletions and food spot locations from moderators' },
     { icon: 'flag', label: 'Reported reviews', to: '/reported-comments', count: attention?.reports,
       detail: 'Reviews that travelers reported from the app' },
-    { icon: 'message-square', label: 'Flagged by moderators', to: '/comments?show=flagged', count: attention?.flagged,
-      detail: 'Reviews a moderator asked you to act on' },
     { icon: 'slash', label: 'Ban appeals', to: '/banned-accounts', count: attention?.appeals,
       detail: 'Suspended or banned travelers asking to come back' },
   ];
@@ -329,7 +325,9 @@ function SubmissionsCard({ submissions, loading }) {
           {recent.map((r, i) => {
             return (
               <li key={`${r.kind}-${r.name}-${i}`} style={s.row}>
-                <span style={s.rowIcon}><Icon name={r.kind === 'Account action' ? 'users' : 'map-pin'} size={16} /></span>
+                <span style={s.rowIcon}>
+                  <Icon name={r.kind === 'Food spot location' ? 'utensils' : r.kind === 'Deletion' ? 'trash' : 'map-pin'} size={16} />
+                </span>
                 <span style={s.rowText}>
                   <span style={s.rowLabel}>{r.name || '—'}</span>
                   <span style={s.rowDetail}>{r.kind} · {timeAgo(r.date)}</span>
@@ -348,9 +346,8 @@ function QuickActions({ isModerator }) {
   const actions = isModerator
     ? [
         { icon: 'plus', label: 'Add a spot', to: '/spots?new=1' },
-        { icon: 'message-square', label: 'Moderate reviews', to: '/comments' },
+        { icon: 'map-pin', label: 'Edit a spot', to: '/spots' },
         { icon: 'send', label: 'My submissions', to: '/my-review-requests' },
-        { icon: 'award', label: 'Leaderboard', to: '/user-progress' },
       ]
     : [
         { icon: 'inbox', label: 'Review approvals', to: '/mod-requests' },

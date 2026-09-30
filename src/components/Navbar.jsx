@@ -40,10 +40,9 @@ const ADMIN_NAV = [
   ] },
 ];
 
-// Moderators previously saw only two links, although three more pages were
-// already built for them (their routes allow it and the backend serves them):
-// Reviews & Feedback — which is where a moderator flags a review for an admin
-// — Traveler Progress, and Inactive Accounts. They're now reachable.
+// A moderator's job is attractions in their municipality and the requests
+// they've sent — per the system spec, nothing else. (Reviews, the leaderboard
+// and inactive accounts are admin-only, in the panel and on the backend.)
 const MODERATOR_NAV = [
   { group: 'Overview', items: [
     { label: 'Dashboard',          path: '/dashboard',          icon: 'grid' },
@@ -51,13 +50,6 @@ const MODERATOR_NAV = [
   { group: 'Content', items: [
     { label: 'Spot Management',    path: '/spots',              icon: 'map-pin' },
     { label: 'My Submissions',     path: '/my-review-requests', icon: 'send' },
-  ] },
-  { group: 'Community', items: [
-    { label: 'Reviews & Feedback', path: '/comments',           icon: 'message-square' },
-  ] },
-  { group: 'Travelers', items: [
-    { label: 'Traveler Progress',  path: '/user-progress',      icon: 'award' },
-    { label: 'Inactive Accounts',  path: '/inactive-users',     icon: 'clock' },
   ] },
 ];
 
