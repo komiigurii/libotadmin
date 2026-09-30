@@ -1,25 +1,16 @@
 import { useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
 import { commentAPI, bannedAccountsAPI } from '../api/api';
 import { notify, confirmAction } from '../components/AppAlert';
 import {
-  Page, PageHeader, Toolbar, SearchInput, FilterTabs, List, Button, StatusPill, Tag,
+  Page, PageHeader, Toolbar, SearchInput, List, Button, Tag,
   Loading, ErrorBanner, EmptyState, Avatar, pageStyles as s,
 } from '../components/Layout';
 import { fmtDateTime } from '../utils/format';
 import Icon from '../components/Icon';
 
-const role = () => localStorage.getItem('role');
-
-// Only a review someone has flagged gets a status — an ordinary review used
-// to carry an "ACTIVE" pill, which said nothing on every single row.
-const FLAG_STATUS = {
-  pending:  { tone: 'warning', icon: 'flag',  label: 'Flagged' },
-  approved: { tone: 'success', icon: 'check', label: 'Flag upheld' },
-  rejected: { tone: 'neutral', icon: 'x',     label: 'Flag declined' },
-};
-
-const ACTION_LABELS = { warn: 'Warn (mute)', suspend: 'Suspend' };
+// Reviews & Feedback — admin only. Every review travelers have left, and the
+// spec's user-management actions on its author: warn, suspend, ban
+// permanently, or delete the review itself.
 
 function toArray(data) {
   if (!data) return [];
@@ -30,23 +21,17 @@ function toArray(data) {
 }
 
 export default function Comments() {
-  const isModerator = role() === 'moderator';
-  // ?show=flagged — the dashboard's "Flagged by moderators" row lands here.
-  const [params] = useSearchParams();
-
   const [comments, setComments] = useState([]);
   const [loading,  setLoading]  = useState(true);
   const [error,    setError]    = useState(null);
   const [search,   setSearch]   = useState('');
-  const [show,     setShow]     = useState(params.get('show') === 'flagged' ? 'flagged' : '');
   const [expandedId, setExpandedId] = useState(null);
 
   const load = async () => {
     setLoading(true);
     setError(null);
     try {
-      const data = isModerator ? await commentAPI.getMine() : await commentAPI.getAll();
-      setComments(toArray(data));
+      setComments(toArray(await commentAPI.getAll()));
     } catch {
       setError('Couldn’t load reviews.');
       setComments([]);
@@ -56,11 +41,8 @@ export default function Comments() {
 
   useEffect(() => { load(); }, []);
 
-  const flaggedCount = comments.filter((c) => c.flagStatus === 'pending').length;
-
   const visible = comments.filter(c => {
     if (!c?._id) return false;
-    if (show === 'flagged' && c.flagStatus !== 'pending') return false;
     if (!search) return true;
     const q = search.toLowerCase();
     const spotName = (c.spotId && typeof c.spotId === 'object' ? c.spotId.name : '') || '';
@@ -75,22 +57,11 @@ export default function Comments() {
       <PageHeader
         title="Reviews & Feedback"
         count={comments.length}
-        subtitle={isModerator
-          ? 'Reviews travelers left on spots in your area. Flag one and an admin decides what happens to it.'
-          : 'Every review travelers have left, across all spots — including the ones moderators flagged for you.'}
+        subtitle="Every review travelers have left, across all spots. Warn, suspend or ban the author, or delete the review."
         actions={<Button icon="refresh-cw" onClick={load} disabled={loading}>Refresh</Button>}
       />
 
       <Toolbar>
-        <FilterTabs
-          label="Show"
-          value={show}
-          onChange={setShow}
-          options={[
-            { value: '',        label: 'All',     count: comments.length },
-            { value: 'flagged', label: 'Flagged', count: flaggedCount },
-          ]}
-        />
         <SearchInput
           value={search}
           onChange={e => setSearch(e.target.value)}
@@ -104,11 +75,9 @@ export default function Comments() {
         <ErrorBanner>{error}</ErrorBanner>
       ) : visible.length === 0 ? (
         <EmptyState
-          icon={show === 'flagged' ? 'check' : 'message-square'}
-          title={comments.length === 0 ? 'No reviews yet' : show === 'flagged' && !search ? 'Nothing flagged' : 'No reviews match'}
-          subtitle={comments.length === 0
-            ? 'Reviews travelers leave in the app will appear here.'
-            : show === 'flagged' && !search ? 'No review is waiting on a flag decision.' : 'Try a different search.'}
+          icon="message-square"
+          title={comments.length === 0 ? 'No reviews yet' : 'No reviews match'}
+          subtitle={comments.length === 0 ? 'Reviews travelers leave in the app will appear here.' : 'Try a different search.'}
         />
       ) : (
         <List>
@@ -116,7 +85,6 @@ export default function Comments() {
             <CommentRow
               key={c._id}
               comment={c}
-              isModerator={isModerator}
               expanded={expandedId === c._id}
               onToggle={() => setExpandedId(expandedId === c._id ? null : c._id)}
               onUpdated={() => { setExpandedId(null); load(); }}
@@ -128,34 +96,60 @@ export default function Comments() {
   );
 }
 
-function CommentRow({ comment, isModerator, expanded, onToggle, onUpdated }) {
-  const [reason,         setReason]         = useState('');
-  const [proposedAction, setProposedAction] = useState('');
-  const [banReason,      setBanReason]      = useState('');
-  const [saving,         setSaving]         = useState(false);
+function CommentRow({ comment, expanded, onToggle, onUpdated }) {
+  const [reason, setReason] = useState('');
+  const [saving, setSaving] = useState(false);
 
-  const userName  = (comment.userId && typeof comment.userId === 'object' ? comment.userId.name : comment.userName) || 'Anonymous';
-  const spotName  = (comment.spotId && typeof comment.spotId === 'object' ? comment.spotId.name : '') || '—';
-  const spotCity  = (comment.spotId && typeof comment.spotId === 'object' ? comment.spotId.City : '') || '';
-  const flagStatus = comment.flagStatus || 'none';
-  const flag = FLAG_STATUS[flagStatus];
-  const canRequest = isModerator && flagStatus === 'none';
+  const userName = (comment.userId && typeof comment.userId === 'object' ? comment.userId.name : comment.userName) || 'Anonymous';
+  const spotName = (comment.spotId && typeof comment.spotId === 'object' ? comment.spotId.name : '') || '—';
+  const spotCity = (comment.spotId && typeof comment.spotId === 'object' ? comment.spotId.City : '') || '';
 
   // clerkUserId lives directly on the review doc; fall back to a populated
   // userId object just in case the endpoint ever starts populating it.
   const clerkUserId = comment.clerkUserId
     || (comment.userId && typeof comment.userId === 'object' ? comment.userId.clerkUserId : null);
 
-  const requestReview = async () => {
-    if (!reason.trim()) { notify('Add a short reason for the admin'); return; }
+  // Every action here needs a reason — it's recorded, and shown on the
+  // traveler's appeal if they send one.
+  const run = async ({ confirm, confirmText, call, needsUser = true }) => {
+    if (!reason.trim()) { notify('Add a reason first — it’s recorded with the action.'); return; }
+    if (needsUser && !clerkUserId) { notify('Could not identify this traveler.', { tone: 'danger' }); return; }
+    if (!(await confirmAction(confirm, { danger: true, confirmText }))) return;
     setSaving(true);
     try {
-      const data = await commentAPI.requestReview(comment._id, reason.trim(), proposedAction || null);
-      if (data?.success !== false) onUpdated();
-      else notify('Failed: ' + (data?.message || 'Unknown error'), { tone: 'danger' });
-    } catch { notify('Network error', { tone: 'danger' }); }
+      const data = await call();
+      if (data?.success !== false) {
+        if (data?.actionResult?.summary) notify(data.actionResult.summary, { tone: 'success' });
+        onUpdated();
+      } else {
+        notify('Failed: ' + (data?.message || 'Unknown error'), { tone: 'danger' });
+      }
+    } catch (err) {
+      notify(err?.response?.data?.message || 'Network error', { tone: 'danger' });
+    }
     setSaving(false);
   };
+
+  const warnUser = () => run({
+    confirm: `Warn ${userName}? A 1st warning mutes their reviews for 7 days; a 2nd mutes them for 14 days and suspends the account.`,
+    confirmText: 'Warn',
+    needsUser: false, // the backend finds the author from the review
+    call: () => commentAPI.warnUser(comment._id, reason.trim()),
+  });
+
+  // Suspend applies whatever the *next* suspension step is (7 days, then 14,
+  // then a permanent ban) — the backend decides the length, not the admin.
+  const suspendUser = () => run({
+    confirm: `Suspend ${userName}? This applies the next step automatically: 1st = 7 days, 2nd = 14 days, 3rd = permanent ban.`,
+    confirmText: 'Suspend',
+    call: () => bannedAccountsAPI.suspend(clerkUserId, reason.trim()),
+  });
+
+  const banUser = () => run({
+    confirm: `Permanently ban ${userName}? Their account is archived for 30 days before deletion, and they can appeal.`,
+    confirmText: 'Ban permanently',
+    call: () => bannedAccountsAPI.ban(clerkUserId, reason.trim()),
+  });
 
   const remove = async () => {
     if (!(await confirmAction('Delete this review permanently?', { danger: true, confirmText: 'Delete review' }))) return;
@@ -165,46 +159,6 @@ function CommentRow({ comment, isModerator, expanded, onToggle, onUpdated }) {
       if (data?.success !== false) onUpdated();
       else notify('Failed: ' + (data?.message || 'Unknown error'), { tone: 'danger' });
     } catch { notify('Network error', { tone: 'danger' }); }
-    setSaving(false);
-  };
-
-  // Suspend applies whatever the *next* escalation step is (7d -> 14d ->
-  // auto-ban on the 3rd) — the backend decides the duration, not the admin.
-  const suspendUser = async () => {
-    if (!banReason.trim()) { notify('Add a reason for suspending this traveler'); return; }
-    if (!clerkUserId) { notify('Could not identify this traveler (missing clerkUserId).', { tone: 'danger' }); return; }
-    if (!(await confirmAction(
-      `Suspend ${userName}? This applies the next escalation step automatically (1st = 7 days, 2nd = 14 days, 3rd = permanent ban).`,
-      { danger: true, confirmText: 'Suspend' }
-    ))) return;
-
-    setSaving(true);
-    try {
-      const data = await bannedAccountsAPI.suspend(clerkUserId, banReason.trim());
-      if (data?.success !== false) onUpdated();
-      else notify('Failed: ' + (data?.message || 'Unknown error'), { tone: 'danger' });
-    } catch (err) {
-      notify(err?.response?.data?.message || 'Network error', { tone: 'danger' });
-    }
-    setSaving(false);
-  };
-
-  const banUser = async () => {
-    if (!banReason.trim()) { notify('Add a reason for banning this traveler'); return; }
-    if (!clerkUserId) { notify('Could not identify this traveler (missing clerkUserId).', { tone: 'danger' }); return; }
-    if (!(await confirmAction(
-      `Permanently ban ${userName}? This archives their account for 30 days before permanent deletion, with a chance to appeal.`,
-      { danger: true, confirmText: 'Ban permanently' }
-    ))) return;
-
-    setSaving(true);
-    try {
-      const data = await bannedAccountsAPI.ban(clerkUserId, banReason.trim());
-      if (data?.success !== false) onUpdated();
-      else notify('Failed: ' + (data?.message || 'Unknown error'), { tone: 'danger' });
-    } catch (err) {
-      notify(err?.response?.data?.message || 'Network error', { tone: 'danger' });
-    }
     setSaving(false);
   };
 
@@ -218,84 +172,45 @@ function CommentRow({ comment, isModerator, expanded, onToggle, onUpdated }) {
             <span style={s.itemTitle}>{userName}</span>
             <span style={s.itemDate}>{fmtDateTime(comment.createdAt)}</span>
             <Tag icon="map-pin">{spotName}{spotCity ? ` · ${spotCity}` : ''}</Tag>
-            {flag && <StatusPill tone={flag.tone} icon={flag.icon}>{flag.label}</StatusPill>}
-            {flagStatus === 'pending' && comment.proposedAction && (
-              <Tag>Suggested: {ACTION_LABELS[comment.proposedAction] || comment.proposedAction}</Tag>
-            )}
           </div>
           <p style={s.itemText}>{comment.comment}</p>
           <div style={s.itemFacts}>
+            {comment.rating != null && <span style={s.itemFact}><Icon name="star" size={12} /> {comment.rating}/5</span>}
             <span style={s.itemFact}><Icon name="thumbs-up" size={12} /> {comment.likes || 0}</span>
             <span style={s.itemFact}><Icon name="thumbs-down" size={12} /> {comment.dislikes || 0}</span>
           </div>
         </div>
 
-        {isModerator ? (
-          canRequest && (
-            <div style={s.itemSide}>
-              <Button size="sm" icon={expanded ? 'chevron-up' : 'flag'} onClick={onToggle}>
-                {expanded ? 'Close' : 'Flag for admin'}
-              </Button>
-            </div>
-          )
-        ) : (
-          <div style={s.itemSide}>
-            <Button size="sm" icon={expanded ? 'chevron-up' : 'slash'} onClick={onToggle}>
-              {expanded ? 'Close' : 'Suspend / ban'}
-            </Button>
-            <Button size="sm" variant="danger" icon="trash" disabled={saving} onClick={remove}>
-              Delete
-            </Button>
-          </div>
-        )}
+        <div style={s.itemSide}>
+          <Button size="sm" icon={expanded ? 'chevron-up' : 'slash'} onClick={onToggle}>
+            {expanded ? 'Close' : 'Take action'}
+          </Button>
+          <Button size="sm" variant="danger" icon="trash" disabled={saving} onClick={remove}>
+            Delete
+          </Button>
+        </div>
       </div>
 
-      {expanded && canRequest && (
+      {expanded && (
         <div style={s.panel}>
-          <p style={s.panelLabel}>Why should an admin look at this review?</p>
+          <p style={s.panelLabel}>Reason (recorded, and shown on the traveler&rsquo;s appeal if they send one)</p>
           <textarea
             value={reason}
             onChange={e => setReason(e.target.value)}
-            placeholder="e.g. Insults another traveler by name"
-            style={s.textarea}
-            className="modern-input"
-            rows={2}
-          />
-          <p style={{ ...s.panelLabel, marginTop: 12 }}>Suggested action (the admin has the final say)</p>
-          <select
-            value={proposedAction}
-            onChange={e => setProposedAction(e.target.value)}
-            style={s.select}
-            className="modern-input"
-          >
-            <option value="">No account action — just look at the review</option>
-            <option value="warn">Warn (mute reviews temporarily)</option>
-            <option value="suspend">Suspend account</option>
-          </select>
-          <div style={s.buttonRow}>
-            <Button variant="primary" icon="send" disabled={saving} onClick={requestReview}>
-              Send to admin
-            </Button>
-          </div>
-        </div>
-      )}
-
-      {expanded && !isModerator && (
-        <div style={s.panel}>
-          <p style={s.panelLabel}>Reason (shown on the traveler&rsquo;s appeal if they send one)</p>
-          <textarea
-            value={banReason}
-            onChange={e => setBanReason(e.target.value)}
-            placeholder={`Why is ${userName} being suspended or banned?`}
+            placeholder={`Why is ${userName} being warned, suspended or banned?`}
             style={s.textarea}
             className="modern-input"
             rows={2}
           />
           <p style={s.panelNote}>
-            Suspend applies the next escalation step automatically — 1st = 7 days, 2nd = 14 days,
-            3rd becomes a permanent ban. Ban skips straight to permanent.
+            Warnings: the 1st mutes reviews for 7 days; the 2nd mutes for 14 days and suspends the account.
+            Suspensions: the 1st lasts 7 days, the 2nd 14 days, and the 3rd is a permanent ban.
+            Ban skips straight to permanent.
           </p>
           <div style={s.buttonRow}>
+            <Button variant="warning" icon="alert-triangle" disabled={saving} onClick={warnUser}>
+              Warn
+            </Button>
             <Button variant="warning" icon="clock" disabled={saving} onClick={suspendUser}>
               Suspend
             </Button>
