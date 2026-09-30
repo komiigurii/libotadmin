@@ -44,6 +44,11 @@ function fmtVal(key, v) {
     if (!Array.isArray(v) || !v.length) return '—';
     return v.map((m, i) => `#${i + 1}  ${fmtCoord(m)}`).join('\n');
   }
+  // Trivia entries are full sentences with their own commas — comma-joining
+  // them would blur where one fact ends and the next begins.
+  if (key === 'trivia' && Array.isArray(v)) {
+    return v.length ? v.map((line, i) => `${i + 1}. ${line}`).join('\n') : '—';
+  }
   if (Array.isArray(v)) return v.length ? v.join(', ') : '—';
   if (typeof v === 'object') return JSON.stringify(v);
   return String(v);
