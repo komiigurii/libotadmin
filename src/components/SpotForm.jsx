@@ -659,6 +659,9 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
     Badge:           initial?.Badge            || '',
     coordinates_lat: initial?.coordinates?.lat || '',
     coordinates_lng: initial?.coordinates?.lng || '',
+    // Edited as one fact per line; stored as an array — each entry is one card
+    // in the app's AR trivia popup.
+    trivia:          Array.isArray(initial?.trivia) ? initial.trivia.join('\n') : '',
   });
 
   const [arModels, setArModels] = useState(() => {
@@ -941,6 +944,7 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
     city: form.city.trim(),
     entranceFee: form.entranceFee.trim(),
     visitingHours: form.visitingHours.trim(),
+    trivia: form.trivia.split('\n').map(line => line.trim()).filter(Boolean),
     image: form.image,
     modelUrl: form.modelUrl || null,
     AR3DModelURL: form.ARModelUrl || null,
@@ -1072,6 +1076,12 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
             <div style={styles.field}>
               <label style={styles.label}>Description</label>
               <textarea name="description" value={form.description} onChange={handleChange} style={styles.textarea} className="modern-input" rows={3} placeholder="Short description of the spot..." />
+            </div>
+
+            <div style={styles.field}>
+              <label style={styles.label} htmlFor="spot-trivia">AR trivia</label>
+              <p style={styles.hint}>One fact per line — each line becomes one card in the app's AR trivia popup.</p>
+              <textarea id="spot-trivia" name="trivia" value={form.trivia} onChange={handleChange} style={styles.textarea} className="modern-input" rows={5} placeholder={'The present church was built from 1885 to 1888.\nThe Malolos Congress opened here on September 15, 1898.'} />
             </div>
           </section>
 
