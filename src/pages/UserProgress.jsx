@@ -75,8 +75,8 @@ export default function UserProgress() {
   return (
     <Page>
       <PageHeader
-        title="User Progress"
-        
+        title="Traveler Progress"
+        subtitle="The traveler leaderboard — spots visited, missions completed, badges and points for everyone using the app."
         actions={
           <button onClick={load} style={s.refreshBtn} className="modern-btn" disabled={loading}>
             {loading ? 'Loading…' : 'Refresh'}

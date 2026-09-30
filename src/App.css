@@ -86,10 +86,55 @@ tbody tr:hover td {
   background: var(--card-bg-hover);
 }
 
-/* ── Nav ── */
-.nav-link-btn:hover {
+/* ── Nav ──
+   :not([aria-current]) — the hover tint must never wash out the filled pill
+   of the page you're on. */
+.nav-link-btn:hover:not([aria-current="page"]) {
   background: var(--brand-soft) !important;
   color: var(--text-primary) !important;
+}
+
+/* ── Capiz lattice ──
+   The shell-paned windows of Bulacan's bahay na bato: small square panes in a
+   thin frame, with a heavier muntin every fourth pane, and a pearly sheen in
+   one corner the way capiz catches light. Decoration only, drawn over a solid
+   fill set inline (background-color, so this image layer survives). */
+.capiz-lattice {
+  background-image:
+    radial-gradient(120% 90% at 100% 0%, var(--lattice), transparent 60%),
+    linear-gradient(var(--lattice) 1px, transparent 1px),
+    linear-gradient(90deg, var(--lattice) 1px, transparent 1px),
+    linear-gradient(var(--lattice) 2px, transparent 2px),
+    linear-gradient(90deg, var(--lattice) 2px, transparent 2px);
+  background-size: 100% 100%, 13px 13px, 13px 13px, 52px 52px, 52px 52px;
+  background-position: 0 0, -1px -1px, -1px -1px, -2px -2px, -2px -2px;
+}
+
+/* ── Dashboard ── */
+/* One orchestrated entrance (sections stagger in via inline animation-delay)
+   rather than motion scattered across every widget. Reduced-motion users get
+   none of it — see the media query at the end of this file. */
+.dash-reveal {
+  animation: fadeInUp 0.4s ease both;
+}
+/* Rows in the "needs attention" list and the quick-action tiles are links:
+   they tint on hover and the chevron nudges toward where it goes. */
+.dash-link {
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.dash-link:hover {
+  background: var(--card-bg-hover);
+}
+.dash-link:hover .dash-chevron {
+  transform: translateX(3px);
+  color: var(--brand);
+}
+.dash-chevron {
+  transition: transform 0.15s ease, color 0.15s ease;
+}
+.dash-action:hover {
+  border-color: var(--brand) !important;
+  background: var(--brand-soft) !important;
 }
 
 .logout-btn:hover {
@@ -186,8 +231,20 @@ tbody tr:hover td {
     padding-left: 0 !important;
     padding-right: 0 !important;
   }
-  .admin-sidebar .sidebar-brand { justify-content: center; padding-left: 0; padding-right: 0; }
+  .admin-sidebar .sidebar-brand {
+    justify-content: center;
+    margin: 10px 8px !important;
+    padding: 10px 0 !important;
+  }
+  /* Role + scope don't fit a 68px rail; the brand block's accessible name
+     still says which console this is. */
+  .admin-sidebar .sidebar-identity { display: none !important; }
+  /* Three theme buttons side by side overflow a 68px rail — stack them. */
+  .admin-sidebar .sidebar-footer { padding-left: 10px !important; padding-right: 10px !important; }
+  .admin-sidebar .theme-row { flex-direction: column; }
   .admin-page { padding-left: 20px !important; padding-right: 20px !important; }
+  /* Dashboard's two-column rows stack. */
+  .dash-split { grid-template-columns: minmax(0, 1fr) !important; }
 }
 
 /* Phone: the sidebar becomes a horizontal bar across the top so the content
@@ -208,8 +265,13 @@ tbody tr:hover td {
     padding: 8px 12px;
   }
   .admin-sidebar .sidebar-section { padding: 0 !important; border: none !important; overflow: visible !important; }
+  .admin-sidebar .sidebar-brand { margin: 0 !important; padding: 6px !important; flex-shrink: 0; }
+  .admin-sidebar .nav-groups { flex-direction: row !important; gap: 4px !important; padding-top: 0 !important; }
   .admin-sidebar .sidebar-links { flex-direction: row !important; gap: 4px; }
+  .admin-sidebar .nav-link-btn { min-width: 40px; }
   .admin-sidebar .sidebar-footer { margin-top: 0 !important; margin-left: auto; padding: 0 !important; border: none !important; display: flex; align-items: center; gap: 8px; }
+  /* Back to a row in the top bar, where there's width but not height. */
+  .admin-sidebar .theme-row { flex-direction: row; margin-bottom: 0 !important; }
   .admin-sidebar .sidebar-version { display: none; }
   .admin-page { padding: 18px 16px !important; }
 }
@@ -230,4 +292,5 @@ tbody tr:hover td {
   }
   .modern-card:hover { transform: none; }
   .modern-btn:hover:not(:disabled) { transform: none; }
+  .dash-link:hover .dash-chevron { transform: none; }
 }

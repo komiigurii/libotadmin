@@ -140,7 +140,8 @@ export default function Login() {
       const data = await authAPI.login(email, password);
       if (data.success && data.token) {
         saveSession({ token: data.token, role: data.role, city: data.city });
-        navigate(data.role === 'moderator' ? '/spots' : '/mod-requests', { replace: true });
+        // Both roles start on the dashboard: it shows what's waiting on them.
+        navigate('/dashboard', { replace: true });
       } else {
         setError(data.message || 'Login failed');
       }
