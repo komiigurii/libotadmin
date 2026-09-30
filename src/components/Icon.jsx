@@ -17,14 +17,15 @@
  * copy has to deep-import one module per icon.
  */
 import {
-  Archive, ArrowRight, Bell, CaretDown, CaretUp, Check, CheckCircle, Clock,
-  Desktop, Flag, Hand, Info, MapPin, Moon, Package, Pause, PencilSimple,
+  Aperture, Archive, ArrowRight, Bell, CaretDown, CaretUp, Check, CheckCircle, Clock,
+  Desktop, Flag, ForkKnife, Hand, Image, Info, MapPin, Moon, Package, Pause, PencilSimple,
   Prohibit, SignOut, Sparkle, Star, Sun, ThumbsDown, ThumbsUp, Trash, Users,
   Warning, Wrench, X,
 } from '@phosphor-icons/react';
 
 const MAP = {
   'alert-triangle': Warning,
+  'aperture':       Aperture,   // AR — same glyph as the app's AR mission
   'archive':        Archive,
   'arrow-right':    ArrowRight,
   'bell':           Bell,
@@ -37,6 +38,7 @@ const MAP = {
   'edit':           PencilSimple,
   'flag':           Flag,
   'hand':           Hand,
+  'image':          Image,
   'info':           Info,
   'log-out':        SignOut,
   'map-pin':        MapPin,
@@ -52,6 +54,7 @@ const MAP = {
   'tool':           Wrench,
   'trash':          Trash,
   'users':          Users,
+  'utensils':       ForkKnife,  // not a Feather name — Feather has no food glyph
   'x':              X,
 };
 
