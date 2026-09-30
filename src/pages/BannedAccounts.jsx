@@ -1,22 +1,23 @@
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import { bannedAccountsAPI, appealAPI } from '../api/api';
 import { notify, confirmAction } from '../components/AppAlert';
-import { theme as t, radius, shadow } from '../theme';
-import { pageStyles, Loading, EmptyState, Avatar } from '../components/Layout';
-import Icon from '../components/Icon';
+import {
+  Page, PageHeader, Toolbar, SearchInput, Table, Th, Td, Button, StatusPill,
+  Loading, EmptyState, ErrorBanner, Avatar, pageStyles as s,
+} from '../components/Layout';
+import { fmtDateTime, fmtDay } from '../utils/format';
 
-function formatRemaining(expiresAt) {
-  if (!expiresAt) return 'Permanent';
+function remaining(expiresAt) {
   const ms = new Date(expiresAt) - Date.now();
-  if (ms <= 0) return 'Expired (pending auto-lift)';
+  if (!(ms > 0)) return 'Expired — lifting soon';
   const days = Math.ceil(ms / 86_400_000);
   return `${days} day${days === 1 ? '' : 's'} left`;
 }
 
-const APPEAL_BADGE = {
-  submitted: { background: t.infoBg,    color: t.info,    label: 'Appeal pending' },
-  approved:  { background: t.successBg, color: t.success, label: 'Appeal approved' },
-  rejected:  { background: t.dangerBg,  color: t.danger,  label: 'Appeal rejected' },
+const APPEAL_STATUS = {
+  submitted: { tone: 'info',    icon: 'message-square', label: 'Appeal waiting' },
+  approved:  { tone: 'success', icon: 'check',          label: 'Appeal approved' },
+  rejected:  { tone: 'neutral', icon: 'x',              label: 'Appeal rejected' },
 };
 
 export default function BannedAccounts() {
@@ -35,7 +36,7 @@ export default function BannedAccounts() {
       setUsers(data || []);
     } catch (err) {
       console.error('Failed to load banned accounts:', err);
-      setError(err.message || 'Failed to load banned accounts');
+      setError('Couldn’t load suspended and banned accounts.');
     }
     setLoading(false);
   };
@@ -43,7 +44,7 @@ export default function BannedAccounts() {
   useEffect(() => { load(); }, []);
 
   const handleUnban = async (clerkUserId) => {
-    if (!(await confirmAction('Unban this account?', { confirmText: 'Unban' }))) return;
+    if (!(await confirmAction('Lift the suspension or ban on this account?', { confirmText: 'Unban' }))) return;
     setBusyId(clerkUserId);
     try {
       await bannedAccountsAPI.unban(clerkUserId);
@@ -55,216 +56,142 @@ export default function BannedAccounts() {
   };
 
   const handleAppealDecision = async (clerkUserId, decision) => {
-    const verb = decision === 'approved' ? 'approve' : 'reject';
-    const question = `${verb === 'approve' ? 'Approve' : 'Reject'} this appeal?` +
-      (decision === 'approved' ? ' This unbans the account.' : ' The account stays banned.');
-    if (!(await confirmAction(question, { danger: verb === 'reject', confirmText: verb === 'approve' ? 'Approve' : 'Reject' }))) return;
+    const approve = decision === 'approved';
+    const question = `${approve ? 'Approve' : 'Reject'} this appeal?` +
+      (approve ? ' This unbans the account.' : ' The account stays banned.');
+    if (!(await confirmAction(question, { danger: !approve, confirmText: approve ? 'Approve & unban' : 'Reject' }))) return;
     setBusyId(clerkUserId);
     try {
       await appealAPI.decide(clerkUserId, decision);
       setExpandedId(null);
       await load();
     } catch (err) {
-      notify(`Failed to ${verb} appeal: ` + (err?.response?.data?.message || err.message || 'Unknown error'), { tone: 'danger' });
+      notify(`Failed to ${approve ? 'approve' : 'reject'} the appeal: ` + (err?.response?.data?.message || err.message || 'Unknown error'), { tone: 'danger' });
     }
     setBusyId(null);
   };
 
   const filtered = users.filter(u => {
-    const name  = u.name?.toLowerCase()  || '';
-    const email = u.email?.toLowerCase() || '';
     const q = search.toLowerCase();
-    return name.includes(q) || email.includes(q);
+    return (u.name?.toLowerCase() || '').includes(q) || (u.email?.toLowerCase() || '').includes(q);
   });
 
   return (
-    <div style={s.page}>
-      <div style={s.pageHeader}>
-        <div>
-          <h1 style={s.pageTitle}>Suspensions &amp; Bans</h1>
-          <p style={s.pageSub}>Accounts suspended or permanently banned for breaking the rules, and any appeals they&rsquo;ve sent.</p>
-        </div>
-      </div>
+    <Page>
+      <PageHeader
+        title="Suspensions & Bans"
+        count={users.length}
+        subtitle="Accounts suspended or permanently banned for breaking the rules, and any appeals they’ve sent."
+        actions={<Button icon="refresh-cw" onClick={load} disabled={loading}>Refresh</Button>}
+      />
 
-      {error && (
-        <div style={s.errorBanner}>
-          <Icon name="alert-triangle" size={13} /> {error}
-          <button onClick={() => setError('')} style={s.errorClose} aria-label="Dismiss error"><Icon name="x" size={12} /></button>
-        </div>
-      )}
+      {error && <ErrorBanner onDismiss={() => setError('')}>{error}</ErrorBanner>}
 
       {users.length > 0 && (
-        <div style={s.filterRow}>
-          <input
-            placeholder="Search by name or email…"
+        <Toolbar>
+          <SearchInput
             value={search}
             onChange={e => setSearch(e.target.value)}
-            style={s.searchInput}
-            className="modern-input"
+            placeholder="Search by name or email…"
           />
-        </div>
+        </Toolbar>
       )}
 
       {loading ? (
-        <Loading label="Loading banned accounts…" />
+        <Loading label="Loading suspended and banned accounts…" />
       ) : users.length === 0 ? (
         <EmptyState
           icon="check"
-          title="No banned accounts"
+          title="No suspended or banned accounts"
           subtitle="Nobody is currently suspended or banned."
         />
       ) : filtered.length === 0 ? (
-        <EmptyState
-          icon="users"
-          title="No accounts match your search"
-          subtitle="Try a different name or email."
-        />
+        <EmptyState icon="users" title="No accounts match" subtitle="Try a different name or email." />
       ) : (
-        <div style={s.list}>
-          <div style={s.listHead}>
-            <span style={s.colUser}>User</span>
-            <span style={s.colReason}>Reason</span>
-            <span style={s.colStrikes}>Strikes</span>
-            <span style={s.colStatus}>Status</span>
-            <span style={s.colActions}></span>
-          </div>
-
+        <Table
+          caption="Suspended and banned accounts"
+          head={<>
+            <Th>Traveler</Th>
+            <Th>Reason</Th>
+            <Th align="right">Strikes</Th>
+            <Th>Status</Th>
+            <Th align="right">Action</Th>
+          </>}
+        >
           {filtered.map(u => {
             const hasAppeal = !!u.appealStatus && u.appealStatus !== 'none';
+            const appeal = APPEAL_STATUS[u.appealStatus];
             const expanded = expandedId === u.clerkUserId;
-            const appealPill = APPEAL_BADGE[u.appealStatus];
             const busy = busyId === u.clerkUserId;
 
             return (
-              <div key={u.clerkUserId} style={s.rowWrap}>
-                <div
-                  style={{ ...s.row, cursor: hasAppeal ? 'pointer' : 'default' }}
-                  className="modern-row"
-                  onClick={() => hasAppeal && setExpandedId(expanded ? null : u.clerkUserId)}
-                >
-                  <div style={s.colUser}>
-                    <Avatar src={u.profileImage} name={u.name} size={34} />
-                    <div>
-                      <div style={s.userName}>{u.name || 'Unknown'}</div>
-                      <div style={s.userEmail}>{u.email}</div>
+              <Fragment key={u.clerkUserId}>
+                <tr>
+                  <Td>
+                    <div style={s.person}>
+                      <Avatar src={u.profileImage} name={u.name} size={32} />
+                      <div style={{ minWidth: 0 }}>
+                        <div style={s.personName}>{u.name || 'Unknown'}</div>
+                        <div style={s.personSub}>{u.email}</div>
+                      </div>
                     </div>
-                  </div>
-
-                  <div style={s.colReason} title={u.banReason}>
-                    {u.banReason || '—'}
-                  </div>
-
-                  <div style={s.colStrikes}>
-                    {u.warningCount || 0}
-                  </div>
-
-                  <div style={s.colStatus}>
-                    <span style={u.isPermanent ? s.badgePermanent : s.badgeTemp}>
-                      {u.isPermanent ? 'Permanent' : formatRemaining(u.suspendedUntil)}
-                    </span>
-                    {appealPill && (
-                      <span style={{ ...s.badgeAppeal, background: appealPill.background, color: appealPill.color }}>
-                        {appealPill.label} {hasAppeal ? <Icon name={expanded ? 'chevron-up' : 'chevron-down'} size={11} /> : null}
-                      </span>
-                    )}
-                  </div>
-
-                  <div style={s.colActions} onClick={e => e.stopPropagation()}>
-                    <button
-                      onClick={() => handleUnban(u.clerkUserId)}
-                      style={s.btnUnban}
-                      className="modern-btn"
-                      disabled={busy}
-                    >
-                      {busy ? '…' : 'Unban'}
-                    </button>
-                  </div>
-                </div>
+                  </Td>
+                  <Td><span style={s.clampCell} title={u.banReason}>{u.banReason || '—'}</span></Td>
+                  <Td align="right">{u.warningCount || 0}</Td>
+                  <Td>
+                    <div style={s.pillStack}>
+                      {u.isPermanent
+                        ? <StatusPill tone="danger" icon="slash">Permanent ban</StatusPill>
+                        : <StatusPill tone="warning" icon="clock">{remaining(u.suspendedUntil)}</StatusPill>}
+                      {appeal && <StatusPill tone={appeal.tone} icon={appeal.icon}>{appeal.label}</StatusPill>}
+                    </div>
+                  </Td>
+                  <Td align="right">
+                    <div style={s.cellActions}>
+                      {hasAppeal && (
+                        <Button size="sm" icon={expanded ? 'chevron-up' : 'chevron-down'} onClick={() => setExpandedId(expanded ? null : u.clerkUserId)}>
+                          {expanded ? 'Hide appeal' : 'View appeal'}
+                        </Button>
+                      )}
+                      <Button size="sm" variant="subtle" disabled={busy} onClick={() => handleUnban(u.clerkUserId)}>
+                        Unban
+                      </Button>
+                    </div>
+                  </Td>
+                </tr>
 
                 {expanded && (
-                  <div style={s.panel}>
-                    <p style={s.panelLabel}>
-                      Appeal submitted {u.appealedAt ? new Date(u.appealedAt).toLocaleString('en-PH', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : ''}
-                    </p>
-                    <p style={s.appealText}>
-                      {u.appealText || '(No appeal text provided.)'}
-                    </p>
-                    {u.deletionDeadline && (
-                      <p style={s.deadlineNote}>
-                        Account is scheduled for permanent deletion on{' '}
-                        {new Date(u.deletionDeadline).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}
-                        {' '}if no decision is made.
+                  <tr>
+                    <td colSpan={5} style={s.panel}>
+                      <p style={s.panelLabel}>Appeal sent {fmtDateTime(u.appealedAt)}</p>
+                      <p style={{ ...s.itemText, margin: 0, whiteSpace: 'pre-wrap' }}>
+                        {u.appealText || '(No appeal text provided.)'}
                       </p>
-                    )}
-                    {u.appealStatus === 'submitted' ? (
-                      <div style={s.appealActions}>
-                        <button
-                          disabled={busy}
-                          onClick={() => handleAppealDecision(u.clerkUserId, 'approved')}
-                          style={{ ...s.btn, ...s.btnApprove, opacity: busy ? 0.6 : 1 }}
-                          className="modern-btn"
-                        >
-                          <Icon name="check" size={12} /> Approve &amp; Unban
-                        </button>
-                        <button
-                          disabled={busy}
-                          onClick={() => handleAppealDecision(u.clerkUserId, 'rejected')}
-                          style={{ ...s.btn, ...s.btnReject, opacity: busy ? 0.6 : 1 }}
-                          className="modern-btn"
-                        >
-                          <Icon name="x" size={12} /> Reject
-                        </button>
-                      </div>
-                    ) : (
-                      <p style={s.decidedNote}>This appeal has already been {u.appealStatus}.</p>
-                    )}
-                  </div>
+                      {u.deletionDeadline && (
+                        <p style={s.panelNote}>
+                          The account is scheduled for permanent deletion on {fmtDay(u.deletionDeadline)} if no decision is made.
+                        </p>
+                      )}
+                      {u.appealStatus === 'submitted' ? (
+                        <div style={s.buttonRow}>
+                          <Button variant="success" icon="check" disabled={busy} onClick={() => handleAppealDecision(u.clerkUserId, 'approved')}>
+                            Approve &amp; unban
+                          </Button>
+                          <Button variant="danger" icon="x" disabled={busy} onClick={() => handleAppealDecision(u.clerkUserId, 'rejected')}>
+                            Reject
+                          </Button>
+                        </div>
+                      ) : (
+                        <p style={s.panelNote}>This appeal has already been {u.appealStatus}.</p>
+                      )}
+                    </td>
+                  </tr>
                 )}
-              </div>
+              </Fragment>
             );
           })}
-        </div>
+        </Table>
       )}
-    </div>
+    </Page>
   );
 }
-
-const s = {
-  // Page shell, header, toolbar, states and table cells come from
-  // components/Layout so every page is spaced identically.
-  ...pageStyles,
-  // Page shell, header, toolbar, states and table cells come from
-  // components/Layout so every page is spaced identically.
-  ...pageStyles,
-  list:        { background: t.cardBg, border: `1px solid ${t.border}`, borderRadius: radius.xl, overflow: 'hidden', boxShadow: shadow.sm },
-  listHead:    { display: 'grid', gridTemplateColumns: '2fr 2fr 0.7fr 1.3fr 100px', gap: 12, alignItems: 'center', padding: '10px 18px', fontSize: 11, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: t.textMuted, borderBottom: `1px solid ${t.border}` },
-  rowWrap:     { borderBottom: `1px solid ${t.divider}` },
-  row:         { display: 'grid', gridTemplateColumns: '2fr 2fr 0.7fr 1.3fr 100px', gap: 12, alignItems: 'center', padding: '14px 18px' },
-
-  colUser:     { display: 'flex', alignItems: 'center', gap: 10 },
-  colReason:   { fontSize: 13, color: t.textSecondary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
-  colStrikes:  { fontSize: 13, fontWeight: 600, color: t.textPrimary },
-  colStatus:   { fontSize: 13, display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-start' },
-  colActions:  { display: 'flex', justifyContent: 'flex-end' },
-
-  userName:    { fontWeight: 600, fontSize: 13.5, color: t.textPrimary },
-  userEmail:   { fontSize: 12, color: t.textMuted },
-
-  badgePermanent: { padding: '3px 9px', borderRadius: 20, fontSize: 11, fontWeight: 600, background: t.dangerBg, color: t.danger },
-  badgeTemp:      { padding: '3px 9px', borderRadius: 20, fontSize: 11, fontWeight: 600, background: t.warningBg, color: t.warning },
-  badgeAppeal:    { padding: '3px 9px', borderRadius: 20, fontSize: 11, fontWeight: 600 },
-
-  btnUnban:    { padding: '6px 14px', background: t.brandSoft, color: t.brand, border: 'none', borderRadius: 7, fontWeight: 600, fontSize: 12, cursor: 'pointer' },
-
-  panel:        { padding: '4px 18px 16px 62px', background: t.sidebarBg },
-  panelLabel:   { fontSize: 11.5, fontWeight: 600, color: t.textMuted, margin: '8px 0 6px' },
-  appealText:   { fontSize: 13.5, color: t.textPrimary, lineHeight: 1.5, margin: '0 0 8px', whiteSpace: 'pre-wrap' },
-  deadlineNote: { fontSize: 12, color: t.warning, margin: '0 0 10px' },
-  decidedNote:  { fontSize: 12.5, color: t.textMuted, fontStyle: 'italic', margin: 0 },
-
-  appealActions: { display: 'flex', gap: 8, marginTop: 4 },
-  btn:           { padding: '8px 16px', borderRadius: 8, fontWeight: 600, fontSize: 12.5, cursor: 'pointer', border: 'none' },
-  btnApprove:    { background: t.successBg, color: t.success },
-  btnReject:     { background: t.dangerBg, color: t.danger },
-
-};

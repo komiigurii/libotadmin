@@ -3,8 +3,11 @@ import { Link } from 'react-router-dom';
 import {
   spotAPI, missionAPI, accountActionAPI, reportAPI, appealAPI, commentAPI, userProgressAPI,
 } from '../api/api';
-import { theme as t, radius, shadow, type, fonts } from '../theme';
-import { Page, Card, Avatar, ErrorBanner } from '../components/Layout';
+import { theme as t, radius, type } from '../theme';
+import {
+  Page, PageHeader, Card, Avatar, ErrorBanner, Stat, Button, ApprovalPill, pageStyles,
+} from '../components/Layout';
+import { fmtNum as fmt, plural, timeAgo } from '../utils/format';
 import Icon from '../components/Icon';
 
 /*
@@ -20,8 +23,6 @@ import Icon from '../components/Icon';
  * figure it feeds and says so, instead of blanking the dashboard.
  */
 
-const API_URL = (import.meta.env.VITE_API_URL || '').replace(/\/+$/, '');
-
 // Endpoints return a bare array, { [key]: [...] } or { data: [...] } — the
 // same shapes each page's own toArray() accepts.
 const listOf = (data, key) =>
@@ -29,31 +30,6 @@ const listOf = (data, key) =>
   : Array.isArray(data?.[key]) ? data[key]
   : Array.isArray(data?.data) ? data.data
   : [];
-const fmt = (n) => (n == null ? '—' : Number(n).toLocaleString('en-PH'));
-const plural = (n, one, many = `${one}s`) => `${fmt(n)} ${n === 1 ? one : many}`;
-
-function timeAgo(date) {
-  if (!date) return '';
-  const mins = Math.round((Date.now() - new Date(date).getTime()) / 60000);
-  if (mins < 1) return 'just now';
-  if (mins < 60) return `${mins} min ago`;
-  const hrs = Math.round(mins / 60);
-  if (hrs < 24) return `${hrs} h ago`;
-  const days = Math.round(hrs / 24);
-  if (days < 30) return `${days} day${days === 1 ? '' : 's'} ago`;
-  return new Date(date).toLocaleDateString('en-PH', { month: 'short', day: 'numeric' });
-}
-
-function formatUptime(sec) {
-  if (sec == null) return null;
-  const d = Math.floor(sec / 86400);
-  const h = Math.floor((sec % 86400) / 3600);
-  const m = Math.floor((sec % 3600) / 60);
-  if (d) return `${d} day${d === 1 ? '' : 's'} ${h} h`;
-  if (h) return `${h} h ${m} min`;
-  return `${m} min`;
-}
-
 const greeting = () => {
   const h = new Date().getHours();
   return h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening';
@@ -162,76 +138,41 @@ export default function Dashboard() {
 
   const [data, setData] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
-  const [updatedAt, setUpdatedAt] = useState(null);
-  const [health, setHealth] = useState({ state: 'checking' });
 
   const load = useCallback(async () => {
     setRefreshing(true);
     const next = await (isModerator ? loadModerator() : loadAdmin());
     setData(next);
-    setUpdatedAt(new Date());
     setRefreshing(false);
   }, [isModerator]);
 
-  // Render's free tier sleeps an idle server; the first request after that can
-  // take 30 s+. A generous timeout, and the latency is shown, so a slow answer
-  // reads as "waking up" rather than "down".
-  const checkHealth = useCallback(async () => {
-    setHealth((h) => ({ ...h, state: 'checking' }));
-    const started = performance.now();
-    const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), 60000);
-    try {
-      const res = await fetch(`${API_URL}/health`, { signal: ctrl.signal, cache: 'no-store' });
-      const body = await res.json().catch(() => ({}));
-      setHealth({
-        state: res.ok && body.status === 'ok' ? 'ok' : 'degraded',
-        ms: Math.round(performance.now() - started),
-        db: body.db,
-        uptime: body.uptime,
-        at: new Date(),
-      });
-    } catch {
-      setHealth({ state: 'down', at: new Date() });
-    } finally {
-      clearTimeout(timer);
-    }
-  }, []);
+  useEffect(() => { load(); }, [load]);
 
-  useEffect(() => { load(); checkHealth(); }, [load, checkHealth]);
-
-  const refresh = () => { load(); checkHealth(); };
   const loading = data === null;
   const stats = data?.progress?.stats;
   const leaderboard = data?.progress?.leaderboard || [];
   const spots = data?.spots;
+  // Admin only: everything waiting on a decision, or null if none of it loaded.
+  const waiting = data?.attention
+    ? sumKnown(Object.values(pick(data.attention, ['approvals', 'reports', 'appeals', 'flagged'])))
+    : null;
 
   // Each section fades in a beat after the one before it.
   const reveal = (i) => ({ animationDelay: `${i * 70}ms` });
 
   return (
     <Page>
-      {/* ── Header ── */}
+      {/* Same header as every other page — the dashboard used to have its own,
+          larger one in a card. */}
       <div className="dash-reveal" style={reveal(0)}>
-      <Card style={s.header}>
-        <div style={{ minWidth: 0 }}>
-          <p style={s.kicker}>
-            {greeting()} · {new Date().toLocaleDateString('en-PH', { weekday: 'long', month: 'long', day: 'numeric' })}
-          </p>
-          <h1 style={s.title}>Dashboard</h1>
-          <p style={s.sub}>
-            {isModerator
-              ? `Your corner of Libot${city ? ` — ${city}` : ''}: the spots you look after, what you've sent for approval, and how travelers are doing.`
-              : 'An overview of what’s live in the app, what’s waiting on you, and how travelers are using it.'}
-          </p>
-        </div>
-        <div style={s.headerSide}>
-          <button onClick={refresh} disabled={refreshing} style={s.refreshBtn} className="modern-btn">
-            <Icon name="refresh-cw" size={14} /> {refreshing ? 'Refreshing…' : 'Refresh'}
-          </button>
-          {updatedAt && <span style={s.updated}>Updated {updatedAt.toLocaleTimeString('en-PH', { hour: 'numeric', minute: '2-digit' })}</span>}
-        </div>
-      </Card>
+        <PageHeader
+          eyebrow={`${greeting()} · ${new Date().toLocaleDateString('en-PH', { weekday: 'long', month: 'long', day: 'numeric' })}`}
+          title="Dashboard"
+          subtitle={isModerator
+            ? `Your corner of Libot${city ? ` — ${city}` : ''}: the spots you look after, what you’ve sent for approval, and how travelers are doing.`
+            : 'An overview of what’s live in the app, what’s waiting on you, and how travelers are using it.'}
+          actions={<Button icon="refresh-cw" onClick={load} disabled={refreshing}>{refreshing ? 'Refreshing…' : 'Refresh'}</Button>}
+        />
       </div>
 
       {data?.failed?.length > 0 && (
@@ -243,50 +184,43 @@ export default function Dashboard() {
       <section
         aria-label="Key figures"
         className="dash-reveal"
-        style={{ ...s.kpis, ...reveal(1), opacity: refreshing && !loading ? 0.6 : 1 }}
+        style={{ ...s.statGrid, ...reveal(1), opacity: refreshing && !loading ? 0.6 : 1, transition: 'opacity 0.2s' }}
       >
         {isModerator ? (
           <>
-            <StatTile icon="map-pin" label={city ? `Spots in ${city}` : 'Your spots'} to="/spots" loading={loading}
-              value={spots?.length}
-              context={spots ? `${fmt(spots.filter((x) => x.AR3DModelURL).length)} with an AR model` : null} />
-            <StatTile icon="send" label="Waiting for approval" to="/my-review-requests" loading={loading}
-              value={data?.submissions?.filter((x) => x.status === 'pending').length}
-              context={data?.submissions ? `${fmt(data.submissions.filter((x) => x.status === 'approved').length)} approved · ${fmt(data.submissions.filter((x) => x.status === 'rejected').length)} rejected` : null} />
-            <StatTile icon="message-square" label="Reviews in your area" to="/comments" loading={loading}
-              value={data?.reviews?.length}
-              context={data?.reviews ? `${fmt(data.reviews.filter((c) => c.flagStatus === 'pending').length)} flagged for an admin` : null} />
-            <StatTile icon="users" label="Travelers" to="/user-progress" loading={loading}
-              value={stats?.totalUsers}
-              context={stats ? `${fmt(stats.activeLast7)} active this week` : null} />
+            <Stat icon="map-pin" label={city ? `Spots in ${city}` : 'Your spots'} to="/spots" value={loading ? '…' : fmt(spots?.length)}
+              hint={loading ? null : spots ? `${fmt(spots.filter((x) => x.AR3DModelURL).length)} with an AR model` : null} />
+            <Stat icon="send" label="Waiting for approval" to="/my-review-requests" value={loading ? '…' : fmt(data?.submissions?.filter((x) => x.status === 'pending').length)}
+              hint={loading ? null : data?.submissions ? `${fmt(data.submissions.filter((x) => x.status === 'approved').length)} approved · ${fmt(data.submissions.filter((x) => x.status === 'rejected').length)} rejected` : null} />
+            <Stat icon="message-square" label="Reviews in your area" to="/comments" value={loading ? '…' : fmt(data?.reviews?.length)}
+              hint={loading ? null : data?.reviews ? `${fmt(data.reviews.filter((c) => c.flagStatus === 'pending').length)} flagged for an admin` : null} />
+            <Stat icon="users" label="Travelers" to="/user-progress" value={loading ? '…' : fmt(stats?.totalUsers)}
+              hint={loading ? null : stats ? `${fmt(stats.activeLast7)} active this week` : null} />
           </>
         ) : (
           <>
-            <StatTile icon="users" label="Travelers" to="/user-progress" loading={loading}
-              value={stats?.totalUsers}
-              context={stats ? `${fmt(stats.activeLast7)} active this week` : null} />
-            <StatTile icon="map-pin" label="Spot visits" to="/user-progress" loading={loading}
-              value={stats?.totalVisits}
-              context={stats ? `by ${plural(stats.explorers, 'traveler')}` : null} />
-            <StatTile icon="image" label="Published spots" to="/spots" loading={loading}
-              value={spots?.length}
-              context={spots ? `across ${plural(new Set(spots.map((x) => (x.city || x.City || '').trim().toLowerCase()).filter(Boolean)).size, 'city', 'cities')}` : null} />
-            <StatTile icon="inbox" label="Waiting on you" to="/mod-requests" loading={loading} emphasis
-              value={data ? sumKnown(Object.values(pick(data.attention, ['approvals', 'reports', 'appeals', 'flagged']))) : undefined}
-              context="approvals, reports, appeals & flags" />
+            <Stat icon="users" label="Travelers" to="/user-progress" value={loading ? '…' : fmt(stats?.totalUsers)}
+              hint={loading ? null : stats ? `${fmt(stats.activeLast7)} active this week` : null} />
+            <Stat icon="map-pin" label="Spot visits" to="/user-progress" value={loading ? '…' : fmt(stats?.totalVisits)}
+              hint={loading ? null : stats ? `by ${plural(stats.explorers, 'traveler')}` : null} />
+            <Stat icon="image" label="Published spots" to="/spots" value={loading ? '…' : fmt(spots?.length)}
+              hint={loading ? null : spots ? `across ${plural(new Set(spots.map((x) => (x.city || x.City || '').trim().toLowerCase()).filter(Boolean)).size, 'city', 'cities')}` : null} />
+            <Stat icon="inbox" label="Waiting on you" to="/mod-requests"
+              emphasis={waiting > 0}
+              value={loading ? '…' : fmt(waiting)}
+              hint="approvals, reports, appeals & flags" />
           </>
         )}
       </section>
 
-      {/* ── Work + system ── */}
+      {/* ── Work ── */}
       <div className="dash-split" style={s.split}>
         <div className="dash-reveal" style={reveal(2)}>
           {isModerator
             ? <SubmissionsCard submissions={data?.submissions} loading={loading} />
             : <AttentionCard attention={data?.attention} loading={loading} />}
         </div>
-        <div className="dash-reveal" style={{ ...s.stack, ...reveal(3) }}>
-          <HealthCard health={health} onRecheck={checkHealth} />
+        <div className="dash-reveal" style={reveal(3)}>
           <QuickActions isModerator={isModerator} />
         </div>
       </div>
@@ -326,30 +260,6 @@ function CardTitle({ children, to, linkLabel }) {
   );
 }
 
-// Stat tile: label · value · one line of context. Values are proportional
-// figures in the sans (per the dataviz rules — a serif or tabular-nums looks
-// loose at this size); the whole tile links to the page behind the number.
-function StatTile({ icon, label, value, context, to, loading, emphasis }) {
-  const shown = loading ? '…' : fmt(value);
-  return (
-    <Link to={to} className="dash-link" style={{ ...s.tile, ...(emphasis && value > 0 ? s.tileEmphasis : null) }}>
-      <div style={s.tileTop}>
-        <span style={{ ...s.tileIcon, ...(emphasis && value > 0 ? s.tileIconEmphasis : null) }}>
-          <Icon name={icon} size={16} />
-        </span>
-        <Icon name="chevron-right" size={13} color={t.textMuted} style={{ marginLeft: 'auto' }} />
-      </div>
-      <div style={s.tileValue}>{shown}</div>
-      <div style={s.tileLabel}>{label}</div>
-      {/* On the yellow tint, muted text drops to 4.3:1 in dark mode;
-          secondary clears 5.9:1 in both themes. */}
-      {context && !loading && (
-        <div style={{ ...s.tileContext, ...(emphasis && value > 0 ? { color: t.textSecondary } : null) }}>{context}</div>
-      )}
-    </Link>
-  );
-}
-
 function CountBadge({ count, loading }) {
   if (loading) return <span style={s.badgeMuted}>…</span>;
   if (count == null) return <span style={s.badgeMuted}>Couldn&rsquo;t load</span>;
@@ -363,7 +273,7 @@ function AttentionCard({ attention, loading }) {
       detail: 'New spots, edits, deletions, food mission pins and account actions from moderators' },
     { icon: 'flag', label: 'Reported reviews', to: '/reported-comments', count: attention?.reports,
       detail: 'Reviews that travelers reported from the app' },
-    { icon: 'message-square', label: 'Flagged by moderators', to: '/comments', count: attention?.flagged,
+    { icon: 'message-square', label: 'Flagged by moderators', to: '/comments?show=flagged', count: attention?.flagged,
       detail: 'Reviews a moderator asked you to act on' },
     { icon: 'slash', label: 'Ban appeals', to: '/banned-accounts', count: attention?.appeals,
       detail: 'Suspended or banned travelers asking to come back' },
@@ -401,12 +311,6 @@ function AttentionCard({ attention, loading }) {
   );
 }
 
-const STATUS = {
-  pending:  { label: 'Pending',  color: t.warning, bg: t.warningBg, icon: 'clock' },
-  approved: { label: 'Approved', color: t.success, bg: t.successBg, icon: 'check' },
-  rejected: { label: 'Rejected', color: t.danger,  bg: t.dangerBg,  icon: 'x' },
-};
-
 function SubmissionsCard({ submissions, loading }) {
   const recent = (submissions || []).slice(0, 5);
   return (
@@ -423,7 +327,6 @@ function SubmissionsCard({ submissions, loading }) {
       ) : (
         <ul style={s.list}>
           {recent.map((r, i) => {
-            const st = STATUS[r.status] || STATUS.pending;
             return (
               <li key={`${r.kind}-${r.name}-${i}`} style={s.row}>
                 <span style={s.rowIcon}><Icon name={r.kind === 'Account action' ? 'users' : 'map-pin'} size={16} /></span>
@@ -431,51 +334,12 @@ function SubmissionsCard({ submissions, loading }) {
                   <span style={s.rowLabel}>{r.name || '—'}</span>
                   <span style={s.rowDetail}>{r.kind} · {timeAgo(r.date)}</span>
                 </span>
-                {/* Status is icon + word, never colour alone. */}
-                <span style={{ ...s.statusPill, color: st.color, background: st.bg }}>
-                  <Icon name={st.icon} size={11} weight="bold" /> {st.label}
-                </span>
+                <ApprovalPill status={r.status} />
               </li>
             );
           })}
         </ul>
       )}
-    </Card>
-  );
-}
-
-function HealthCard({ health, onRecheck }) {
-  const view = {
-    checking: { icon: 'activity', tone: t.textSecondary, bg: t.sidebarBg, text: 'Checking the API…' },
-    ok:       { icon: 'check-circle', tone: t.success, bg: t.successBg, text: 'All systems operational' },
-    degraded: { icon: 'alert-triangle', tone: t.warning, bg: t.warningBg, text: 'API is up, but the database isn’t answering' },
-    down:     { icon: 'alert-triangle', tone: t.danger, bg: t.dangerBg, text: 'Can’t reach the API' },
-  }[health.state];
-  const slow = health.state === 'ok' && health.ms > 5000;
-  const uptime = formatUptime(health.uptime);
-
-  return (
-    <Card style={s.card}>
-      <CardTitle>API health</CardTitle>
-      <div style={{ ...s.healthBanner, background: view.bg }} role="status" aria-live="polite">
-        <Icon name={view.icon} size={18} color={view.tone} weight={health.state === 'ok' ? 'fill' : 'regular'} />
-        <div style={{ minWidth: 0 }}>
-          <div style={{ ...s.healthText, color: view.tone }}>{view.text}</div>
-          {health.at && (
-            <div style={s.healthMeta}>
-              Checked {health.at.toLocaleTimeString('en-PH', { hour: 'numeric', minute: '2-digit', second: '2-digit' })}
-              {health.ms != null && <> · {fmt(health.ms)} ms</>}
-              {uptime && <> · up {uptime}</>}
-            </div>
-          )}
-        </div>
-      </div>
-      {slow && (
-        <p style={s.note}>That was a slow answer — the server was probably asleep and has just woken up. The next requests will be quick.</p>
-      )}
-      <button onClick={onRecheck} disabled={health.state === 'checking'} style={s.ghostBtn} className="modern-btn">
-        <Icon name="refresh-cw" size={13} /> Check again
-      </button>
     </Card>
   );
 }
@@ -618,45 +482,8 @@ function TopTravelers({ rows, loading, failed }) {
 // ── Styles ───────────────────────────────────────────────────────────
 
 const s = {
-  header: {
-    display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: 16, flexWrap: 'wrap',
-    padding: '22px 24px',
-  },
-  kicker: { ...type.label, color: t.textMuted, margin: 0 },
-  title: { fontFamily: fonts.display, fontSize: 38, fontWeight: 600, letterSpacing: '-0.02em', lineHeight: 1.1, color: t.textPrimary, margin: '6px 0 0' },
-  sub: { fontSize: 14, color: t.textSecondary, margin: '8px 0 0', maxWidth: 620, lineHeight: 1.5 },
-  headerSide: { display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 },
-  refreshBtn: {
-    display: 'inline-flex', alignItems: 'center', gap: 7, padding: '8px 14px', borderRadius: radius.md,
-    border: `1px solid ${t.border}`, background: t.cardBg, color: t.textPrimary, fontWeight: 600, fontSize: 13,
-    cursor: 'pointer', fontFamily: 'inherit',
-  },
-  updated: { fontSize: 11.5, color: t.textMuted },
-
-  kpis: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 14, transition: 'opacity 0.2s' },
-  // Border as longhands: tileEmphasis swaps only the colour, and mixing the
-  // `border` shorthand with a `borderColor` override is unreliable in React
-  // once the override comes and goes (it did on the SpotForm tabs).
-  tile: {
-    display: 'flex', flexDirection: 'column', padding: '16px 18px', borderRadius: radius.lg,
-    backgroundColor: t.cardBg, borderWidth: 1, borderStyle: 'solid', borderColor: t.border, boxShadow: shadow.sm,
-    color: 'inherit', textDecoration: 'none', minWidth: 0,
-  },
-  // "Waiting on you" earns the accent only when something IS waiting. The tint
-  // is layered over the card colour so it reads the same in both themes.
-  tileEmphasis: { borderColor: t.accent, backgroundImage: `linear-gradient(${t.accentBg}, ${t.accentBg})` },
-  tileTop: { display: 'flex', alignItems: 'center', marginBottom: 12 },
-  tileIcon: {
-    width: 34, height: 34, borderRadius: radius.md, display: 'flex', alignItems: 'center', justifyContent: 'center',
-    background: t.brandSoft, color: t.brand,
-  },
-  tileIconEmphasis: { background: t.accent, color: t.onAccent },
-  tileValue: { fontSize: 32, fontWeight: 650, letterSpacing: '-0.02em', lineHeight: 1, color: t.textPrimary },
-  tileLabel: { fontSize: 13, fontWeight: 600, color: t.textPrimary, marginTop: 8 },
-  tileContext: { fontSize: 12, color: t.textMuted, marginTop: 3 },
-
+  ...pageStyles,
   split: { display: 'grid', gridTemplateColumns: 'minmax(0, 1.55fr) minmax(0, 1fr)', gap: 18, alignItems: 'start' },
-  stack: { display: 'flex', flexDirection: 'column', gap: 18 },
 
   card: { padding: 18 },
   cardHead: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 12 },
@@ -680,20 +507,11 @@ const s = {
   badgeCount: { flexShrink: 0, fontSize: 12, fontWeight: 700, padding: '3px 10px', borderRadius: radius.pill, background: t.accentBg, color: t.textPrimary, border: `1px solid ${t.accent}` },
   badgeClear: { flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12, fontWeight: 600, color: t.success },
   badgeMuted: { flexShrink: 0, fontSize: 12, color: t.textMuted },
-  statusPill: { flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11.5, fontWeight: 700, padding: '3px 9px', borderRadius: radius.pill },
 
   allClear: { display: 'flex', alignItems: 'center', gap: 7, fontSize: 13, color: t.textSecondary, margin: '0 0 8px' },
   muted: { fontSize: 13, color: t.textMuted, margin: 0, lineHeight: 1.5 },
   note: { fontSize: 12, color: t.textMuted, margin: '10px 0 0', lineHeight: 1.5 },
 
-  healthBanner: { display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', borderRadius: radius.md },
-  healthText: { fontSize: 14, fontWeight: 700 },
-  healthMeta: { fontSize: 12, color: t.textSecondary, marginTop: 2 },
-  ghostBtn: {
-    marginTop: 12, display: 'inline-flex', alignItems: 'center', gap: 6, padding: '7px 12px', borderRadius: radius.md,
-    border: `1px solid ${t.border}`, background: 'transparent', color: t.textSecondary, fontWeight: 600, fontSize: 12.5,
-    cursor: 'pointer', fontFamily: 'inherit',
-  },
 
   actions: { display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 8 },
   action: {
