@@ -61,8 +61,8 @@ export default function ReportedComments() {
     <div style={s.page}>
       <div style={s.pageHeader}>
         <div>
-          <h1 style={s.pageTitle}>Reported Comments</h1>
-          <p style={s.pageSub}>Comments flagged by app users, awaiting admin review</p>
+          <h1 style={s.pageTitle}>Reported Reviews</h1>
+          <p style={s.pageSub}>Reviews that travelers reported from the app, waiting for your decision.</p>
         </div>
         <span style={s.totalBadge}>{reports.length} total</span>
       </div>

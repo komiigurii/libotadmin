@@ -64,9 +64,11 @@ export default function Comments() {
     <div style={s.page}>
       <div style={s.pageHeader}>
         <div>
-          <h1 style={s.pageTitle}>All Comments &amp; Feedback</h1>
+          <h1 style={s.pageTitle}>Reviews &amp; Feedback</h1>
           <p style={s.pageSub}>
-            {isModerator ? 'Viewing comments for your assigned location' : 'Viewing comments across all locations'}
+            {isModerator
+              ? 'Reviews travelers left on spots in your area. Flag one and an admin decides what happens to it.'
+              : 'Every review travelers have left, across all spots — including the ones moderators flagged for you.'}
           </p>
         </div>
         <span style={s.totalBadge}>{comments.length} total</span>

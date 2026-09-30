@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { spotAPI } from '../api/api';
 import SpotForm from '../components/SpotForm';
 import { notify } from '../components/AppAlert';
@@ -35,6 +36,15 @@ export default function Spots() {
   };
 
   useEffect(() => { load(); }, []);
+
+  // The dashboard's "Add a spot" action links here with ?new=1. Open the form
+  // once, then drop the parameter so closing it (or reloading) doesn't reopen it.
+  const [searchParams, setSearchParams] = useSearchParams();
+  useEffect(() => {
+    if (searchParams.get('new') !== '1') return;
+    if (isModerator) { setEditing(null); setShowForm(true); }
+    setSearchParams({}, { replace: true });
+  }, [searchParams, setSearchParams, isModerator]);
 
   // Moderators only — opens our custom modal instead of window.prompt
   const openDeleteModal = (id) => {
@@ -101,12 +111,16 @@ export default function Spots() {
     <div style={s.page}>
       <div style={s.pageHeader}>
         <div>
-          <h1 style={s.pageTitle}>Spots</h1>
-          <p style={s.pageSub}>{spots.length} spots total</p>
+          <h1 style={s.pageTitle}>Spot Management</h1>
+          <p style={s.pageSub}>
+            {isModerator
+              ? `${spots.length} ${spots.length === 1 ? 'spot' : 'spots'}${lockedCity ? ` in ${lockedCity}` : ''}. Add a spot or propose changes — an admin approves each one before it goes live.`
+              : `${spots.length} published ${spots.length === 1 ? 'spot' : 'spots'}. Moderators propose changes; you approve them in the Approval Queue.`}
+          </p>
         </div>
         {isModerator && (
           <button onClick={() => { setEditing(null); setShowForm(true); }} style={s.btnPrimary} className="modern-btn">
-            + Add Spot
+            <Icon name="plus" size={14} /> Add spot
           </button>
         )}
       </div>
@@ -259,7 +273,7 @@ const s = {
   // Page-specific: the shared card has no padding, overflow or margin,
   // because those differ by how each page uses a card.
   card: { background: t.cardBg, border: `1px solid ${t.border}`, borderRadius: radius.xl, overflow: 'hidden', display: 'flex', flexDirection: 'column', boxShadow: shadow.sm },
-  btnPrimary:  { padding: '9px 20px', background: t.accent, color: t.onAccent, border: 'none', borderRadius: radius.lg, fontWeight: 700, fontSize: 14, cursor: 'pointer', boxShadow: shadow.sm },
+  btnPrimary:  { display: 'inline-flex', alignItems: 'center', gap: 7, flexShrink: 0, padding: '9px 20px', background: t.accent, color: t.onAccent, border: 'none', borderRadius: radius.lg, fontWeight: 700, fontSize: 14, cursor: 'pointer', boxShadow: shadow.sm },
   modalOverlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 },
   modalBox:     { background: t.cardBg, borderRadius: radius.xl, padding: 20, width: 360, boxShadow: shadow.lg, border: `1px solid ${t.border}` },
   modalTextarea:{ width: '100%', padding: 10, borderRadius: 8, border: `1px solid ${t.border}`, fontSize: 13, resize: 'vertical', boxSizing: 'border-box', fontFamily: 'inherit', color: t.textPrimary, background: t.cardBg },

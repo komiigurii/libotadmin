@@ -7,6 +7,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 // on the login screen.
 import Login  from './pages/Login';
 import Navbar from './components/Navbar';
+const Dashboard        = lazy(() => import('./pages/Dashboard'));
 const Spots            = lazy(() => import('./pages/Spots'));
 const Comments         = lazy(() => import('./pages/Comments'));
 const ReportedComments = lazy(() => import('./pages/ReportedComments'));
@@ -32,14 +33,18 @@ const PrivateRoute = ({ children }) => {
   return <Navigate to={`/login${reason}`} replace />;
 };
 
+// Both guards send the other role to the dashboard — the one page every role
+// has. AdminRoute used to redirect to /mod-requests, which is itself
+// admin-only, so a moderator opening any admin URL bounced between the guard
+// and its own redirect target.
 const ModeratorRoute = ({ children }) => {
   const role = localStorage.getItem('role');
-  return role === 'moderator' ? children : <Navigate to="/spots" replace />;
+  return role === 'moderator' ? children : <Navigate to="/dashboard" replace />;
 };
 
 const AdminRoute = ({ children }) => {
   const role = localStorage.getItem('role');
-  return role === 'admin' ? children : <Navigate to="/mod-requests" replace />;
+  return role === 'admin' ? children : <Navigate to="/dashboard" replace />;
 };
 
 export default function App() {
@@ -63,6 +68,9 @@ export default function App() {
                 <main id="main" tabIndex={-1} style={shell.main}>
                   <Suspense fallback={<PageFallback />}>
                     <Routes>
+                      {/* Both roles; the page itself is role-aware. */}
+                      <Route path="/dashboard"          element={<Dashboard />} />
+
                       <Route path="/my-review-requests" element={<ModeratorRoute><MyReviewRequests /></ModeratorRoute>} />
 
                       <Route path="/mod-requests"       element={<AdminRoute><ModRequests /></AdminRoute>} />
@@ -83,15 +91,7 @@ export default function App() {
                           deliberately not wrapped in a role guard. */}
                       <Route path="/user-progress" element={<UserProgress />} />
 
-                      <Route
-                        path="*"
-                        element={
-                          <Navigate
-                            to={localStorage.getItem('role') === 'admin' ? '/comments' : '/my-review-requests'}
-                            replace
-                          />
-                        }
-                      />
+                      <Route path="*" element={<Navigate to="/dashboard" replace />} />
                     </Routes>
                   </Suspense>
                 </main>

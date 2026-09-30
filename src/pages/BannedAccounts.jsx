@@ -81,8 +81,8 @@ export default function BannedAccounts() {
     <div style={s.page}>
       <div style={s.pageHeader}>
         <div>
-          <h1 style={s.pageTitle}>Banned Accounts</h1>
-          <p style={s.pageSub}>Accounts suspended or permanently banned for policy violations</p>
+          <h1 style={s.pageTitle}>Suspensions &amp; Bans</h1>
+          <p style={s.pageSub}>Accounts suspended or permanently banned for breaking the rules, and any appeals they&rsquo;ve sent.</p>
         </div>
       </div>
 

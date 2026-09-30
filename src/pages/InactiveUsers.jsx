@@ -68,7 +68,7 @@ export default function InactiveUsers() {
     <div style={s.page}>
       <div style={s.pageHeader}>
         <div>
-          <h1 style={s.pageTitle}>Inactive Users</h1>
+          <h1 style={s.pageTitle}>Inactive Accounts</h1>
           <p style={s.pageSub}>
             {isModerator
               ? 'Users with 30+ days of inactivity — propose a temporary suspension for admin review'
