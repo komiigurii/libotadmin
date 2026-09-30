@@ -372,16 +372,18 @@ function MapSearch({ mapRef }) {
   );
 }
 
-// ── Merged map: one Leaflet instance shows the spot pin, every AR position
-// pin, and (when a food-recommendation mission exists for this spot) its
-// single geofence pin, all together. The mode toggle above the map is
-// exclusive: only the pin(s) for the active mode are draggable, and map
-// clicks affect only that mode's pin(s).
+// ── Map: every instance shows the spot pin, every AR position pin, and (when
+// a food-recommendation mission exists for this spot) its single geofence
+// pin, all together. Each tab that needs a map (Location, AR, Food mission)
+// mounts its own, with `mode` fixed to that tab: only that mode's pin(s) are
+// draggable and map clicks only affect them. The other pins stay visible for
+// reference — AR models are placed relative to the spot, and so is the eatery.
 function SpotMapPicker({
   spotLat, spotLng, onSpotChange,
   arModels, onPlaceAr, onArMove,
   mode = 'spot', // 'spot' | 'ar' | 'mission'
   missionLat, missionLng, onMissionChange,
+  active = true, // false while this map's tab is hidden
   height = 320,
 }) {
   const containerRef  = useRef(null);
@@ -431,12 +433,22 @@ function SpotMapPicker({
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
 
-    const startLat = toNum(spotLat);
-    const startLng = toNum(spotLng);
-    const hasSpot  = startLat !== null && startLng !== null;
+    // Open framed on what this tab edits, with the spot alongside for
+    // reference: the AR tab on the spot and its AR pins, the food tab on the
+    // spot and the eatery.
+    const pts = [];
+    const add = (la, ln) => {
+      const a = toNum(la), b = toNum(ln);
+      if (a !== null && b !== null) pts.push([a, b]);
+    };
+    add(spotLat, spotLng);
+    if (mode === 'ar') arModels.forEach((m) => add(m.lat, m.lng));
+    if (mode === 'mission') add(missionLat, missionLng);
 
-    const map = L.map(containerRef.current, { zoomControl: false })
-      .setView([hasSpot ? startLat : DEFAULT_CENTER.lat, hasSpot ? startLng : DEFAULT_CENTER.lng], hasSpot ? 16 : 13);
+    const map = L.map(containerRef.current, { zoomControl: false });
+    if (pts.length > 1) map.fitBounds(pts, { padding: [48, 48], maxZoom: 18 });
+    else if (pts.length === 1) map.setView(pts[0], 16);
+    else map.setView([DEFAULT_CENTER.lat, DEFAULT_CENTER.lng], 13);
     mapRef.current = map;
 
     // Zoom +/- control, moved down to the bottom-right corner instead of
@@ -614,6 +626,12 @@ function SpotMapPicker({
     return () => clearTimeout(id);
   }, [spotLat, spotLng, missionLat, missionLng, mode]);
 
+  // A hidden tab keeps its map mounted (so its view survives a tab switch);
+  // Leaflet can't measure a display:none container, so re-measure on show.
+  useEffect(() => {
+    if (active) mapRef.current?.invalidateSize();
+  }, [active]);
+
   // Lock dragging to the active mode — only the pin(s) for the current mode
   // are draggable, so a stray drag doesn't move the wrong pin.
   useEffect(() => {
@@ -636,6 +654,105 @@ function SpotMapPicker({
         ref={containerRef}
         style={{ height, borderRadius: radius.lg, overflow: 'hidden', border: `1px solid ${t.border}`, boxShadow: shadow.sm }}
       />
+    </div>
+  );
+}
+
+// ── Sections ──────────────────────────────────────────────────────
+// The form used to be one long scroll. Each tab now holds everything for one
+// feature, so e.g. the AR model file, its map positions and its trivia sit
+// together instead of across three sections.
+const TABS = [
+  { id: 'details',  label: 'Details',      icon: 'info' },
+  { id: 'media',    label: 'Media',        icon: 'image' },
+  { id: 'location', label: 'Location',     icon: 'map-pin' },
+  { id: 'ar',       label: 'AR',           icon: 'aperture' },
+  { id: 'food',     label: 'Food mission', icon: 'utensils' },
+];
+
+// WAI-ARIA tabs: arrow keys / Home / End move between tabs, and only the
+// selected tab is in the Tab order. `status[id]` adds a warning dot
+// (`missing`: what's still required) or a count.
+function FormTabs({ active, onChange, status }) {
+  const refs = useRef({});
+
+  const onKeyDown = (e) => {
+    const i = TABS.findIndex((tab) => tab.id === active);
+    const next =
+      e.key === 'ArrowRight' ? TABS[(i + 1) % TABS.length]
+      : e.key === 'ArrowLeft' ? TABS[(i - 1 + TABS.length) % TABS.length]
+      : e.key === 'Home' ? TABS[0]
+      : e.key === 'End' ? TABS[TABS.length - 1]
+      : null;
+    if (!next) return;
+    e.preventDefault();
+    onChange(next.id);
+    refs.current[next.id]?.focus();
+  };
+
+  return (
+    <div role="tablist" aria-label="Spot sections" style={styles.tabBar} onKeyDown={onKeyDown}>
+      {TABS.map((tab) => {
+        const selected = tab.id === active;
+        const st = status[tab.id] || {};
+        return (
+          <button
+            key={tab.id}
+            ref={(el) => { refs.current[tab.id] = el; }}
+            type="button"
+            role="tab"
+            id={`spot-tab-${tab.id}`}
+            aria-selected={selected}
+            aria-controls={`spot-panel-${tab.id}`}
+            tabIndex={selected ? 0 : -1}
+            onClick={() => onChange(tab.id)}
+            title={st.missing || undefined}
+            style={{ ...styles.tab, ...(selected ? styles.tabActive : {}) }}
+          >
+            <Icon name={tab.icon} size={15} color={selected ? t.brand : 'currentColor'} weight={selected ? 'bold' : 'regular'} />
+            {tab.label}
+            {st.count > 0 && <span style={styles.tabCount}>{st.count}</span>}
+            {st.missing && (
+              <>
+                <span style={styles.tabDot} aria-hidden="true" />
+                <span style={styles.srOnly}> — {st.missing}</span>
+              </>
+            )}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+// Kept mounted once visited (just hidden), so an upload in progress or a
+// map's viewport survives switching away and back.
+function TabPanel({ id, active, children }) {
+  return (
+    <div role="tabpanel" id={`spot-panel-${id}`} aria-labelledby={`spot-tab-${id}`} hidden={!active}>
+      {children}
+    </div>
+  );
+}
+
+// Which pin is which, now that there's no Spot / AR / Food toggle above the
+// map carrying the coloured dots. The pins this tab edits are listed first
+// and in full colour; the rest are there for reference.
+function MapLegend({ mode, spotPinned, arCount, missionPinned }) {
+  const items = [
+    (spotPinned || mode === 'spot') && { key: 'spot', color: MAP_PIN.spot, label: 'Spot' },
+    (arCount > 0 || mode === 'ar') && { key: 'ar', color: MAP_PIN.ar, label: arCount === 1 ? 'AR position' : 'AR positions' },
+    (missionPinned || mode === 'mission') && { key: 'mission', color: MAP_PIN.mission, label: 'Food spot' },
+  ].filter(Boolean).sort((a, b) => (b.key === mode) - (a.key === mode));
+  if (items.length < 2) return null;
+  return (
+    <div style={styles.legend}>
+      {items.map((it) => (
+        <span key={it.key} style={it.key === mode ? styles.legendItemActive : styles.legendItem}>
+          <span style={{ ...styles.modeDot, background: it.color }} />
+          {it.label}{it.key === mode ? '' : ' (reference)'}
+        </span>
+      ))}
     </div>
   );
 }
@@ -697,12 +814,18 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
     [categories, form.category]
   );
 
-  // Pinning mode: 'spot' (drag/click moves the spot pin only), 'ar' (click
-  // adds a new AR pin, existing AR pins draggable), or 'mission' (click/drag
-  // moves the food-recommendation mission's single geofence pin). Stays
-  // armed until switched back so several pins of the same kind can be
-  // placed/adjusted in a row.
-  const [mode, setMode] = useState('spot');
+  // Which section is showing. Panels mount on first visit and then stay
+  // mounted (hidden) — see TabPanel. The tab also decides the map's pinning
+  // mode: Location moves the spot pin, AR drops/drags AR pins, Food mission
+  // moves the eatery's geofence pin.
+  const [tab, setTab] = useState('details');
+  const [visited, setVisited] = useState(() => new Set(['details']));
+  const bodyRef = useRef(null);
+  const selectTab = (id) => {
+    setTab(id);
+    setVisited((prev) => (prev.has(id) ? prev : new Set(prev).add(id)));
+    if (bodyRef.current) bodyRef.current.scrollTop = 0;
+  };
 
   // The spot's 2nd ("location") mission — a food recommendation the user
   // must physically visit. Only exists for spots that already have one
@@ -908,33 +1031,37 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
   };
 
   const handleSave = async () => {
+  // Every problem opens the tab it lives on — with the form split into tabs,
+  // "Image is required" is no help if the image field is out of sight.
+  const fail = (tabId, message) => { selectTab(tabId); notify(message); };
+
   if (!form.name.trim()) {
-    return notify('Name is required');
+    return fail('details', 'Name is required');
   }
   if (!form.category.length) {
-    return notify('Select at least one category');
+    return fail('details', 'Select at least one category');
   }
   if (!form.city.trim()) {
-    return notify('City is required');
+    return fail('details', 'City is required');
   }
   if (!form.image) {
-    return notify('Image is required');
+    return fail('media', 'Spot image is required');
   }
   // Typed coordinates can be blank, half-finished ("14.") or out of range, so
   // this checks for a usable number rather than just a non-empty string.
   const spotLatNum = toNum(form.coordinates_lat);
   const spotLngNum = toNum(form.coordinates_lng);
   if (spotLatNum === null || spotLngNum === null) {
-    return notify('Spot location is required — pin it on the map or type valid coordinates.');
+    return fail('location', 'Spot location is required — pin it on the map or type valid coordinates.');
   }
   const spotCoordErr = coordError(form.coordinates_lat, form.coordinates_lng);
-  if (spotCoordErr) return notify(spotCoordErr);
+  if (spotCoordErr) return fail('location', spotCoordErr);
 
   const badAr = arModels.findIndex(
     (m) => (m.lat !== '' || m.lng !== '') && (toNum(m.lat) === null || toNum(m.lng) === null)
   );
   if (badAr !== -1) {
-    return notify(`AR ${badAr + 1} has an incomplete coordinate — fix or remove it.`);
+    return fail('ar', `AR ${badAr + 1} has an incomplete coordinate — fix or remove it.`);
   }
 
   const payload = {
@@ -960,7 +1087,7 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
   // needing a separate click. If it fails, stop here — don't let the spot
   // save succeed and close the form out from under a visible error.
   const missionResult = await maybeSubmitMissionLocation();
-  if (missionResult === 'failed') return;
+  if (missionResult === 'failed') { selectTab('food'); return; }
 
   // Only actually submit the spot itself if something about it changed (or
   // it's a brand-new spot, which must always go through) — otherwise a
@@ -994,16 +1121,46 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
   const spotPinned    = toNum(form.coordinates_lat) !== null && toNum(form.coordinates_lng) !== null;
   const missionPinned = toNum(missionLat) !== null && toNum(missionLng) !== null;
 
-  const mapHint =
-    mode === 'ar'
+  // Per-tab map instructions — each map has one fixed mode now.
+  const mapHintFor = (m) =>
+    m === 'ar'
       ? `Click the map to drop AR ${arModels.length + 1}. Drag any AR pin to fine-tune it, or edit its numbers below.`
-      : mode === 'mission'
+      : m === 'mission'
         ? (missionPinned
             ? 'Click the map, drag the pin, or type the coordinates below to move the food mission location.'
             : 'Click the map to pin where the food recommendation actually is — or type its coordinates below.')
         : spotPinned
           ? 'Click the map, drag the pin, or type the coordinates below to move the spot location.'
           : 'Click the map to set the spot location — or type its coordinates below.';
+
+  // Drives the dots on the tab bar: what's still required on each tab, so a
+  // missing field on a tab you aren't looking at is still visible.
+  const missingDetails = [
+    !form.name.trim() && 'name',
+    !form.city.trim() && 'city',
+    !form.category.length && 'category',
+  ].filter(Boolean);
+  const tabStatus = {
+    details:  { missing: missingDetails.length ? `Still needed: ${missingDetails.join(', ')}` : '' },
+    media:    { missing: form.image ? '' : 'Spot image is required' },
+    location: { missing: spotPinned ? coordError(form.coordinates_lat, form.coordinates_lng) : 'Spot location is required' },
+    ar:       { count: arModels.length },
+  };
+
+  // Shared by the three maps; each adds its own mode.
+  const mapProps = {
+    spotLat: form.coordinates_lat,
+    spotLng: form.coordinates_lng,
+    onSpotChange: handleSpotChange,
+    arModels,
+    onPlaceAr: handlePlaceAr,
+    onArMove: handleArMove,
+    missionLat,
+    missionLng,
+    onMissionChange: handleMissionChange,
+  };
+  const legendProps = { spotPinned, arCount: arModels.length, missionPinned };
+  const busy = saving || savingMission;
 
   return (
     <div style={styles.overlay}>
@@ -1015,309 +1172,307 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
               ? (isModerator ? 'Propose Edit' : 'Edit Spot')
               : 'Add New Spot'}
           </h2>
-          <button onClick={handleCancelClick} style={styles.closeBtn} className="modern-btn" disabled={saving || savingMission} aria-label="Close"><Icon name="x" size={13} /></button>
+          <button onClick={handleCancelClick} style={styles.closeBtn} className="modern-btn" disabled={busy} aria-label="Close"><Icon name="x" size={13} /></button>
         </div>
 
-        <div style={styles.body}>
+        <FormTabs active={tab} onChange={selectTab} status={tabStatus} />
 
-          <section style={styles.section}>
-            <p style={styles.sectionTitle}>Basic info</p>
+        <div ref={bodyRef} style={styles.body}>
 
-            <div style={styles.field}>
-              <label style={styles.label}>Name <span style={styles.required}>*</span></label>
-              <input name="name" value={form.name} onChange={handleChange} style={styles.input} className="modern-input" placeholder="e.g. Barasoain Church" />
-            </div>
+          {visited.has('details') && (
+            <TabPanel id="details" active={tab === 'details'}>
+              <section style={styles.section}>
+                <div style={styles.field}>
+                  <label style={styles.label}>Name <span style={styles.required}>*</span></label>
+                  <input name="name" value={form.name} onChange={handleChange} style={styles.input} className="modern-input" placeholder="e.g. Barasoain Church" />
+                </div>
 
-            <div style={styles.field}>
-              <label style={styles.label}>City <span style={styles.required}>*</span></label>
-              {lockedCity ? (
-                <input
-                  name="city"
-                  value={form.city}
-                  readOnly
-                  style={{ ...styles.input, background: t.divider, cursor: 'not-allowed', color: t.textSecondary }}
-                />
-              ) : (
-                <input name="city" value={form.city} onChange={handleChange} style={styles.input} className="modern-input" placeholder="e.g. Malolos City" />
-              )}
-            </div>
-
-            <div style={styles.field}>
-              <label style={styles.label}>Category <span style={styles.required}>*</span></label>
-              <div style={styles.categoryChips}>
-                {categoryOptions.map(cat => {
-                  const active = form.category.includes(cat);
-                  return (
-                    <button
-                      key={cat}
-                      type="button"
-                      onClick={() => toggleCategory(cat)}
-                      style={{ ...styles.categoryChip, ...(active ? styles.categoryChipActive : {}) }}
-                      className="modern-btn"
-                    >
-                      {cat}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div style={styles.twoCol}>
-              <div style={styles.field}>
-                <label style={styles.label}>Entrance fee</label>
-                <input name="entranceFee" value={form.entranceFee} onChange={handleChange} style={styles.input} className="modern-input" placeholder="Free or ₱50" />
-              </div>
-              <div style={styles.field}>
-                <label style={styles.label}>Visiting hours</label>
-                <input name="visitingHours" value={form.visitingHours} onChange={handleChange} style={styles.input} className="modern-input" placeholder="6am – 10pm" />
-              </div>
-            </div>
-
-            <div style={styles.field}>
-              <label style={styles.label}>Description</label>
-              <textarea name="description" value={form.description} onChange={handleChange} style={styles.textarea} className="modern-input" rows={3} placeholder="Short description of the spot..." />
-            </div>
-
-            <div style={styles.field}>
-              <label style={styles.label} htmlFor="spot-trivia">AR trivia</label>
-              <p style={styles.hint}>One fact per line — each line becomes one card in the app's AR trivia popup.</p>
-              <textarea id="spot-trivia" name="trivia" value={form.trivia} onChange={handleChange} style={styles.textarea} className="modern-input" rows={5} placeholder={'The present church was built from 1885 to 1888.\nThe Malolos Congress opened here on September 15, 1898.'} />
-            </div>
-          </section>
-
-          <section style={styles.section}>
-            <p style={styles.sectionTitle}>Media</p>
-            <div style={styles.uploadGrid}>
-              <FileUploadField label="Spot image" required accept="image/*" uploadType="image" previewType="image" value={form.image} onUploaded={setField('image')} />
-              <FileUploadField label="Badge image" hint="Reward for visiting" accept="image/*" uploadType="badge" previewType="badge" value={form.Badge} onUploaded={setField('Badge')} />
-              <FileUploadField label="Display 3D model" hint=".glb — spot detail screen" accept=".glb,.gltf" uploadType="model" previewType="file" value={form.modelUrl} onUploaded={setField('modelUrl')} />
-              <FileUploadField label="AR 3D model" hint=".glb — AR camera" accept=".glb,.gltf" uploadType="model" previewType="file" value={form.ARModelUrl} onUploaded={setField('ARModelUrl')} />
-              {initial?._id && locationMission && (
-                <FileUploadField
-                  label="Restaurant photo"
-                  hint="For the 2nd mission's food recommendation"
-                  accept="image/*"
-                  uploadType="image"
-                  previewType="image"
-                  value={missionImage}
-                  onUploaded={setMissionImage}
-                />
-              )}
-            </div>
-          </section>
-
-          <section style={styles.section}>
-            <div style={styles.mapSectionHeader}>
-              <p style={styles.sectionTitle}>Location &amp; AR positions <span style={styles.required}>*</span></p>
-              <div style={styles.modeToggle}>
-                <button
-                  type="button"
-                  onClick={() => setMode('spot')}
-                  style={{ ...styles.modeBtn, ...(mode === 'spot' ? styles.modeBtnActiveSpot : {}) }}
-                  className="modern-btn"
-                >
-                  <span style={{ ...styles.modeDot, background: MAP_PIN.spot }} />
-                  Spot
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setMode('ar')}
-                  style={{ ...styles.modeBtn, ...(mode === 'ar' ? styles.modeBtnActiveAr : {}) }}
-                  className="modern-btn"
-                >
-                  <span style={{ ...styles.modeDot, background: MAP_PIN.ar }} />
-                  AR position
-                </button>
-                <button
-                  type="button"
-                  onClick={() => locationMission && setMode('mission')}
-                  disabled={!locationMission}
-                  title={
-                    !initial?._id ? 'Save this spot first — missions are created afterwards'
-                    : loadingMission ? 'Checking for a food mission…'
-                    : !locationMission ? 'This spot has no food-recommendation mission yet (none were auto-created for it)'
-                    : undefined
-                  }
-                  style={{
-                    ...styles.modeBtn,
-                    ...(mode === 'mission' ? styles.modeBtnActiveMission : {}),
-                    ...(!locationMission ? styles.modeBtnDisabled : {}),
-                  }}
-                  className="modern-btn"
-                >
-                  <span style={{ ...styles.modeDot, background: MAP_PIN.mission }} />
-                  {!initial?._id ? 'Food mission (save spot first)'
-                    : loadingMission ? 'Food mission (checking…)'
-                    : locationMission ? 'Food mission'
-                    : 'Food mission (none yet)'}
-                </button>
-              </div>
-            </div>
-
-            <div style={styles.mapHintRow}>
-              <p style={styles.mapHint}>{mapHint}</p>
-              {mode === 'spot' && spotPinned && (
-                <button type="button" onClick={handleClearSpot} style={styles.clearPinBtn} className="modern-btn">
-                  Clear pin
-                </button>
-              )}
-              {mode === 'mission' && missionPinned && (
-                <button type="button" onClick={handleClearMissionPin} style={styles.clearPinBtn} className="modern-btn">
-                  Clear pin
-                </button>
-              )}
-              {/* Was `addingAr`, which is declared nowhere in this file — the
-                  reference threw the moment this block rendered. The two
-                  branches above establish the pattern; this is AR mode. */}
-              {mode === 'ar' && arModels.length > 0 && (
-                <button type="button" onClick={() => setArModels([])} style={styles.clearPinBtn} className="modern-btn">
-                  Clear all AR pins
-                </button>
-              )}
-            </div>
-
-            <SpotMapPicker
-              spotLat={form.coordinates_lat}
-              spotLng={form.coordinates_lng}
-              onSpotChange={handleSpotChange}
-              arModels={arModels}
-              onPlaceAr={handlePlaceAr}
-              onArMove={handleArMove}
-              mode={mode}
-              missionLat={missionLat}
-              missionLng={missionLng}
-              onMissionChange={handleMissionChange}
-            />
-
-            <div style={styles.coordBlock}>
-              <p style={styles.coordBlockTitle}>Spot coordinates <span style={styles.required}>*</span></p>
-              <CoordFields
-                lat={form.coordinates_lat}
-                lng={form.coordinates_lng}
-                onChange={handleSpotChange}
-                disabled={saving || savingMission}
-              />
-              <p style={styles.hint}>
-                Type or paste them if you already have the numbers — pasting
-                "14.8433, 120.8114" into either box fills both. The pin follows.
-              </p>
-            </div>
-
-            {arModels.length === 0 ? (
-              <div style={styles.emptyAr}>No AR positions yet. Switch to "AR position" mode above, then tap the map.</div>
-            ) : (
-              <div style={styles.arList}>
-                {arModels.map((model, index) => (
-                  <div key={model.id} style={styles.arListRow}>
-                    <span style={styles.arBadge}>AR {index + 1}</span>
-                    <CoordFields
-                      lat={model.lat}
-                      lng={model.lng}
-                      onChange={(lat, lng) => handleArMove(model.id, lat, lng)}
-                      compact
-                      disabled={saving || savingMission}
+                <div style={styles.field}>
+                  <label style={styles.label}>City <span style={styles.required}>*</span></label>
+                  {lockedCity ? (
+                    <input
+                      name="city"
+                      value={form.city}
+                      readOnly
+                      style={{ ...styles.input, background: t.divider, cursor: 'not-allowed', color: t.textSecondary }}
                     />
-                    <button onClick={() => removeArModel(model.id)} style={styles.removeBtn} className="modern-btn">Remove</button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </section>
+                  ) : (
+                    <input name="city" value={form.city} onChange={handleChange} style={styles.input} className="modern-input" placeholder="e.g. Malolos City" />
+                  )}
+                </div>
 
-          {initial?._id && !loadingMission && !locationMission && (
-            <section style={styles.section}>
-              <p style={styles.sectionTitle}>Food Recommendation Mission</p>
-              <p style={styles.hint}>
-                This spot has no missions yet — new spots normally get their 3 missions
-                (including this one) created automatically, so this one likely predates that.
-                Create them now and its location can be pinned right here.
-              </p>
-              {missionError && <p style={styles.warningText}><Icon name="alert-triangle" size={12} /> {missionError}</p>}
-              <button
-                type="button"
-                onClick={handleCreateDefaultMissions}
-                disabled={creatingMissions}
-                style={{ ...styles.saveMissionBtn, opacity: creatingMissions ? 0.7 : 1 }}
-                className="modern-btn"
-              >
-                {creatingMissions ? 'Creating…' : <><Icon name="sparkle" size={13} /> Create missions for this spot</>}
-              </button>
-            </section>
+                <div style={styles.field}>
+                  <label style={styles.label}>Category <span style={styles.required}>*</span></label>
+                  <div style={styles.categoryChips}>
+                    {categoryOptions.map(cat => {
+                      const active = form.category.includes(cat);
+                      return (
+                        <button
+                          key={cat}
+                          type="button"
+                          onClick={() => toggleCategory(cat)}
+                          style={{ ...styles.categoryChip, ...(active ? styles.categoryChipActive : {}) }}
+                          className="modern-btn"
+                        >
+                          {cat}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div style={styles.twoCol}>
+                  <div style={styles.field}>
+                    <label style={styles.label}>Entrance fee</label>
+                    <input name="entranceFee" value={form.entranceFee} onChange={handleChange} style={styles.input} className="modern-input" placeholder="Free or ₱50" />
+                  </div>
+                  <div style={styles.field}>
+                    <label style={styles.label}>Visiting hours</label>
+                    <input name="visitingHours" value={form.visitingHours} onChange={handleChange} style={styles.input} className="modern-input" placeholder="6am – 10pm" />
+                  </div>
+                </div>
+
+                <div style={styles.field}>
+                  <label style={styles.label}>Description</label>
+                  <textarea name="description" value={form.description} onChange={handleChange} style={styles.textarea} className="modern-input" rows={4} placeholder="Short description of the spot..." />
+                </div>
+              </section>
+            </TabPanel>
           )}
 
-          {initial?._id && !loadingMission && locationMission && (
-            <section style={styles.section}>
-              <p style={styles.sectionTitle}>Food Recommendation Mission</p>
-              <p style={styles.hint}>
-                This spot's 2nd mission — the user must physically be within range of this pin to
-                complete it. Switch the map above to "Food mission" mode to place or move it.
-                Changes here go out together with the spot's own edits when you press{' '}
-                {isModerator ? '"Submit for review"' : '"Save changes"'} below — proposed for
-                admin review, same as spot edits, only going live once approved.
-              </p>
-
-              {missionError && <p style={styles.warningText}><Icon name="alert-triangle" size={12} /> {missionError}</p>}
-
-              <div style={styles.missionStatusRow}>
-                <span style={missionPinned ? styles.badgeOk : styles.badgeWarn}>
-                  {missionPinned
-                    ? <><Icon name="map-pin" size={12} /> Location pinned</>
-                    : <><Icon name="alert-triangle" size={12} /> Not pinned yet</>}
-                </span>
-              </div>
-
-              <div style={styles.coordBlock}>
-                <p style={styles.coordBlockTitle}>Restaurant coordinates</p>
-                <CoordFields
-                  lat={missionLat}
-                  lng={missionLng}
-                  onChange={handleMissionChange}
-                  disabled={saving || savingMission}
-                />
-              </div>
-
-              {locationMission.pendingChange && (
-                <div style={styles.missionPendingNote}>
-                  <Icon name="clock" size={12} /> A change is already awaiting admin review for this mission
-                  {locationMission.pendingChange.locationName ? ` ("${locationMission.pendingChange.locationName}")` : ''}.
-                  Submitting again replaces that pending proposal.
+          {visited.has('media') && (
+            <TabPanel id="media" active={tab === 'media'}>
+              <section style={styles.section}>
+                <p style={styles.panelIntro}>
+                  What the app shows on this spot's page. The AR model and the restaurant
+                  photo are on the AR and Food mission tabs.
+                </p>
+                <div style={styles.uploadGrid}>
+                  <FileUploadField label="Spot image" required accept="image/*" uploadType="image" previewType="image" value={form.image} onUploaded={setField('image')} />
+                  <FileUploadField label="Badge image" hint="Reward for visiting" accept="image/*" uploadType="badge" previewType="badge" value={form.Badge} onUploaded={setField('Badge')} />
+                  <FileUploadField label="Display 3D model" hint=".glb — spot detail screen" accept=".glb,.gltf" uploadType="model" previewType="file" value={form.modelUrl} onUploaded={setField('modelUrl')} />
                 </div>
+              </section>
+            </TabPanel>
+          )}
+
+          {visited.has('location') && (
+            <TabPanel id="location" active={tab === 'location'}>
+              <section style={styles.section}>
+                <div style={styles.mapHintRow}>
+                  <p style={styles.mapHint}>{mapHintFor('spot')}</p>
+                  {spotPinned && (
+                    <button type="button" onClick={handleClearSpot} style={styles.clearPinBtn} className="modern-btn">
+                      Clear pin
+                    </button>
+                  )}
+                </div>
+
+                <SpotMapPicker {...mapProps} mode="spot" active={tab === 'location'} />
+                <MapLegend mode="spot" {...legendProps} />
+
+                <div style={styles.coordBlock}>
+                  <p style={styles.coordBlockTitle}>Spot coordinates <span style={styles.required}>*</span></p>
+                  <CoordFields
+                    lat={form.coordinates_lat}
+                    lng={form.coordinates_lng}
+                    onChange={handleSpotChange}
+                    disabled={busy}
+                  />
+                  <p style={styles.hint}>
+                    Type or paste them if you already have the numbers — pasting
+                    "14.8433, 120.8114" into either box fills both. The pin follows.
+                  </p>
+                </div>
+              </section>
+            </TabPanel>
+          )}
+
+          {visited.has('ar') && (
+            <TabPanel id="ar" active={tab === 'ar'}>
+              <section style={styles.section}>
+                <p style={styles.sectionTitle}>AR model</p>
+                <FileUploadField label="AR 3D model" hint=".glb — what users see through the AR camera" accept=".glb,.gltf" uploadType="model" previewType="file" value={form.ARModelUrl} onUploaded={setField('ARModelUrl')} />
+              </section>
+
+              <section style={styles.section}>
+                <p style={styles.sectionTitle}>AR positions</p>
+                <div style={styles.mapHintRow}>
+                  <p style={styles.mapHint}>{mapHintFor('ar')}</p>
+                  {arModels.length > 0 && (
+                    <button type="button" onClick={() => setArModels([])} style={styles.clearPinBtn} className="modern-btn">
+                      Clear all AR pins
+                    </button>
+                  )}
+                </div>
+
+                <SpotMapPicker {...mapProps} mode="ar" active={tab === 'ar'} />
+                <MapLegend mode="ar" {...legendProps} />
+
+                {arModels.length === 0 ? (
+                  <div style={styles.emptyNote}>No AR positions yet — click the map above to drop one.</div>
+                ) : (
+                  <div style={styles.arList}>
+                    {arModels.map((model, index) => (
+                      <div key={model.id} style={styles.arListRow}>
+                        <span style={styles.arBadge}>AR {index + 1}</span>
+                        <CoordFields
+                          lat={model.lat}
+                          lng={model.lng}
+                          onChange={(lat, lng) => handleArMove(model.id, lat, lng)}
+                          compact
+                          disabled={busy}
+                        />
+                        <button onClick={() => removeArModel(model.id)} style={styles.removeBtn} className="modern-btn">Remove</button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </section>
+
+              <section style={styles.section}>
+                <div style={styles.field}>
+                  <label style={styles.sectionTitle} htmlFor="spot-trivia">AR trivia</label>
+                  <p style={styles.hint}>One fact per line — each line becomes one card in the app's AR trivia popup.</p>
+                  <textarea id="spot-trivia" name="trivia" value={form.trivia} onChange={handleChange} style={styles.textarea} className="modern-input" rows={6} placeholder={'The present church was built from 1885 to 1888.\nThe Malolos Congress opened here on September 15, 1898.'} />
+                </div>
+              </section>
+            </TabPanel>
+          )}
+
+          {visited.has('food') && (
+            <TabPanel id="food" active={tab === 'food'}>
+              {!initial?._id ? (
+                <section style={styles.section}>
+                  <div style={styles.emptyNote}>
+                    Save the spot first. New spots get their missions created automatically —
+                    reopen this spot afterwards to set up its food recommendation.
+                  </div>
+                </section>
+              ) : loadingMission ? (
+                <section style={styles.section}>
+                  <div style={styles.emptyNote}>Checking for a food mission…</div>
+                </section>
+              ) : !locationMission ? (
+                <section style={styles.section}>
+                  <p style={styles.panelIntro}>
+                    This spot has no missions yet — new spots normally get their 3 missions
+                    (including this one) created automatically, so this one likely predates that.
+                    Create them now and its location can be pinned right here.
+                  </p>
+                  {missionError && <p style={styles.warningText}><Icon name="alert-triangle" size={12} /> {missionError}</p>}
+                  <button
+                    type="button"
+                    onClick={handleCreateDefaultMissions}
+                    disabled={creatingMissions}
+                    style={{ ...styles.saveMissionBtn, opacity: creatingMissions ? 0.7 : 1 }}
+                    className="modern-btn"
+                  >
+                    {creatingMissions ? 'Creating…' : <><Icon name="sparkle" size={13} /> Create missions for this spot</>}
+                  </button>
+                </section>
+              ) : (
+                <>
+                  <section style={styles.section}>
+                    <p style={styles.panelIntro}>
+                      This spot's 2nd mission — the user must physically be within range of this
+                      pin to complete it. Changes here go out together with the spot's own edits
+                      when you press {isModerator ? '"Submit for review"' : '"Save changes"'} below —
+                      proposed for admin review, same as spot edits, only going live once approved.
+                    </p>
+
+                    {missionError && <p style={styles.warningText}><Icon name="alert-triangle" size={12} /> {missionError}</p>}
+
+                    <div style={styles.missionStatusRow}>
+                      <span style={missionPinned ? styles.badgeOk : styles.badgeWarn}>
+                        {missionPinned
+                          ? <><Icon name="map-pin" size={12} /> Location pinned</>
+                          : <><Icon name="alert-triangle" size={12} /> Not pinned yet</>}
+                      </span>
+                    </div>
+
+                    {locationMission.pendingChange && (
+                      <div style={styles.missionPendingNote}>
+                        <Icon name="clock" size={12} /> A change is already awaiting admin review for this mission
+                        {locationMission.pendingChange.locationName ? ` ("${locationMission.pendingChange.locationName}")` : ''}.
+                        Submitting again replaces that pending proposal.
+                      </div>
+                    )}
+
+                    <div style={styles.twoCol}>
+                      <div style={styles.field}>
+                        <label style={styles.label}>Restaurant name</label>
+                        <input
+                          value={locationName}
+                          onChange={(e) => setLocationName(e.target.value)}
+                          style={styles.input} className="modern-input"
+                          placeholder="e.g. Kuya's Turo-Turo"
+                        />
+                      </div>
+                      <div style={styles.field}>
+                        <label style={styles.label}>Radius (meters)</label>
+                        <input
+                          type="number"
+                          min={10}
+                          value={radiusMeters}
+                          onChange={(e) => setRadiusMeters(e.target.value)}
+                          style={styles.input} className="modern-input"
+                        />
+                      </div>
+                    </div>
+                  </section>
+
+                  <section style={styles.section}>
+                    <p style={styles.sectionTitle}>Restaurant location</p>
+                    <div style={styles.mapHintRow}>
+                      <p style={styles.mapHint}>{mapHintFor('mission')}</p>
+                      {missionPinned && (
+                        <button type="button" onClick={handleClearMissionPin} style={styles.clearPinBtn} className="modern-btn">
+                          Clear pin
+                        </button>
+                      )}
+                    </div>
+
+                    <SpotMapPicker {...mapProps} mode="mission" active={tab === 'food'} />
+                    <MapLegend mode="mission" {...legendProps} />
+
+                    <div style={styles.coordBlock}>
+                      <p style={styles.coordBlockTitle}>Restaurant coordinates</p>
+                      <CoordFields
+                        lat={missionLat}
+                        lng={missionLng}
+                        onChange={handleMissionChange}
+                        disabled={busy}
+                      />
+                    </div>
+                  </section>
+
+                  <section style={styles.section}>
+                    <p style={styles.sectionTitle}>What users see</p>
+                    <FileUploadField
+                      label="Restaurant photo"
+                      hint="Shown beside the restaurant's name in the app"
+                      accept="image/*"
+                      uploadType="image"
+                      previewType="image"
+                      value={missionImage}
+                      onUploaded={setMissionImage}
+                    />
+                    <div style={styles.field}>
+                      <label style={styles.label}>Restaurant info</label>
+                      <textarea
+                        value={locationInfo}
+                        onChange={(e) => setLocationInfo(e.target.value)}
+                        style={styles.textarea} className="modern-input"
+                        rows={3}
+                        placeholder="e.g. Famous for their sisig and halo-halo. Open 10am–9pm, cash only."
+                      />
+                      <p style={styles.hint}>Shown to the user under the mission's description.</p>
+                    </div>
+                  </section>
+                </>
               )}
-
-              <div style={styles.twoCol}>
-                <div style={styles.field}>
-                  <label style={styles.label}>Restaurant name</label>
-                  <input
-                    value={locationName}
-                    onChange={(e) => setLocationName(e.target.value)}
-                    style={styles.input} className="modern-input"
-                    placeholder="e.g. Kuya's Turo-Turo"
-                  />
-                </div>
-                <div style={styles.field}>
-                  <label style={styles.label}>Radius (meters)</label>
-                  <input
-                    type="number"
-                    min={10}
-                    value={radiusMeters}
-                    onChange={(e) => setRadiusMeters(e.target.value)}
-                    style={styles.input} className="modern-input"
-                  />
-                </div>
-              </div>
-
-              <div style={styles.field}>
-                <label style={styles.label}>Restaurant info</label>
-                <textarea
-                  value={locationInfo}
-                  onChange={(e) => setLocationInfo(e.target.value)}
-                  style={styles.textarea} className="modern-input"
-                  rows={3}
-                  placeholder="e.g. Famous for their sisig and halo-halo. Open 10am–9pm, cash only."
-                />
-                <p style={styles.hint}>Shown to the user below the restaurant photo.</p>
-              </div>
-            </section>
+            </TabPanel>
           )}
 
         </div>
@@ -1343,16 +1498,31 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
 
 const styles = {
   overlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(3px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200, padding: 20 },
-  modal:   { background: t.cardBg, borderRadius: radius.xl + 4, width: '100%', maxWidth: 640, maxHeight: '88vh', display: 'flex', flexDirection: 'column', boxShadow: shadow.lg, border: `1px solid ${t.border}` },
+  // A fixed height rather than a max: tabs differ a lot in length, and a modal
+  // that resizes on every tab switch makes the tab bar jump under the cursor.
+  modal:   { background: t.cardBg, borderRadius: radius.xl + 4, width: '100%', maxWidth: 640, height: 'min(88vh, 860px)', display: 'flex', flexDirection: 'column', boxShadow: shadow.lg, border: `1px solid ${t.border}` },
 
   modalHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '18px 24px', borderBottom: `1px solid ${t.divider}`, flexShrink: 0 },
   modalTitle:  { fontSize: 17, fontWeight: 700, color: t.textPrimary },
   closeBtn:    { width: 30, height: 30, borderRadius: radius.md, border: 'none', background: t.brandSoft, color: t.textPrimary, fontWeight: 700, cursor: 'pointer', fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
 
+  // ── Tab bar ── scrolls sideways rather than wrapping on a narrow screen.
+  tabBar:    { display: 'flex', gap: 4, padding: '0 16px', borderBottom: `1px solid ${t.divider}`, overflowX: 'auto', flexShrink: 0, scrollbarWidth: 'none' },
+  // Border as longhands only, and the SAME longhand (borderColor) in both
+  // states. Mixing the `borderBottom` shorthand with a `borderBottomColor`
+  // override breaks on deselect: React removes the longhand but never
+  // re-applies the shorthand, so the old tab kept a text-coloured underline.
+  tab:       { display: 'inline-flex', alignItems: 'center', gap: 7, padding: '12px 10px 10px', marginBottom: -1, borderWidth: '0 0 2px 0', borderStyle: 'solid', borderColor: 'transparent', background: 'none', color: t.textSecondary, fontWeight: 600, fontSize: 13, cursor: 'pointer', whiteSpace: 'nowrap', borderRadius: 0 },
+  tabActive: { color: t.textPrimary, borderColor: t.brand },
+  tabCount:  { fontSize: 11, fontWeight: 700, lineHeight: '16px', padding: '0 6px', borderRadius: radius.pill, background: t.infoBg, color: t.info },
+  tabDot:    { width: 7, height: 7, borderRadius: '50%', background: t.warning, flexShrink: 0 },
+  srOnly:    { position: 'absolute', width: 1, height: 1, padding: 0, margin: -1, overflow: 'hidden', clip: 'rect(0 0 0 0)', whiteSpace: 'nowrap', border: 0 },
+
   body: { overflowY: 'auto', flex: 1, padding: '0 24px' },
 
   section:      { padding: '20px 0', borderBottom: `1px solid ${t.divider}`, display: 'flex', flexDirection: 'column', gap: 14 },
-  sectionTitle: { fontSize: 12, fontWeight: 700, color: t.textSecondary, textTransform: 'uppercase', letterSpacing: '0.06em' },
+  sectionTitle: { fontSize: 12, fontWeight: 700, color: t.textSecondary, textTransform: 'uppercase', letterSpacing: '0.06em', margin: 0 },
+  panelIntro:   { fontSize: 13, color: t.textSecondary, lineHeight: 1.55, margin: 0 },
 
   field: { display: 'flex', flexDirection: 'column', gap: 6 },
   twoCol: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 },
@@ -1395,15 +1565,11 @@ const styles = {
   uploadBtn: { padding: '6px 12px', borderRadius: radius.sm, border: `1px solid ${t.border}`, background: t.cardBg, color: t.textPrimary, fontWeight: 600, fontSize: 12, cursor: 'pointer' },
   clearBtn:  { padding: '6px 10px', borderRadius: radius.sm, border: 'none', background: t.dangerBg, color: t.danger, fontWeight: 600, fontSize: 12, cursor: 'pointer' },
 
-  mapSectionHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' },
-
-  modeToggle:        { display: 'inline-flex', border: `1px solid ${t.border}`, borderRadius: radius.md, overflow: 'hidden' },
-  modeBtn:           { display: 'inline-flex', alignItems: 'center', gap: 7, padding: '7px 14px', background: t.sidebarBg, color: t.textSecondary, border: 'none', fontWeight: 600, fontSize: 13, cursor: 'pointer' },
-  modeBtnActiveSpot:    { background: t.brandSoft, color: t.textPrimary },
-  modeBtnActiveAr:      { background: t.brandSoft, color: t.textPrimary },
-  modeBtnActiveMission: { background: t.brandSoft, color: t.textPrimary },
-  modeBtnDisabled:      { opacity: 0.45, cursor: 'not-allowed' },
-  modeDot:           { width: 8, height: 8, borderRadius: '50%', display: 'inline-block', flexShrink: 0 },
+  // ── Map legend ──
+  legend:           { display: 'flex', flexWrap: 'wrap', gap: '6px 16px', marginTop: -4 },
+  legendItem:       { display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, color: t.textMuted },
+  legendItemActive: { display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, color: t.textPrimary, fontWeight: 600 },
+  modeDot:          { width: 8, height: 8, borderRadius: '50%', display: 'inline-block', flexShrink: 0 },
 
   mapHintRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 },
   mapHint: { fontSize: 12, color: t.textSecondary, margin: 0 },
@@ -1424,7 +1590,7 @@ const styles = {
   searchDropdown: { position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, background: t.cardBg, border: `1px solid ${t.border}`, borderRadius: 8, boxShadow: '0 8px 24px rgba(0,0,0,0.35)', overflow: 'hidden', maxHeight: 220, overflowY: 'auto' },
   searchResultItem: { display: 'block', width: '100%', textAlign: 'left', padding: '9px 12px', border: 'none', borderBottom: `1px solid ${t.divider}`, background: 'transparent', color: t.textPrimary, fontSize: 12.5, cursor: 'pointer', lineHeight: 1.4 },
 
-  emptyAr: { background: t.sidebarBg, borderRadius: 10, padding: 16, textAlign: 'center', color: t.textSecondary, fontSize: 13, border: `1px dashed ${t.border}` },
+  emptyNote: { background: t.sidebarBg, borderRadius: 10, padding: 16, textAlign: 'center', color: t.textSecondary, fontSize: 13, lineHeight: 1.55, border: `1px dashed ${t.border}` },
 
   arList:       { display: 'flex', flexDirection: 'column', gap: 6 },
   arListRow:    { display: 'flex', alignItems: 'center', gap: 10, background: t.sidebarBg, borderRadius: 8, padding: '8px 12px', border: `1px solid ${t.border}` },
