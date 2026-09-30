@@ -19,13 +19,12 @@
 import {
   Aperture, Archive, ArrowClockwise, ArrowRight, Bell, CaretDown, CaretRight, CaretUp,
   ChatCircleText, Check, CheckCircle, Clock, Desktop, Flag, ForkKnife, Hand, Image, Info,
-  MapPin, Moon, Package, PaperPlaneTilt, Pause, PencilSimple, Plus, Prohibit, Pulse,
+  MapPin, Moon, Package, PaperPlaneTilt, Pause, PencilSimple, Plus, Prohibit,
   SignOut, Sparkle, SquaresFour, Star, Sun, ThumbsDown, ThumbsUp, Tray, Trash, Trophy,
   Users, Warning, Wrench, X,
 } from '@phosphor-icons/react';
 
 const MAP = {
-  'activity':       Pulse,
   'alert-triangle': Warning,
   'aperture':       Aperture,   // AR — same glyph as the app's AR mission
   'archive':        Archive,

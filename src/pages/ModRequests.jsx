@@ -1,42 +1,22 @@
 import { useEffect, useState } from 'react';
 import { spotAPI, accountActionAPI, missionAPI } from '../api/api';
 import { notify } from '../components/AppAlert';
-import { theme as t, radius, shadow } from '../theme';
-import { pageStyles, Loading, ErrorBanner, EmptyState, Avatar, SpotThumb } from '../components/Layout';
+import {
+  Page, PageHeader, Toolbar, FilterTabs, List, Button, ApprovalPill, Tag,
+  Loading, ErrorBanner, EmptyState, Avatar, SpotThumb, pageStyles as s,
+} from '../components/Layout';
+import { ChangeList, ProposalFieldList } from '../components/ChangeDiff';
+import { MISSION_FIELD_LABELS } from '../utils/changeDiff';
+import { fmtDateTime } from '../utils/format';
 import Icon from '../components/Icon';
 
-const STATUS_PILL = {
-  pending:  { background: t.purpleBg,  color: t.purple,  label: 'PENDING' },
-  approved: { background: t.successBg, color: t.success, label: 'APPROVED' },
-  rejected: { background: t.dangerBg,  color: t.danger,  label: 'REJECTED' },
-};
-
 const KIND_LABELS = {
-  spot:          'Spot edit',
-  'spot-delete': 'Spot deletion',
-  'spot-proposal': 'New spot',
-  account:       'Account action',
+  spot:               'Spot edit',
+  'spot-delete':      'Spot deletion',
+  'spot-proposal':    'New spot',
+  account:            'Account action',
   'mission-location': 'Food mission location',
 };
-
-const MISSION_FIELD_LABELS = {
-  locationName: 'Restaurant name',
-  image:        'Restaurant photo',
-  locationInfo: 'Restaurant info',
-  coordinates:  'Coordinates',
-  radiusMeters: 'Radius (m)',
-};
-
-const FIELD_LABELS = {
-  name: 'Name', location: 'Location', category: 'Category', description: 'Description',
-  history: 'History', recommendations: 'Recommendations', visitingHours: 'Visiting Hours',
-  entranceFee: 'Entrance Fee', image: 'Image', modelUrl: 'Model URL', AR3DModelURL: 'AR Model URL',
-  Badge: 'Badge', City: 'City', coordinates: 'Coordinates', modelsCoordinates: 'AR Positions', trivia: 'Trivia',
-};
-
-const LONG_FIELDS = new Set(['description', 'history', 'recommendations', 'trivia', 'locationInfo']);
-const THUMB_FIELDS = new Set(['image', 'Badge']);
-const FILE_LINK_FIELDS = new Set(['modelUrl', 'AR3DModelURL']);
 
 function toArray(data) {
   if (!data) return [];
@@ -46,134 +26,12 @@ function toArray(data) {
   return [];
 }
 
-
-function fmtCoord(c) {
-  if (!c || c.lat == null || c.lng == null) return '—';
-  return `${Number(c.lat).toFixed(6)}, ${Number(c.lng).toFixed(6)}`;
-}
-
-function fmtVal(key, v) {
-  if (v === null || v === undefined || v === '') return '—';
-  if (key === 'coordinates') return fmtCoord(v);
-  if (key === 'modelsCoordinates') {
-    if (!Array.isArray(v) || !v.length) return '—';
-    return v.map((m, i) => `#${i + 1}  ${fmtCoord(m)}`).join('\n');
-  }
-  // Trivia entries are full sentences with their own commas — comma-joining
-  // them would blur where one fact ends and the next begins.
-  if (key === 'trivia' && Array.isArray(v)) {
-    return v.length ? v.map((line, i) => `${i + 1}. ${line}`).join('\n') : '—';
-  }
-  if (Array.isArray(v)) return v.length ? v.join(', ') : '—';
-  if (typeof v === 'object') return JSON.stringify(v);
-  return String(v);
-}
-
-function fileNameOf(url) {
-  try {
-    const clean = url.split('?')[0];
-    return decodeURIComponent(clean.split('/').pop());
-  } catch {
-    return url;
-  }
-}
-
-function Thumb({ url, dimmed }) {
-  const [broken, setBroken] = useState(false);
-  if (!url || broken) {
-    return <div style={{ ...s.thumb, ...s.thumbEmpty }}>—</div>;
-  }
-  return (
-    <a href={url} target="_blank" rel="noreferrer" style={s.thumbLink}>
-      <img
-        src={url}
-        alt=""
-        onError={() => setBroken(true)}
-        style={{ ...s.thumb, opacity: dimmed ? 0.4 : 1, filter: dimmed ? 'grayscale(0.6)' : 'none' }}
-      />
-    </a>
-  );
-}
-
-function DiffField({ fieldKey, oldVal, newVal, labelMap = FIELD_LABELS }) {
-  const label = labelMap[fieldKey] || fieldKey;
-  const changed = fmtVal(fieldKey, oldVal) !== fmtVal(fieldKey, newVal);
-  if (!changed) return null;
-
-  if (THUMB_FIELDS.has(fieldKey)) {
-    return (
-      <div style={s.fieldRow}>
-        <span style={s.fieldLabel}>{label}</span>
-        <div style={s.thumbPair}>
-          <Thumb url={oldVal} dimmed />
-          <span style={s.arrow}><Icon name="arrow-right" size={12} /></span>
-          <Thumb url={newVal} />
-        </div>
-      </div>
-    );
-  }
-
-  if (FILE_LINK_FIELDS.has(fieldKey)) {
-    const hasOld = !!oldVal, hasNew = !!newVal;
-    return (
-      <div style={s.fieldRow}>
-        <span style={s.fieldLabel}>{label}</span>
-        <div style={s.linkPair}>
-          {hasOld ? <a href={oldVal} target="_blank" rel="noreferrer" style={s.linkOld}>{fileNameOf(oldVal)}</a> : <span style={s.emptyDash}>—</span>}
-          <span style={s.arrow}><Icon name="arrow-right" size={12} /></span>
-          {hasNew ? <a href={newVal} target="_blank" rel="noreferrer" style={s.linkNew}>{fileNameOf(newVal)}</a> : <span style={s.emptyDash}>—</span>}
-        </div>
-      </div>
-    );
-  }
-
-  if (LONG_FIELDS.has(fieldKey)) {
-    return (
-      <div style={s.longBlock}>
-        <span style={s.fieldLabel}>{label}</span>
-        <div style={s.longOldBox}>{fmtVal(fieldKey, oldVal)}</div>
-        <div style={s.longNewBox}>{fmtVal(fieldKey, newVal)}</div>
-      </div>
-    );
-  }
-
-  return (
-    <div style={s.fieldRow}>
-      <span style={s.fieldLabel}>{label}</span>
-      <span style={s.oldText}>{fmtVal(fieldKey, oldVal)}</span>
-      <span style={s.arrow}><Icon name="arrow-right" size={12} /></span>
-      <span style={s.newText}>{fmtVal(fieldKey, newVal)}</span>
-    </div>
-  );
-}
-
-// New-spot proposals have no "old" value to diff against — every
-// submitted field is just shown as-is.
-function ProposalFieldList({ proposal }) {
-  const keys = Object.keys(FIELD_LABELS).filter(k => {
-    const v = proposal[k];
-    return v !== null && v !== undefined && v !== '' && !(Array.isArray(v) && v.length === 0);
-  });
-
-  if (!keys.length) return null;
-
-  return (
-    <div style={s.fieldList}>
-      {keys.map(k => (
-        <div style={s.fieldRow} key={k}>
-          <span style={s.fieldLabel}>{FIELD_LABELS[k]}</span>
-          <span style={s.newText}>{fmtVal(k, proposal[k])}</span>
-        </div>
-      ))}
-    </div>
-  );
-}
-
 export default function ModRequests() {
   const [requests, setRequests] = useState([]);
   const [loading,  setLoading]  = useState(true);
   const [error,    setError]    = useState(null);
-  const [statusFilter, setStatusFilter] = useState('');
+  // Opens on what's waiting — that's what a queue is for.
+  const [statusFilter, setStatusFilter] = useState('pending');
   const [acting, setActing] = useState(null);
   const [expandedKey, setExpandedKey] = useState(null);
 
@@ -286,7 +144,7 @@ export default function ModRequests() {
       setRequests(all);
     } catch (err) {
       console.error(err);
-      setError('Failed to load mod requests.');
+      setError('Couldn’t load the approval queue.');
       setRequests([]);
     }
     setLoading(false);
@@ -349,248 +207,165 @@ export default function ModRequests() {
     setActing(null);
   };
 
-  return (
-    <div style={s.page}>
-      <div style={s.pageHeader}>
-        <div>
-          <h1 style={s.pageTitle}>Approval Queue</h1>
-          <p style={s.pageSub}>New spots, spot edits and deletions, food mission locations and account actions from moderators — nothing goes live until you approve it.</p>
-        </div>
-        <span style={s.totalBadge}>{requests.length} total</span>
-      </div>
+  const count = (st) => requests.filter((r) => r.status === st).length;
 
-      <div style={s.filterRow}>
-        <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} style={s.filterSelect} className="modern-input">
-          <option value="">All ({requests.length})</option>
-          <option value="pending">Pending ({pendingCount})</option>
-          <option value="approved">Approved</option>
-          <option value="rejected">Rejected</option>
-        </select>
-      </div>
+  return (
+    <Page>
+      <PageHeader
+        title="Approval Queue"
+        count={pendingCount}
+        subtitle="New spots, spot edits and deletions, food mission locations and account actions from moderators — nothing goes live until you approve it."
+        actions={<Button icon="refresh-cw" onClick={load} disabled={loading}>Refresh</Button>}
+      />
+
+      <Toolbar>
+        <FilterTabs
+          label="Filter by status"
+          value={statusFilter}
+          onChange={setStatusFilter}
+          options={[
+            { value: 'pending',  label: 'Pending',  count: pendingCount },
+            { value: 'approved', label: 'Approved', count: count('approved') },
+            { value: 'rejected', label: 'Rejected', count: count('rejected') },
+            { value: '',         label: 'All',      count: requests.length },
+          ]}
+        />
+      </Toolbar>
+
+      {error && <ErrorBanner>{error}</ErrorBanner>}
 
       {loading ? (
-        <Loading />
-      ) : error ? (
-        <ErrorBanner>{error}</ErrorBanner>
+        <Loading label="Loading the approval queue…" />
       ) : visible.length === 0 ? (
         <EmptyState
           icon="check"
-          title={requests.length === 0 ? 'Nothing awaiting review' : 'No requests found'}
-          subtitle={requests.length === 0
-            ? 'Moderator submissions will appear here.'
-            : 'All caught up for this filter.'}
+          title={statusFilter === 'pending' ? 'Nothing waiting for approval' : 'No requests here'}
+          subtitle={statusFilter === 'pending'
+            ? 'Moderator submissions will appear here as they come in.'
+            : 'Try another filter.'}
         />
       ) : (
-        visible.map(r => {
-          const pill = STATUS_PILL[r.status] || STATUS_PILL.pending;
-          const isPending = r.status === 'pending';
-          const isActing = acting === r.id;
-          const key = `${r.kind}-${r.id}`;
-          const isExpanded = expandedKey === key;
-          const isDeleteRequest = r.kind === 'spot-delete';
-          const isNewProposal = r.kind === 'spot-proposal';
+        <List>
+          {visible.map((r) => {
+            const isPending = r.status === 'pending';
+            const isActing = acting === r.id;
+            const key = `${r.kind}-${r.id}`;
+            const isExpanded = expandedKey === key;
+            const isDeleteRequest = r.kind === 'spot-delete';
+            const isNewProposal = r.kind === 'spot-proposal';
+            const isMissionLocation = r.kind === 'mission-location';
+            const hasDetails = r.kind === 'spot' || isNewProposal || isDeleteRequest || isMissionLocation;
+            const byLine = r.kind === 'account' ? r.title : null;
 
-          const avatarName = r.subtitle;
-          const primaryName = avatarName || '—';
-          const isMissionLocation = r.kind === 'mission-location';
-          const byLine = r.kind === 'spot' || r.kind === 'spot-delete' || r.kind === 'spot-proposal' || isMissionLocation ? null : r.title;
+            const handleApprove = () => {
+              if (r.kind === 'account') decideAccount(r.id, 'approved');
+              else if (isNewProposal) decideProposal(r.id, 'approve');
+              else if (isMissionLocation) decideMissionLocation(r.id, 'approve');
+              else decideSpot(r.id, 'approve');
+            };
 
-          const handleApprove = () => {
-            if (r.kind === 'account') decideAccount(r.id, 'approved');
-            else if (isNewProposal) decideProposal(r.id, 'approve');
-            else if (isMissionLocation) decideMissionLocation(r.id, 'approve');
-            else decideSpot(r.id, 'approve');
-          };
+            const handleReject = () => {
+              if (r.kind === 'account') decideAccount(r.id, 'rejected');
+              else if (isNewProposal) decideProposal(r.id, 'reject');
+              else if (isMissionLocation) decideMissionLocation(r.id, 'reject');
+              else decideSpot(r.id, 'reject');
+            };
 
-          const handleReject = () => {
-            if (r.kind === 'account') decideAccount(r.id, 'rejected');
-            else if (isNewProposal) decideProposal(r.id, 'reject');
-            else if (isMissionLocation) decideMissionLocation(r.id, 'reject');
-            else decideSpot(r.id, 'reject');
-          };
+            return (
+              <div key={key} style={s.item}>
+                <div style={s.itemTop}>
+                  {isDeleteRequest ? (
+                    <div style={{ ...s.mediaIcon, ...s.mediaIconDanger }}><Icon name="trash" size={16} /></div>
+                  ) : r.kind === 'account' ? (
+                    <Avatar src={r.image} name={r.subtitle} size={38} />
+                  ) : (
+                    <SpotThumb src={r.image} size={38} />
+                  )}
 
-          return (
-            <div key={key} style={s.card} className="modern-card">
-              <div style={s.cardTop} onClick={() => setExpandedKey(isExpanded ? null : key)}>
-                {isDeleteRequest ? (
-                  <div style={{ ...s.avatar, ...s.avatarDanger }}><Icon name="trash" size={14} /></div>
-                ) : r.kind === 'account' ? (
-                  <Avatar src={r.image} name={avatarName} size={38} />
-                ) : (
-                  <SpotThumb src={r.image} size={38} />
+                  <div style={s.itemMain}>
+                    <div style={s.itemMeta}>
+                      <span style={s.itemTitle}>{r.subtitle || '—'}</span>
+                      <span style={s.itemDate}>{fmtDateTime(r.date)}</span>
+                      <Tag tone={isDeleteRequest ? 'danger' : undefined}>{KIND_LABELS[r.kind]}</Tag>
+                      <ApprovalPill status={r.status} />
+                    </div>
+
+                    {byLine && <p style={s.itemText}>Proposed by <strong>{byLine}</strong></p>}
+                    {r.kind === 'account' && <p style={s.itemText}>{r.body.reason}</p>}
+                    {isNewProposal && <p style={s.itemText}>A new spot, submitted for review.</p>}
+                    {r.kind === 'spot' && <p style={s.itemText}>Changes to this spot&rsquo;s details.</p>}
+                    {isDeleteRequest && (
+                      <p style={s.itemText}>
+                        {r.body.pendingDeleteReason ? `Reason: ${r.body.pendingDeleteReason}` : 'No reason given.'}
+                      </p>
+                    )}
+                    {isMissionLocation && (
+                      <p style={s.itemText}>A new location for this spot&rsquo;s food recommendation mission.</p>
+                    )}
+
+                    {(r.kind === 'account' || (r.status !== 'pending' && r.body.resultSummary)) && (
+                      <div style={s.itemFacts}>
+                        {r.kind === 'account' && (
+                          <span style={s.itemFact}>
+                            <Icon name={r.body.sourceType === 'inactivity' ? 'clock' : 'hand'} size={12} />
+                            {r.body.sourceType === 'inactivity' ? 'Account inactivity' : 'Manual'}
+                          </span>
+                        )}
+                        {r.status !== 'pending' && r.body.resultSummary && (
+                          <span style={s.itemFact}><Icon name="check-circle" size={12} /> {r.body.resultSummary}</span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {hasDetails && (
+                    <div style={s.itemSide}>
+                      <Button size="sm" icon={isExpanded ? 'chevron-up' : 'chevron-down'} onClick={() => setExpandedKey(isExpanded ? null : key)}>
+                        {isExpanded ? 'Hide details' : 'View details'}
+                      </Button>
+                    </div>
+                  )}
+                </div>
+
+                {isExpanded && r.kind === 'spot' && <ChangeList record={r.body} />}
+                {isExpanded && isNewProposal && <ProposalFieldList proposal={r.body} />}
+                {isExpanded && isDeleteRequest && (
+                  <div style={s.panel}>
+                    <p style={{ ...s.itemText, margin: 0 }}>
+                      <Icon name="alert-triangle" size={13} /> Approving permanently deletes <strong>{r.body.name}</strong>. This can&rsquo;t be undone.
+                    </p>
+                  </div>
+                )}
+                {isExpanded && isMissionLocation && (
+                  <ChangeList
+                    record={r.body}
+                    labelMap={MISSION_FIELD_LABELS}
+                    keys={['locationName', 'image', 'locationInfo', 'coordinates', 'radiusMeters']}
+                  />
                 )}
 
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={s.metaRow}>
-                    <span style={s.userName}>{primaryName}</span>
-                    <span style={s.dateText}>
-                      {r.date ? new Date(r.date).toLocaleString('en-PH', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}
-                    </span>
-                    <span style={{ ...s.locPill, ...(isDeleteRequest ? s.locPillDanger : {}) }}>{KIND_LABELS[r.kind]}</span>
-                    <span style={{ ...s.statusPill, background: pill.background, color: pill.color }}>{pill.label}</span>
+                {isPending && (
+                  <div style={s.panel}>
+                    <div style={{ ...s.buttonRow, marginTop: 0 }}>
+                      <Button
+                        variant={isDeleteRequest ? 'dangerSolid' : 'success'}
+                        icon={isDeleteRequest ? 'trash' : 'check'}
+                        disabled={isActing}
+                        onClick={handleApprove}
+                      >
+                        {isDeleteRequest ? 'Approve & delete' : 'Approve'}
+                      </Button>
+                      <Button variant="danger" icon="x" disabled={isActing} onClick={handleReject}>
+                        Reject
+                      </Button>
+                    </div>
                   </div>
-
-                  {byLine && (
-                    <p style={s.byLine}><span style={s.byLineLabel}>Proposed by </span>{byLine}</p>
-                  )}
-
-                  {r.kind === 'account' && (
-                    <p style={s.commentText}>{r.body.reason}</p>
-                  )}
-                  {r.kind === 'spot-proposal' && (
-                    <p style={s.commentText}>New spot submitted for review — expand to see details.</p>
-                  )}
-                  {r.kind === 'spot' && (
-                    <p style={s.commentText}>Proposed changes to this spot's details.</p>
-                  )}
-                  {r.kind === 'spot-delete' && (
-                    <p style={s.commentText}>
-                      {r.body.pendingDeleteReason
-                        ? `Reason: ${r.body.pendingDeleteReason}`
-                        : 'No reason provided.'}
-                    </p>
-                  )}
-                  {isMissionLocation && (
-                    <p style={s.commentText}>
-                      Proposed food-recommendation location for this spot's 2nd mission — expand to see details.
-                    </p>
-                  )}
-
-                  <div style={s.reactRow}>
-                    {r.kind === 'account' && (
-                      <span style={s.react}>{r.body.sourceType === 'inactivity'
-                          ? <><Icon name="clock" size={11} /> Account inactivity</>
-                          : <><Icon name="hand" size={11} /> Manual</>}</span>
-                    )}
-                    {r.status !== 'pending' && r.body.resultSummary && (
-                      <span style={s.react}><Icon name="check-circle" size={11} /> {r.body.resultSummary}</span>
-                    )}
-                  </div>
-                </div>
+                )}
               </div>
-
-              {isExpanded && r.kind === 'spot' && (
-                <div style={s.fieldList}>
-                  {Object.entries(r.body.pendingChange)
-                    .filter(([k]) => k !== 'submittedBy' && k !== 'submittedAt')
-                    .map(([k, newVal]) => (
-                      <DiffField key={k} fieldKey={k} oldVal={r.body[k]} newVal={newVal} />
-                    ))}
-                </div>
-              )}
-
-              {isExpanded && r.kind === 'spot-proposal' && (
-                <ProposalFieldList proposal={r.body} />
-              )}
-
-              {isExpanded && r.kind === 'spot-delete' && (
-                <div style={s.fieldList}>
-                  <div style={s.deleteNotice}>
-                    Approving this will permanently delete <strong>{r.body.name}</strong> and cannot be undone.
-                  </div>
-                </div>
-              )}
-
-              {isExpanded && isMissionLocation && (
-                <div style={s.fieldList}>
-                  <p style={s.byLine}>
-                    <span style={s.byLineLabel}>Mission: </span>{r.body.title}
-                  </p>
-                  {Object.entries(r.body.pendingChange || {})
-                    .filter(([k]) => ['locationName', 'image', 'locationInfo', 'coordinates', 'radiusMeters'].includes(k))
-                    .map(([k, newVal]) => (
-                      <DiffField key={k} fieldKey={k} oldVal={r.body[k]} newVal={newVal} labelMap={MISSION_FIELD_LABELS} />
-                    ))}
-                </div>
-              )}
-
-              {isPending && (
-                <div style={s.panel}>
-                  <div style={s.actions}>
-                    <button
-                      disabled={isActing}
-                      onClick={handleApprove}
-                      style={{ ...s.btn, ...(isDeleteRequest ? s.btnApproveDelete : s.btnApprove), opacity: isActing ? 0.6 : 1 }}
-                      className="modern-btn"
-                    >
-                      {isDeleteRequest ? 'Approve & Delete' : 'Approve'}
-                    </button>
-                    <button
-                      disabled={isActing}
-                      onClick={handleReject}
-                      style={{ ...s.btn, ...s.btnDisapprove, opacity: isActing ? 0.6 : 1 }}
-                      className="modern-btn"
-                    >
-                      Disapprove
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          );
-        })
+            );
+          })}
+        </List>
       )}
-    </div>
+    </Page>
   );
 }
-
-const s = {
-  // Page shell, header, toolbar, states and table cells come from
-  // components/Layout so every page is spaced identically.
-  ...pageStyles,
-  // Page-specific: the shared card has no padding, overflow or margin,
-  // because those differ by how each page uses a card.
-  card: { background: t.cardBg, border: `1px solid ${t.border}`, borderRadius: radius.xl, marginBottom: 12, overflow: 'hidden', boxShadow: shadow.sm },
-  totalBadge: { fontSize: 13, color: t.textMuted, fontWeight: 500, paddingTop: 4 },
-
-  filterSelect: { padding: '10px 14px', borderRadius: 10, border: `1px solid ${t.border}`, fontSize: 13, color: t.textPrimary, background: t.cardBg, outline: 'none', cursor: 'pointer' },
-
-  cardTop:    { display: 'flex', alignItems: 'flex-start', gap: 14, padding: '16px 18px', cursor: 'pointer' },
-  avatar:     { width: 38, height: 38, borderRadius: '50%', background: t.brandSoft, color: t.brand, fontWeight: 700, fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
-  avatarDanger: { background: t.dangerBg, color: t.danger, fontSize: 16 },
-  metaRow:    { display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 4 },
-  userName:   { fontSize: 14, fontWeight: 700, color: t.textPrimary },
-  dateText:   { fontSize: 12, color: t.textMuted },
-  locPill:    { padding: '3px 10px', background: t.sidebarBg, border: `1px solid ${t.border}`, borderRadius: 20, fontSize: 11, fontWeight: 500, color: t.textSecondary },
-  locPillDanger: { background: t.dangerBg, border: `1px solid ${t.dangerBorder}`, color: t.danger },
-  statusPill: { padding: '3px 10px', borderRadius: 6, fontSize: 10, fontWeight: 700, letterSpacing: '0.03em' },
-
-  byLine:      { fontSize: 11.5, color: t.textMuted, margin: '0 0 4px' },
-  byLineLabel: { fontWeight: 600, color: t.textSecondary },
-
-  commentText:{ fontSize: 14, color: t.textSecondary, lineHeight: 1.5, margin: '2px 0 8px' },
-  reactRow:   { display: 'flex', gap: 14, flexWrap: 'wrap' },
-  react:      { fontSize: 12, color: t.textMuted },
-
-  panel:      { borderTop: `1px solid ${t.divider}`, padding: '14px 18px 18px', background: t.sidebarBg },
-  actions:    { display: 'flex', gap: 8, marginTop: 10 },
-  btn:        { padding: '8px 18px', borderRadius: radius.md, fontWeight: 600, fontSize: 13, cursor: 'pointer', border: 'none' },
-  btnApprove: { background: t.successBg, color: t.success },
-  btnApproveDelete: { background: t.dangerBg, color: t.danger },
-  btnDisapprove: { background: t.dangerBg, color: t.danger },
-
-  fieldList: { display: 'flex', flexDirection: 'column', borderTop: `1px solid ${t.divider}`, padding: '4px 18px' },
-  deleteNotice: { padding: '12px 0', fontSize: 13, color: t.danger, lineHeight: 1.5 },
-
-  fieldRow: { display: 'flex', alignItems: 'center', gap: 10, padding: '7px 0', borderBottom: `1px solid ${t.divider}`, fontSize: 12, flexWrap: 'wrap' },
-  fieldLabel: { fontSize: 10, fontWeight: 700, color: t.textMuted, textTransform: 'uppercase', letterSpacing: '0.04em', width: 92, flexShrink: 0 },
-
-  oldText: { color: t.textMuted, textDecoration: 'line-through' },
-  newText: { color: t.brand, fontWeight: 600 },
-  arrow:   { color: t.textMuted, fontSize: 11, flexShrink: 0 },
-  emptyDash: { color: t.textMuted },
-
-  thumbPair: { display: 'flex', alignItems: 'center', gap: 8 },
-  thumbLink: { display: 'block', lineHeight: 0 },
-  thumb:     { width: 40, height: 40, objectFit: 'cover', borderRadius: 6, border: `1px solid ${t.border}` },
-  thumbEmpty: { display: 'flex', alignItems: 'center', justifyContent: 'center', color: t.textMuted, fontSize: 12, background: t.sidebarBg },
-
-  linkPair: { display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
-  linkOld:  { fontSize: 11.5, color: t.textMuted, textDecoration: 'line-through' },
-  linkNew:  { fontSize: 11.5, color: t.brand, fontWeight: 600, textDecoration: 'underline' },
-
-  longBlock: { padding: '9px 0', borderBottom: `1px solid ${t.divider}` },
-  longOldBox: { fontSize: 11.5, color: t.textMuted, textDecoration: 'line-through', lineHeight: 1.5, marginTop: 4, whiteSpace: 'pre-wrap' },
-  longNewBox: { fontSize: 11.5, color: t.brand, lineHeight: 1.5, marginTop: 4, whiteSpace: 'pre-wrap', fontWeight: 500 },
-
-};

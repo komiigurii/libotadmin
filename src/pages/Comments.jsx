@@ -1,17 +1,22 @@
 import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { commentAPI, bannedAccountsAPI } from '../api/api';
 import { notify, confirmAction } from '../components/AppAlert';
-import { theme as t, radius, shadow } from '../theme';
-import { pageStyles, Loading, ErrorBanner, EmptyState, Avatar } from '../components/Layout';
+import {
+  Page, PageHeader, Toolbar, SearchInput, FilterTabs, List, Button, StatusPill, Tag,
+  Loading, ErrorBanner, EmptyState, Avatar, pageStyles as s,
+} from '../components/Layout';
+import { fmtDateTime } from '../utils/format';
 import Icon from '../components/Icon';
 
 const role = () => localStorage.getItem('role');
 
-const STATUS_PILL = {
-  none:      { background: t.successBg, color: t.success, label: 'ACTIVE' },
-  pending:   { background: t.purpleBg,  color: t.purple,  label: 'REVIEW REQUESTED' },
-  approved:  { background: t.successBg, color: t.success, label: 'APPROVED' },
-  rejected:  { background: t.dangerBg,  color: t.danger,  label: 'REJECTED' },
+// Only a review someone has flagged gets a status — an ordinary review used
+// to carry an "ACTIVE" pill, which said nothing on every single row.
+const FLAG_STATUS = {
+  pending:  { tone: 'warning', icon: 'flag',  label: 'Flagged' },
+  approved: { tone: 'success', icon: 'check', label: 'Flag upheld' },
+  rejected: { tone: 'neutral', icon: 'x',     label: 'Flag declined' },
 };
 
 const ACTION_LABELS = { warn: 'Warn (mute)', suspend: 'Suspend' };
@@ -24,14 +29,16 @@ function toArray(data) {
   return [];
 }
 
-
 export default function Comments() {
   const isModerator = role() === 'moderator';
+  // ?show=flagged — the dashboard's "Flagged by moderators" row lands here.
+  const [params] = useSearchParams();
 
   const [comments, setComments] = useState([]);
   const [loading,  setLoading]  = useState(true);
   const [error,    setError]    = useState(null);
   const [search,   setSearch]   = useState('');
+  const [show,     setShow]     = useState(params.get('show') === 'flagged' ? 'flagged' : '');
   const [expandedId, setExpandedId] = useState(null);
 
   const load = async () => {
@@ -41,7 +48,7 @@ export default function Comments() {
       const data = isModerator ? await commentAPI.getMine() : await commentAPI.getAll();
       setComments(toArray(data));
     } catch {
-      setError('Failed to load comments.');
+      setError('Couldn’t load reviews.');
       setComments([]);
     }
     setLoading(false);
@@ -49,8 +56,11 @@ export default function Comments() {
 
   useEffect(() => { load(); }, []);
 
+  const flaggedCount = comments.filter((c) => c.flagStatus === 'pending').length;
+
   const visible = comments.filter(c => {
     if (!c?._id) return false;
+    if (show === 'flagged' && c.flagStatus !== 'pending') return false;
     if (!search) return true;
     const q = search.toLowerCase();
     const spotName = (c.spotId && typeof c.spotId === 'object' ? c.spotId.name : '') || '';
@@ -61,54 +71,60 @@ export default function Comments() {
   });
 
   return (
-    <div style={s.page}>
-      <div style={s.pageHeader}>
-        <div>
-          <h1 style={s.pageTitle}>Reviews &amp; Feedback</h1>
-          <p style={s.pageSub}>
-            {isModerator
-              ? 'Reviews travelers left on spots in your area. Flag one and an admin decides what happens to it.'
-              : 'Every review travelers have left, across all spots — including the ones moderators flagged for you.'}
-          </p>
-        </div>
-        <span style={s.totalBadge}>{comments.length} total</span>
-      </div>
+    <Page>
+      <PageHeader
+        title="Reviews & Feedback"
+        count={comments.length}
+        subtitle={isModerator
+          ? 'Reviews travelers left on spots in your area. Flag one and an admin decides what happens to it.'
+          : 'Every review travelers have left, across all spots — including the ones moderators flagged for you.'}
+        actions={<Button icon="refresh-cw" onClick={load} disabled={loading}>Refresh</Button>}
+      />
 
-      <div style={s.filterRow}>
-        <input
-          placeholder="Search comments, users, or spots…"
+      <Toolbar>
+        <FilterTabs
+          label="Show"
+          value={show}
+          onChange={setShow}
+          options={[
+            { value: '',        label: 'All',     count: comments.length },
+            { value: 'flagged', label: 'Flagged', count: flaggedCount },
+          ]}
+        />
+        <SearchInput
           value={search}
           onChange={e => setSearch(e.target.value)}
-          style={s.searchInput}
-          className="modern-input"
+          placeholder="Search reviews, travelers or spots…"
         />
-      </div>
+      </Toolbar>
 
       {loading ? (
-        <Loading />
+        <Loading label="Loading reviews…" />
       ) : error ? (
         <ErrorBanner>{error}</ErrorBanner>
       ) : visible.length === 0 ? (
         <EmptyState
-          icon="check"
-          title={comments.length === 0 ? 'No comments yet' : 'No comments found'}
+          icon={show === 'flagged' ? 'check' : 'message-square'}
+          title={comments.length === 0 ? 'No reviews yet' : show === 'flagged' && !search ? 'Nothing flagged' : 'No reviews match'}
           subtitle={comments.length === 0
-            ? 'Reviews left in the app will appear here.'
-            : 'Nothing matches your search.'}
+            ? 'Reviews travelers leave in the app will appear here.'
+            : show === 'flagged' && !search ? 'No review is waiting on a flag decision.' : 'Try a different search.'}
         />
       ) : (
-        visible.map(c => (
-          <CommentRow
-            key={c._id}
-            comment={c}
-            isModerator={isModerator}
-            expanded={expandedId === c._id}
-            onToggle={() => setExpandedId(expandedId === c._id ? null : c._id)}
-            onUpdated={() => { setExpandedId(null); load(); }}
-          />
-        ))
+        <List>
+          {visible.map(c => (
+            <CommentRow
+              key={c._id}
+              comment={c}
+              isModerator={isModerator}
+              expanded={expandedId === c._id}
+              onToggle={() => setExpandedId(expandedId === c._id ? null : c._id)}
+              onUpdated={() => { setExpandedId(null); load(); }}
+            />
+          ))}
+        </List>
       )}
-    </div>
+    </Page>
   );
 }
 
@@ -122,7 +138,7 @@ function CommentRow({ comment, isModerator, expanded, onToggle, onUpdated }) {
   const spotName  = (comment.spotId && typeof comment.spotId === 'object' ? comment.spotId.name : '') || '—';
   const spotCity  = (comment.spotId && typeof comment.spotId === 'object' ? comment.spotId.City : '') || '';
   const flagStatus = comment.flagStatus || 'none';
-  const pill = STATUS_PILL[flagStatus] || STATUS_PILL.none;
+  const flag = FLAG_STATUS[flagStatus];
   const canRequest = isModerator && flagStatus === 'none';
 
   // clerkUserId lives directly on the review doc; fall back to a populated
@@ -131,7 +147,7 @@ function CommentRow({ comment, isModerator, expanded, onToggle, onUpdated }) {
     || (comment.userId && typeof comment.userId === 'object' ? comment.userId.clerkUserId : null);
 
   const requestReview = async () => {
-    if (!reason.trim()) { notify('Add a short reason for admin'); return; }
+    if (!reason.trim()) { notify('Add a short reason for the admin'); return; }
     setSaving(true);
     try {
       const data = await commentAPI.requestReview(comment._id, reason.trim(), proposedAction || null);
@@ -142,7 +158,7 @@ function CommentRow({ comment, isModerator, expanded, onToggle, onUpdated }) {
   };
 
   const remove = async () => {
-    if (!(await confirmAction('Delete this comment permanently?', { danger: true, confirmText: 'Delete' }))) return;
+    if (!(await confirmAction('Delete this review permanently?', { danger: true, confirmText: 'Delete review' }))) return;
     setSaving(true);
     try {
       const data = await commentAPI.delete(comment._id);
@@ -155,8 +171,8 @@ function CommentRow({ comment, isModerator, expanded, onToggle, onUpdated }) {
   // Suspend applies whatever the *next* escalation step is (7d -> 14d ->
   // auto-ban on the 3rd) — the backend decides the duration, not the admin.
   const suspendUser = async () => {
-    if (!banReason.trim()) { notify('Add a reason for suspending this user'); return; }
-    if (!clerkUserId) { notify('Could not identify this user (missing clerkUserId).', { tone: 'danger' }); return; }
+    if (!banReason.trim()) { notify('Add a reason for suspending this traveler'); return; }
+    if (!clerkUserId) { notify('Could not identify this traveler (missing clerkUserId).', { tone: 'danger' }); return; }
     if (!(await confirmAction(
       `Suspend ${userName}? This applies the next escalation step automatically (1st = 7 days, 2nd = 14 days, 3rd = permanent ban).`,
       { danger: true, confirmText: 'Suspend' }
@@ -174,11 +190,11 @@ function CommentRow({ comment, isModerator, expanded, onToggle, onUpdated }) {
   };
 
   const banUser = async () => {
-    if (!banReason.trim()) { notify('Add a reason for banning this user'); return; }
-    if (!clerkUserId) { notify('Could not identify this user (missing clerkUserId).', { tone: 'danger' }); return; }
+    if (!banReason.trim()) { notify('Add a reason for banning this traveler'); return; }
+    if (!clerkUserId) { notify('Could not identify this traveler (missing clerkUserId).', { tone: 'danger' }); return; }
     if (!(await confirmAction(
       `Permanently ban ${userName}? This archives their account for 30 days before permanent deletion, with a chance to appeal.`,
-      { danger: true, confirmText: 'Ban Permanently' }
+      { danger: true, confirmText: 'Ban permanently' }
     ))) return;
 
     setSaving(true);
@@ -193,74 +209,80 @@ function CommentRow({ comment, isModerator, expanded, onToggle, onUpdated }) {
   };
 
   return (
-    <div style={s.card} className="modern-card">
-      <div style={s.cardTop} onClick={onToggle}>
+    <div style={s.item}>
+      <div style={s.itemTop}>
         <Avatar src={comment.userImage} name={userName} size={38} />
 
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={s.metaRow}>
-            <span style={s.userName}>{userName}</span>
-            <span style={s.dateText}>
-              {comment.createdAt ? new Date(comment.createdAt).toLocaleString('en-PH', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—'}
-            </span>
-            <span style={s.locPill}>{spotName}{spotCity ? ` · ${spotCity}` : ''}</span>
-            <span style={{ ...s.statusPill, background: pill.background, color: pill.color }}>{pill.label}</span>
+        <div style={s.itemMain}>
+          <div style={s.itemMeta}>
+            <span style={s.itemTitle}>{userName}</span>
+            <span style={s.itemDate}>{fmtDateTime(comment.createdAt)}</span>
+            <Tag icon="map-pin">{spotName}{spotCity ? ` · ${spotCity}` : ''}</Tag>
+            {flag && <StatusPill tone={flag.tone} icon={flag.icon}>{flag.label}</StatusPill>}
             {flagStatus === 'pending' && comment.proposedAction && (
-              <span style={s.suggestPill}>Suggested: {ACTION_LABELS[comment.proposedAction] || comment.proposedAction}</span>
+              <Tag>Suggested: {ACTION_LABELS[comment.proposedAction] || comment.proposedAction}</Tag>
             )}
           </div>
-          <p style={s.commentText}>{comment.comment}</p>
-          <div style={s.reactRow}>
-            <span style={s.react}><Icon name="thumbs-up" size={11} /> {comment.likes || 0}</span>
-            <span style={s.react}><Icon name="thumbs-down" size={11} /> {comment.dislikes || 0}</span>
+          <p style={s.itemText}>{comment.comment}</p>
+          <div style={s.itemFacts}>
+            <span style={s.itemFact}><Icon name="thumbs-up" size={12} /> {comment.likes || 0}</span>
+            <span style={s.itemFact}><Icon name="thumbs-down" size={12} /> {comment.dislikes || 0}</span>
           </div>
         </div>
 
-        {!isModerator && (
-          <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
-            <button onClick={(e) => { e.stopPropagation(); onToggle(); }} style={s.btnBanToggle} className="modern-btn">
-              <Icon name="slash" size={12} /> Suspend / Ban
-            </button>
-            <button onClick={(e) => { e.stopPropagation(); remove(); }} disabled={saving} style={s.btnDelete} className="modern-btn">
-              <Icon name="trash" size={12} /> Delete
-            </button>
+        {isModerator ? (
+          canRequest && (
+            <div style={s.itemSide}>
+              <Button size="sm" icon={expanded ? 'chevron-up' : 'flag'} onClick={onToggle}>
+                {expanded ? 'Close' : 'Flag for admin'}
+              </Button>
+            </div>
+          )
+        ) : (
+          <div style={s.itemSide}>
+            <Button size="sm" icon={expanded ? 'chevron-up' : 'slash'} onClick={onToggle}>
+              {expanded ? 'Close' : 'Suspend / ban'}
+            </Button>
+            <Button size="sm" variant="danger" icon="trash" disabled={saving} onClick={remove}>
+              Delete
+            </Button>
           </div>
         )}
       </div>
 
       {expanded && canRequest && (
         <div style={s.panel}>
-          <p style={s.panelLabel}>Reason for admin review</p>
+          <p style={s.panelLabel}>Why should an admin look at this review?</p>
           <textarea
             value={reason}
             onChange={e => setReason(e.target.value)}
-            placeholder="Why should admin look at this comment?"
+            placeholder="e.g. Insults another traveler by name"
             style={s.textarea}
             className="modern-input"
             rows={2}
           />
-          <p style={{ ...s.panelLabel, marginTop: 10 }}>Suggested action (admin has final say)</p>
+          <p style={{ ...s.panelLabel, marginTop: 12 }}>Suggested action (the admin has the final say)</p>
           <select
             value={proposedAction}
             onChange={e => setProposedAction(e.target.value)}
             style={s.select}
             className="modern-input"
           >
-            <option value="">No account action — just review the comment</option>
-            <option value="warn">Warn (mute comments temporarily)</option>
+            <option value="">No account action — just look at the review</option>
+            <option value="warn">Warn (mute reviews temporarily)</option>
             <option value="suspend">Suspend account</option>
           </select>
-          <div style={s.actions}>
-            <button disabled={saving} onClick={requestReview} style={{ ...s.btn, ...s.btnPrimary, opacity: saving ? 0.6 : 1 }} className="modern-btn">
+          <div style={s.buttonRow}>
+            <Button variant="primary" icon="send" disabled={saving} onClick={requestReview}>
               Send to admin
-            </button>
+            </Button>
           </div>
         </div>
       )}
 
       {expanded && !isModerator && (
         <div style={s.panel}>
-          <p style={s.panelLabel}>Reason (visible on the user's appeal if they submit one)</p>
+          <p style={s.panelLabel}>Reason (shown on the traveler&rsquo;s appeal if they send one)</p>
           <textarea
             value={banReason}
             onChange={e => setBanReason(e.target.value)}
@@ -269,58 +291,20 @@ function CommentRow({ comment, isModerator, expanded, onToggle, onUpdated }) {
             className="modern-input"
             rows={2}
           />
-          <p style={s.escalationNote}>
+          <p style={s.panelNote}>
             Suspend applies the next escalation step automatically — 1st = 7 days, 2nd = 14 days,
-            3rd auto-escalates to a permanent ban. Ban skips straight to permanent.
+            3rd becomes a permanent ban. Ban skips straight to permanent.
           </p>
-
-          <div style={s.actions}>
-            <button disabled={saving} onClick={suspendUser} style={{ ...s.btn, ...s.btnWarn, opacity: saving ? 0.6 : 1 }} className="modern-btn">
-              <Icon name="clock" size={12} /> Suspend
-            </button>
-            <button disabled={saving} onClick={banUser} style={{ ...s.btn, ...s.btnDanger, opacity: saving ? 0.6 : 1 }} className="modern-btn">
-              <Icon name="slash" size={12} /> Ban Permanently
-            </button>
+          <div style={s.buttonRow}>
+            <Button variant="warning" icon="clock" disabled={saving} onClick={suspendUser}>
+              Suspend
+            </Button>
+            <Button variant="dangerSolid" icon="slash" disabled={saving} onClick={banUser}>
+              Ban permanently
+            </Button>
           </div>
         </div>
       )}
     </div>
   );
 }
-
-const s = {
-  // Page shell, header, toolbar, states and table cells come from
-  // components/Layout so every page is spaced identically.
-  ...pageStyles,
-  // Page-specific: the shared card has no padding, overflow or margin,
-  // because those differ by how each page uses a card.
-  card: { background: t.cardBg, border: `1px solid ${t.border}`, borderRadius: radius.xl, marginBottom: 12, overflow: 'hidden', boxShadow: shadow.sm },
-  totalBadge: { fontSize: 13, color: t.textMuted, fontWeight: 500, paddingTop: 4 },
-
-
-  cardTop:    { display: 'flex', alignItems: 'flex-start', gap: 14, padding: '16px 18px', cursor: 'pointer' },
-  metaRow:    { display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 6 },
-  userName:   { fontSize: 14, fontWeight: 700, color: t.textPrimary },
-  dateText:   { fontSize: 12, color: t.textMuted },
-  locPill:    { padding: '3px 10px', background: t.sidebarBg, border: `1px solid ${t.border}`, borderRadius: 20, fontSize: 11, fontWeight: 500, color: t.textSecondary },
-  statusPill: { padding: '3px 10px', borderRadius: 6, fontSize: 10, fontWeight: 700, letterSpacing: '0.03em' },
-  suggestPill:{ padding: '3px 10px', borderRadius: 6, fontSize: 10, fontWeight: 700, letterSpacing: '0.02em', background: t.warningBg, color: t.warning },
-  commentText:{ fontSize: 14, color: t.textSecondary, lineHeight: 1.5, margin: '2px 0 8px' },
-  reactRow:   { display: 'flex', gap: 14 },
-  react:      { fontSize: 12, color: t.textMuted },
-
-  btnBanToggle: { padding: '7px 14px', background: t.warningBg, color: t.warning, border: 'none', borderRadius: 8, fontWeight: 600, fontSize: 12, cursor: 'pointer', whiteSpace: 'nowrap' },
-  btnDelete:  { padding: '7px 14px', background: t.dangerBg, color: t.danger, border: 'none', borderRadius: 8, fontWeight: 600, fontSize: 12, cursor: 'pointer', whiteSpace: 'nowrap' },
-
-  panel:      { borderTop: `1px solid ${t.divider}`, padding: '14px 18px 18px', background: t.sidebarBg },
-  panelLabel: { fontSize: 12, fontWeight: 600, color: t.textPrimary, margin: '0 0 6px' },
-  textarea:   { width: '100%', padding: '9px 12px', borderRadius: 8, border: `1.5px solid ${t.border}`, fontSize: 13, color: t.textPrimary, background: t.cardBg, resize: 'vertical', outline: 'none', boxSizing: 'border-box' },
-  select:     { width: '100%', padding: '9px 12px', borderRadius: 8, border: `1.5px solid ${t.border}`, fontSize: 13, color: t.textPrimary, background: t.cardBg, outline: 'none', boxSizing: 'border-box', cursor: 'pointer' },
-  escalationNote: { fontSize: 11.5, color: t.textMuted, lineHeight: 1.5, margin: '10px 0 0' },
-  actions:    { display: 'flex', gap: 8, marginTop: 10 },
-  btn:        { padding: '8px 18px', borderRadius: 8, fontWeight: 600, fontSize: 13, cursor: 'pointer', border: 'none' },
-  btnPrimary: { background: t.accent, color: t.onAccent, fontWeight: 700 },
-  btnWarn:    { background: t.warningBg, color: t.warning },
-  btnDanger:  { background: t.dangerBg, color: t.danger },
-
-};
