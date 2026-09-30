@@ -353,8 +353,8 @@ export default function ModRequests() {
     <div style={s.page}>
       <div style={s.pageHeader}>
         <div>
-          <h1 style={s.pageTitle}>Mod Requests</h1>
-          <p style={s.pageSub}>Account actions, spot edit/deletion proposals, and food mission locations submitted by moderators</p>
+          <h1 style={s.pageTitle}>Approval Queue</h1>
+          <p style={s.pageSub}>New spots, spot edits and deletions, food mission locations and account actions from moderators — nothing goes live until you approve it.</p>
         </div>
         <span style={s.totalBadge}>{requests.length} total</span>
       </div>

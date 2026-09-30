@@ -9,15 +9,63 @@ import { clearSession } from '../auth/session';
  *
  * Responsive behaviour lives in App.css keyed off `.admin-sidebar`, because
  * inline styles can't express a media query:
- *   > 1100px  full 240px rail with labels
+ *   > 1100px  full 248px rail with labels
  *   ≤ 1100px  68px icon rail — labels are visually hidden, NOT removed, so
  *             screen readers still announce them
  *   ≤ 720px   horizontal bar across the top
  */
+
+// Grouped by what the work IS rather than listed flat. Names say what the page
+// holds in plain words — "Approval Queue", not "Mod Requests"; "Reviews &
+// Feedback", because the app calls them reviews — and each page's heading
+// uses the same name, so the link and the page it opens always agree.
+//
+// Paths are unchanged from before the rename, so bookmarks keep working.
+const ADMIN_NAV = [
+  { group: 'Overview', items: [
+    { label: 'Dashboard',          path: '/dashboard',         icon: 'grid' },
+  ] },
+  { group: 'Content', items: [
+    { label: 'Spot Management',    path: '/spots',             icon: 'map-pin' },
+    { label: 'Approval Queue',     path: '/mod-requests',      icon: 'inbox' },
+  ] },
+  { group: 'Community', items: [
+    { label: 'Reviews & Feedback', path: '/comments',          icon: 'message-square' },
+    { label: 'Reported Reviews',   path: '/reported-comments', icon: 'flag' },
+  ] },
+  { group: 'Travelers', items: [
+    { label: 'Traveler Progress',  path: '/user-progress',     icon: 'award' },
+    { label: 'Inactive Accounts',  path: '/inactive-users',    icon: 'clock' },
+    { label: 'Suspensions & Bans', path: '/banned-accounts',   icon: 'slash' },
+  ] },
+];
+
+// Moderators previously saw only two links, although three more pages were
+// already built for them (their routes allow it and the backend serves them):
+// Reviews & Feedback — which is where a moderator flags a review for an admin
+// — Traveler Progress, and Inactive Accounts. They're now reachable.
+const MODERATOR_NAV = [
+  { group: 'Overview', items: [
+    { label: 'Dashboard',          path: '/dashboard',          icon: 'grid' },
+  ] },
+  { group: 'Content', items: [
+    { label: 'Spot Management',    path: '/spots',              icon: 'map-pin' },
+    { label: 'My Submissions',     path: '/my-review-requests', icon: 'send' },
+  ] },
+  { group: 'Community', items: [
+    { label: 'Reviews & Feedback', path: '/comments',           icon: 'message-square' },
+  ] },
+  { group: 'Travelers', items: [
+    { label: 'Traveler Progress',  path: '/user-progress',      icon: 'award' },
+    { label: 'Inactive Accounts',  path: '/inactive-users',     icon: 'clock' },
+  ] },
+];
+
 export default function Navbar() {
   const navigate = useNavigate();
   const location = useLocation();
   const role     = localStorage.getItem('role');
+  const city     = localStorage.getItem('city') || '';
   const [pref, setPref] = useThemePref();
 
   const logout = () => {
@@ -26,24 +74,8 @@ export default function Navbar() {
   };
 
   const isModerator = role === 'moderator';
-
-  const navItems = isModerator
-    ? [
-        //Moderator
-        { label: 'Spots',           path: '/spots',              icon: 'map-pin' },
-        { label: 'Review Requests', path: '/my-review-requests', icon: 'edit' },
-      ]
-    : [
-        //Admin
-        { label: 'Requests',          path: '/mod-requests',     icon: 'hand' },
-        { label: 'Comments',          path: '/comments',         icon: 'thumbs-up' },
-        { label: 'Reported Comments', path: '/reported-comments',icon: 'flag' },
-        { label: 'Banned Accounts',   path: '/banned-accounts',  icon: 'slash' },
-        { label: 'Inactive Users',    path: '/inactive-users',   icon: 'clock' },
-        { label: 'User Progress',     path: '/user-progress',    icon: 'star' },
-      ];
-
-  const home = isModerator ? '/spots' : '/mod-requests';
+  const nav = isModerator ? MODERATOR_NAV : ADMIN_NAV;
+  const home = '/dashboard';
 
   const themeOptions = [
     { key: 'light',  label: 'Light',  icon: 'sun' },
@@ -53,60 +85,75 @@ export default function Navbar() {
 
   return (
     <nav className="admin-sidebar" style={s.sidebar} aria-label="Main">
+      {/* The one bold surface in the panel: solid brand teal under a capiz
+          window lattice — the shell-paned windows of Bulacan's heritage
+          houses — so the console has a face of its own instead of a logo
+          floating on a grey rail. */}
       <div
-        className="sidebar-brand"
+        className="sidebar-brand capiz-lattice"
         style={s.brand}
         onClick={() => navigate(home)}
         role="button"
         tabIndex={0}
         onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate(home); } }}
-        aria-label="Libot Admin — go to home"
+        aria-label={`Libot ${isModerator ? 'Moderator' : 'Admin'} Console — go to dashboard`}
       >
         <img src={logo} alt="" style={s.logo} />
-        <div className="sidebar-text">
+        <div className="sidebar-text" style={s.brandText}>
           <div style={s.brandName}>Libot</div>
+          <div style={s.brandSub}>{isModerator ? 'Moderator Console' : 'Admin Console'}</div>
         </div>
       </div>
 
-      <div className="sidebar-section" style={s.roleSection}>
-        <p className="sidebar-text" style={s.roleLabel}>Role</p>
+      <div className="sidebar-section sidebar-identity" style={s.identity}>
         <span style={{ ...s.rolePill, ...(isModerator ? s.rolePillMod : s.rolePillAdmin) }}>
-          {isModerator ? 'MOD' : 'ADMIN'}
+          <span style={{ ...s.roleDot, background: isModerator ? t.info : t.brand }} aria-hidden="true" />
+          {isModerator ? 'Moderator' : 'Admin'}
+        </span>
+        <span className="sidebar-text" style={s.scope}>
+          {isModerator ? (city || 'No city assigned') : 'All of Bulacan'}
         </span>
       </div>
 
       <div className="sidebar-section" style={s.navSection}>
-        <p className="nav-label" style={s.navLabel}>Navigation</p>
-        <div className="sidebar-links" style={s.links}>
-          {navItems.map(item => {
-            const active = location.pathname === item.path;
-            return (
-              <button
-                key={item.path}
-                onClick={() => navigate(item.path)}
-                className="nav-link-btn"
-                // aria-current is how a screen reader knows which page it's on.
-                // The colour + left border said it visually and nothing said it
-                // otherwise.
-                aria-current={active ? 'page' : undefined}
-                title={item.label}
-                style={{ ...s.link, ...(active ? s.linkActive : {}) }}
-              >
-                <span style={s.linkInner}>
-                  <Icon name={item.icon} size={15} color={active ? t.brand : 'currentColor'} />
-                  <span className="sidebar-text">{item.label}</span>
-                </span>
-                {active && <span className="sidebar-text" style={s.linkChevron} aria-hidden="true">›</span>}
-              </button>
-            );
-          })}
+        <div className="nav-groups" style={s.groups}>
+          {nav.map((section) => (
+            <div key={section.group} className="nav-group" style={s.group}>
+              <p className="nav-label" style={s.navLabel}>{section.group}</p>
+              <div className="sidebar-links" style={s.links}>
+                {section.items.map((item) => {
+                  const active = location.pathname === item.path;
+                  return (
+                    <button
+                      key={item.path}
+                      onClick={() => navigate(item.path)}
+                      className="nav-link-btn"
+                      // aria-current is how a screen reader knows which page
+                      // it's on; the filled pill only says it visually.
+                      aria-current={active ? 'page' : undefined}
+                      title={item.label}
+                      style={{ ...s.link, ...(active ? s.linkActive : {}) }}
+                    >
+                      <Icon
+                        name={item.icon}
+                        size={16}
+                        color={active ? t.onBrandSolid : 'currentColor'}
+                        weight={active ? 'fill' : 'regular'}
+                      />
+                      <span className="sidebar-text">{item.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
         </div>
       </div>
 
       <div className="sidebar-footer" style={s.footer}>
         {/* Three-way, matching the mobile app's Settings control. "System"
             follows the OS rather than pinning a choice. */}
-        <div style={s.themeRow} role="radiogroup" aria-label="Colour theme">
+        <div className="theme-row" style={s.themeRow} role="radiogroup" aria-label="Colour theme">
           {themeOptions.map((o) => {
             const on = pref === o.key;
             return (
@@ -125,11 +172,10 @@ export default function Navbar() {
           })}
         </div>
 
-        <button onClick={logout} className="logout-btn" style={s.logoutBtn} title="Logout">
+        <button onClick={logout} className="logout-btn" style={s.logoutBtn} title="Sign out">
           <Icon name="log-out" size={14} />
-          <span className="sidebar-text">Logout</span>
+          <span className="sidebar-text">Sign out</span>
         </button>
-        <p className="sidebar-version" style={s.versionText}>v1.0 · Libot Admin</p>
       </div>
     </nav>
   );
@@ -137,40 +183,49 @@ export default function Navbar() {
 
 const s = {
   sidebar: {
-    display: 'flex', flexDirection: 'column', width: 240, minWidth: 240,
+    display: 'flex', flexDirection: 'column', width: 248, minWidth: 248,
     // dvh, not vh: on mobile browsers vh includes the collapsing URL bar, so a
     // 100vh rail is taller than the visible viewport and clips its own footer.
     height: '100dvh',
     background: t.sidebarBg, borderRight: `1px solid ${t.divider}`,
     position: 'sticky', top: 0, flexShrink: 0,
-    boxShadow: shadow.sm,
   },
-  brand: { display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', padding: '20px 20px 18px' },
-  logo: { width: 42, height: 42, objectFit: 'contain', flexShrink: 0, borderRadius: radius.md },
-  brandName: { fontFamily: fonts.display, color: t.textPrimary, fontWeight: 600, fontSize: 19, lineHeight: 1.2, letterSpacing: '-0.01em' },
 
-  roleSection: { padding: '4px 20px 16px', borderBottom: `1px solid ${t.divider}` },
-  roleLabel:   { fontSize: 10, fontWeight: 700, color: t.textMuted, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 },
-  rolePill:    { display: 'inline-block', padding: '5px 14px', borderRadius: radius.pill, fontSize: 12, fontWeight: 700, letterSpacing: '0.03em' },
+  brand: {
+    display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer',
+    margin: 12, padding: '18px 16px', borderRadius: radius.xl,
+    backgroundColor: t.brandSolid, boxShadow: shadow.md,
+  },
+  logo: { width: 40, height: 40, objectFit: 'contain', flexShrink: 0, borderRadius: radius.md },
+  brandText: { minWidth: 0 },
+  brandName: { fontFamily: fonts.display, color: t.onBrandSolid, fontWeight: 600, fontSize: 24, lineHeight: 1.05, letterSpacing: '-0.015em' },
+  // nowrap: "Moderator Console" must stay one line in the 248px rail.
+  brandSub:  { marginTop: 4, color: t.onBrandSolidMuted, fontSize: 10, fontWeight: 700, letterSpacing: '0.09em', textTransform: 'uppercase', whiteSpace: 'nowrap' },
+
+  identity: { display: 'flex', alignItems: 'center', gap: 10, padding: '2px 20px 14px', flexWrap: 'wrap' },
+  rolePill: { display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 10px', borderRadius: radius.pill, fontSize: 11.5, fontWeight: 700, letterSpacing: '0.02em' },
   rolePillMod:   { background: t.infoBg, color: t.info },
-  rolePillAdmin: { background: t.brandSolid, color: '#fff' },
+  rolePillAdmin: { background: t.brandSoft, color: t.brand },
+  roleDot: { width: 6, height: 6, borderRadius: '50%', flexShrink: 0 },
+  scope: { fontSize: 12, color: t.textMuted, fontWeight: 500, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
 
-  navSection: { padding: '18px 14px', overflowY: 'auto' },
-  navLabel:   { fontSize: 10, fontWeight: 700, color: t.textMuted, textTransform: 'uppercase', letterSpacing: '0.08em', margin: '0 8px 10px' },
+  navSection: { padding: '6px 12px 12px', overflowY: 'auto', borderTop: `1px solid ${t.divider}` },
+  groups:     { display: 'flex', flexDirection: 'column', gap: 14, paddingTop: 12 },
+  group:      { display: 'flex', flexDirection: 'column', gap: 4 },
+  navLabel:   { fontSize: 10.5, fontWeight: 700, color: t.textMuted, textTransform: 'uppercase', letterSpacing: '0.1em', margin: '0 10px 2px' },
   links:      { display: 'flex', flexDirection: 'column', gap: 2 },
   link: {
-    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+    display: 'flex', alignItems: 'center', gap: 11,
     textAlign: 'left', padding: '9px 12px', borderRadius: radius.md, border: 'none',
-    borderLeft: '3px solid transparent',
     background: 'transparent', color: t.textSecondary, fontWeight: 500, fontSize: 13.5,
-    cursor: 'pointer', transition: 'all 0.15s', width: '100%', fontFamily: 'inherit',
-    minHeight: 38,
+    cursor: 'pointer', transition: 'background 0.15s, color 0.15s', width: '100%', fontFamily: 'inherit',
+    minHeight: 40,
   },
-  linkInner:   { display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 },
-  linkActive:  { background: t.brandSoft, color: t.textPrimary, fontWeight: 600, borderLeft: `3px solid ${t.brand}` },
-  linkChevron: { color: t.brand, fontSize: 16, lineHeight: 1 },
+  // A filled pill, not a tint: the current page is the one thing in the rail
+  // that should be unmistakable at a glance.
+  linkActive: { background: t.brandSolid, color: t.onBrandSolid, fontWeight: 600, boxShadow: shadow.sm },
 
-  footer: { marginTop: 'auto', padding: '14px 20px 20px', borderTop: `1px solid ${t.divider}` },
+  footer: { marginTop: 'auto', padding: '14px 16px 18px', borderTop: `1px solid ${t.divider}` },
 
   themeRow: {
     display: 'flex', gap: 4, padding: 3, marginBottom: 10,
@@ -186,9 +241,8 @@ const s = {
   logoutBtn: {
     display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
     padding: '9px 14px', borderRadius: radius.md,
-    border: `1px solid ${t.border}`, background: 'transparent', color: t.textMuted,
-    fontSize: 13, fontWeight: 500, cursor: 'pointer', width: '100%',
-    transition: 'all 0.15s', fontFamily: 'inherit', minHeight: 38,
+    border: `1px solid ${t.border}`, background: 'transparent', color: t.textSecondary,
+    fontSize: 13, fontWeight: 600, cursor: 'pointer', width: '100%',
+    transition: 'all 0.15s', fontFamily: 'inherit', minHeight: 40,
   },
-  versionText: { fontSize: 10.5, color: t.textMuted, textAlign: 'center', marginTop: 10 },
 };

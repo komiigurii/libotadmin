@@ -58,6 +58,13 @@ export const theme = {
   flaggedBg:     'var(--flagged-bg)',
   purple:        'var(--purple)',
   purpleBg:      'var(--purple-bg)',
+
+  onBrandSolid:      'var(--on-brand-solid)',
+  onBrandSolidMuted: 'var(--on-brand-solid-muted)',
+  lattice:           'var(--lattice)',
+  // Chart marks only — see index.css for why these aren't --brand.
+  data1:             'var(--data-1)',
+  data1Track:        'var(--data-1-track)',
 };
 
 export const radius = {

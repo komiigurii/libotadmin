@@ -227,8 +227,8 @@ export default function MyReviewRequests() {
     <div style={s.page}>
       <div style={s.pageHeader}>
         <div>
-          <h1 style={s.pageTitle}>My Review Requests</h1>
-          <p style={s.pageSub}>Spot edits and account actions you've submitted</p>
+          <h1 style={s.pageTitle}>My Submissions</h1>
+          <p style={s.pageSub}>Spot changes and account actions you&rsquo;ve sent for admin approval, and where each one stands.</p>
         </div>
       </div>
 
