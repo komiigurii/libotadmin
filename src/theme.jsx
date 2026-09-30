@@ -61,6 +61,7 @@ export const theme = {
 
   onBrandSolid:      'var(--on-brand-solid)',
   onBrandSolidMuted: 'var(--on-brand-solid-muted)',
+  onBrandSolidSoft:  'var(--on-brand-solid-soft)',  // a light wash ON solid teal (counts in the active filter tab)
   lattice:           'var(--lattice)',
   // Chart marks only — see index.css for why these aren't --brand.
   data1:             'var(--data-1)',

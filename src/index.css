@@ -68,6 +68,7 @@
      brand block). White clears 5.9:1 on #0A6F78. */
   --on-brand-solid:       #FFFFFF;
   --on-brand-solid-muted: rgba(255,255,255,0.86);
+  --on-brand-solid-soft:  rgba(255,255,255,0.22);
   /* The capiz-window lattice drawn over solid teal — decoration only. */
   --lattice:         rgba(255,255,255,0.10);
 
@@ -133,6 +134,7 @@
 
     --on-brand-solid:       #FFFFFF;
     --on-brand-solid-muted: rgba(255,255,255,0.96); /* 0.86 was 4.19:1 on the darker-mode teal */
+    --on-brand-solid-soft:  rgba(255,255,255,0.22);
     --lattice:         rgba(255,255,255,0.08);
     --data-1:          #12A7B5;
     --data-1-track:    rgba(18,167,181,0.20);
@@ -189,6 +191,7 @@
 
   --on-brand-solid:       #FFFFFF;
   --on-brand-solid-muted: rgba(255,255,255,0.96); /* 0.86 was 4.19:1 on the darker-mode teal */
+  --on-brand-solid-soft:  rgba(255,255,255,0.22);
   --lattice:         rgba(255,255,255,0.08);
   --data-1:          #12A7B5;
   --data-1-track:    rgba(18,167,181,0.20);

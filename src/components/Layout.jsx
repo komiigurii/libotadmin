@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { theme as t, radius, shadow, type } from '../theme';
 import Icon from './Icon';
 
@@ -49,11 +50,16 @@ export function Page({ children, wide = false }) {
 }
 
 /* ── Page header ──────────────────────────────────────────────────
-   Title, one-line description, and an optional action on the right. */
-export function PageHeader({ title, subtitle, count, actions }) {
+   Title, one-line description, and an optional action on the right.
+   EVERY page uses this — the count sits in the pill beside the title (not as
+   "6 total" text on one page and "9 shown" on another), and actions sit on
+   the right. `eyebrow` is the small line above the title (the dashboard's
+   greeting). */
+export function PageHeader({ title, subtitle, count, actions, eyebrow }) {
   return (
     <div style={s.header}>
       <div style={{ minWidth: 0 }}>
+        {eyebrow && <p style={s.eyebrow}>{eyebrow}</p>}
         <div style={s.titleRow}>
           <h1 style={s.title}>{title}</h1>
           {count != null && (
@@ -226,10 +232,143 @@ export function SpotThumb({ src, size = 38, radius: r = 10 }) {
 export function Pill({ children, color = t.textSecondary, background = t.brandSoft, icon }) {
   return (
     <span style={{ ...s.pill, color, background }}>
-      {icon && <Icon name={icon} size={10} />}
+      {icon && <Icon name={icon} size={11} weight="bold" />}
       {children}
     </span>
   );
+}
+
+/* ── Status ───────────────────────────────────────────────────────
+   Pages used to pick their own status colours — "Pending" was purple on the
+   Approval Queue and amber on My Submissions, uppercase on one and title case
+   on the other. Tones are named once here; a status is a tone + icon + word,
+   never colour alone. */
+const TONES = {
+  neutral: { color: t.textSecondary, background: t.sidebarBg },
+  brand:   { color: t.brand,   background: t.brandSoft },
+  info:    { color: t.info,    background: t.infoBg },
+  success: { color: t.success, background: t.successBg },
+  warning: { color: t.warning, background: t.warningBg },
+  danger:  { color: t.danger,  background: t.dangerBg },
+};
+
+// The one approval vocabulary, shared by the Approval Queue, My Submissions,
+// the dashboard and anything else with a pending → approved/rejected life.
+const APPROVAL_STATUS = {
+  pending:  { tone: 'warning', icon: 'clock', label: 'Pending' },
+  approved: { tone: 'success', icon: 'check', label: 'Approved' },
+  rejected: { tone: 'danger',  icon: 'x',     label: 'Rejected' },
+};
+
+export function StatusPill({ tone = 'neutral', icon, children }) {
+  const c = TONES[tone] || TONES.neutral;
+  return <Pill color={c.color} background={c.background} icon={icon}>{children}</Pill>;
+}
+
+export function ApprovalPill({ status }) {
+  const st = APPROVAL_STATUS[status] || APPROVAL_STATUS.pending;
+  return <StatusPill tone={st.tone} icon={st.icon}>{st.label}</StatusPill>;
+}
+
+/* ── Tag ──────────────────────────────────────────────────────────
+   A neutral, outlined label for WHAT something is (a category, a request
+   type, a place) — as opposed to StatusPill, which says what STATE it's in. */
+export function Tag({ children, icon, tone }) {
+  const danger = tone === 'danger';
+  return (
+    <span style={{ ...s.tag, ...(danger ? s.tagDanger : null) }}>
+      {icon && <Icon name={icon} size={11} />}
+      {children}
+    </span>
+  );
+}
+
+/* ── Button ───────────────────────────────────────────────────────
+   One button. There were ~20 hand-rolled ones: five paddings, three radii,
+   font sizes from 11 to 14, and a yellow "Refresh" — yellow is reserved for
+   the one primary action on a screen.
+     primary      yellow — the main thing to do here (Add spot, Send)
+     secondary    outlined — everything neutral (Refresh, Cancel, View)
+     success      soft green — approve / agree
+     danger       soft red — reject / delete
+     dangerSolid  solid red — irreversible (ban permanently)
+   Border colour is a longhand so a variant can override it cleanly. */
+export function Button({ variant = 'secondary', size = 'md', icon, children, style, type = 'button', ...rest }) {
+  const off = !!rest.disabled;
+  return (
+    <button
+      type={type}
+      className="modern-btn"
+      style={{ ...s.btn, ...s.btnSize[size], ...s.btnVariant[variant], ...(off ? s.btnOff : null), ...style }}
+      {...rest}
+    >
+      {icon && <Icon name={icon} size={size === 'sm' ? 12 : 14} />}
+      {children}
+    </button>
+  );
+}
+
+/* ── Filter tabs ──────────────────────────────────────────────────
+   Status filters were <select> dropdowns, sized differently on each page.
+   A segmented row shows every option and its count at once, and switching is
+   one click. aria-pressed tells a screen reader which one is on. */
+export function FilterTabs({ options, value, onChange, label = 'Filter' }) {
+  return (
+    <div role="group" aria-label={label} style={s.filterTabs}>
+      {options.map((o) => {
+        const on = o.value === value;
+        return (
+          <button
+            key={o.value}
+            type="button"
+            aria-pressed={on}
+            onClick={() => onChange(o.value)}
+            style={{ ...s.filterTab, ...(on ? s.filterTabOn : null) }}
+          >
+            {o.label}
+            {o.count != null && <span style={{ ...s.filterCount, ...(on ? s.filterCountOn : null) }}>{o.count}</span>}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/* ── Stat ─────────────────────────────────────────────────────────
+   A headline figure: label · value · one line of context. Shared by the
+   dashboard and Traveler Progress so a number looks the same wherever it is.
+   With `to`, the whole tile links to the page behind the number. Values are
+   proportional figures in the sans — tabular-nums look loose at this size. */
+// `emphasis` is the condition itself (e.g. `waiting > 0`), not a flag to
+// re-derive from `value` — values arrive formatted ("1,284"), which don't
+// parse back to numbers.
+export function Stat({ label, value, hint, icon, to, emphasis }) {
+  const on = !!emphasis;
+  const body = (
+    <>
+      {(icon || to) && (
+        <div style={s.statTop}>
+          {icon && <span style={{ ...s.statIcon, ...(on ? s.statIconOn : null) }}><Icon name={icon} size={16} /></span>}
+          {to && <span style={s.statChevron}><Icon name="chevron-right" size={13} /></span>}
+        </div>
+      )}
+      <div style={s.statValue}>{value ?? '—'}</div>
+      <div style={s.statLabel}>{label}</div>
+      {hint && <div style={{ ...s.statHint, ...(on ? { color: t.textSecondary } : null) }}>{hint}</div>}
+    </>
+  );
+  const style = { ...s.stat, ...(on ? s.statOn : null) };
+  return to
+    ? <Link to={to} className="dash-link" style={style}>{body}</Link>
+    : <div style={style}>{body}</div>;
+}
+
+/* ── List ─────────────────────────────────────────────────────────
+   Item cards (a review, a request, a report) sit in one of these, 12px
+   apart. They used to be direct children of the page with their own bottom
+   margin, which stacked on top of the page gap. */
+export function List({ children }) {
+  return <div style={s.list}>{children}</div>;
 }
 
 /* ── Shared style objects ─────────────────────────────────────────
@@ -329,6 +468,122 @@ const base = {
     padding: '3px 10px', borderRadius: radius.pill,
     fontSize: 11.5, fontWeight: 700, letterSpacing: '0.02em', whiteSpace: 'nowrap',
   },
+  tag: {
+    display: 'inline-flex', alignItems: 'center', gap: 5,
+    padding: '2px 9px', borderRadius: radius.pill,
+    borderWidth: 1, borderStyle: 'solid', borderColor: t.border,
+    background: t.sidebarBg, color: t.textSecondary,
+    fontSize: 11.5, fontWeight: 600, whiteSpace: 'nowrap',
+  },
+  tagDanger: { background: t.dangerBg, borderColor: t.dangerBorder, color: t.danger },
+
+  eyebrow: { ...type.label, color: t.textMuted, margin: '0 0 6px' },
+
+  // ── Button ──
+  btn: {
+    display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+    borderRadius: radius.md, borderWidth: 1, borderStyle: 'solid', borderColor: 'transparent',
+    fontFamily: 'inherit', fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
+  },
+  btnSize: {
+    md: { padding: '8px 15px', fontSize: 13, minHeight: 36 },
+    sm: { padding: '5px 11px', fontSize: 12, minHeight: 30 },
+  },
+  btnVariant: {
+    primary:     { background: t.accent,    color: t.onAccent, fontWeight: 700, boxShadow: shadow.sm },
+    secondary:   { background: t.cardBg,    color: t.textPrimary, borderColor: t.border },
+    subtle:      { background: t.brandSoft, color: t.brand },
+    success:     { background: t.successBg, color: t.success },
+    danger:      { background: t.dangerBg,  color: t.danger },
+    dangerSolid: { background: t.danger,    color: t.onDanger },
+    warning:     { background: t.warningBg, color: t.warning },
+  },
+  btnOff: { opacity: 0.55, cursor: 'not-allowed' },
+
+  // ── Filter tabs ──
+  filterTabs: {
+    display: 'inline-flex', flexWrap: 'wrap', gap: 2, padding: 3,
+    background: t.cardBg, borderWidth: 1, borderStyle: 'solid', borderColor: t.border, borderRadius: radius.md,
+  },
+  filterTab: {
+    display: 'inline-flex', alignItems: 'center', gap: 7, padding: '6px 12px',
+    border: 'none', borderRadius: radius.sm, background: 'transparent',
+    color: t.textSecondary, fontFamily: 'inherit', fontSize: 13, fontWeight: 600, cursor: 'pointer',
+  },
+  // Same language as the sidebar's current-page pill.
+  filterTabOn:   { background: t.brandSolid, color: t.onBrandSolid },
+  filterCount:   { fontSize: 11, fontWeight: 700, padding: '0 6px', borderRadius: radius.pill, background: t.sidebarBg, color: t.textSecondary, lineHeight: '17px' },
+  filterCountOn: { background: t.onBrandSolidSoft, color: t.onBrandSolid },
+
+  // ── Stat ──
+  stat: {
+    display: 'flex', flexDirection: 'column', padding: '16px 18px', borderRadius: radius.lg,
+    backgroundColor: t.cardBg, borderWidth: 1, borderStyle: 'solid', borderColor: t.border, boxShadow: shadow.sm,
+    color: 'inherit', textDecoration: 'none', minWidth: 0,
+  },
+  // Only a figure that asks for action ("Waiting on you") earns the accent,
+  // and only while it's above zero.
+  statOn:      { borderColor: t.accent, backgroundImage: `linear-gradient(${t.accentBg}, ${t.accentBg})` },
+  statTop:     { display: 'flex', alignItems: 'center', marginBottom: 12 },
+  statIcon:    { width: 34, height: 34, borderRadius: radius.md, display: 'flex', alignItems: 'center', justifyContent: 'center', background: t.brandSoft, color: t.brand },
+  statIconOn:  { background: t.accent, color: t.onAccent },
+  statChevron: { marginLeft: 'auto', color: t.textMuted, display: 'inline-flex' },
+  statValue:   { fontSize: 30, fontWeight: 650, letterSpacing: '-0.02em', lineHeight: 1, color: t.textPrimary },
+  statLabel:   { fontSize: 13, fontWeight: 600, color: t.textPrimary, marginTop: 8 },
+  statHint:    { fontSize: 12, color: t.textMuted, marginTop: 3 },
+  statGrid:    { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 14 },
+
+  // ── List + item card ──
+  // The one layout for "a thing to review": media on the left, title row with
+  // date and pills, body text, small facts, then an optional tinted panel
+  // for the form/actions. Reviews, reports, approval requests and a
+  // moderator's own submissions all use it.
+  list:      { display: 'flex', flexDirection: 'column', gap: 12 },
+  item:      { background: t.cardBg, border: `1px solid ${t.border}`, borderRadius: radius.lg, boxShadow: shadow.sm, overflow: 'hidden' },
+  // Wraps: on a narrow screen the side buttons drop under the text instead of
+  // squeezing it into a sliver.
+  itemTop:   { display: 'flex', alignItems: 'flex-start', gap: 14, padding: '16px 18px', flexWrap: 'wrap' },
+  itemMain:  { flex: '1 1 260px', minWidth: 0 },
+  itemMeta:  { display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
+  itemTitle: { fontSize: 14, fontWeight: 700, color: t.textPrimary },
+  itemDate:  { fontSize: 12, color: t.textMuted },
+  itemText:  { fontSize: 13.5, color: t.textSecondary, lineHeight: 1.5, margin: '6px 0 0', overflowWrap: 'anywhere' },
+  itemFacts: { display: 'flex', gap: 14, flexWrap: 'wrap', marginTop: 8 },
+  itemFact:  { display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12, color: t.textMuted },
+  itemSide:  { display: 'flex', gap: 8, flexShrink: 0, alignItems: 'center' },
+  panel:     { borderTop: `1px solid ${t.divider}`, padding: '14px 18px 16px', background: t.sidebarBg },
+  panelLabel:{ fontSize: 12, fontWeight: 600, color: t.textPrimary, margin: '0 0 6px' },
+  panelNote: { fontSize: 12, color: t.textMuted, lineHeight: 1.5, margin: '10px 0 0' },
+  buttonRow: { display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12 },
+  textarea: {
+    width: '100%', padding: '9px 12px', borderRadius: radius.md, border: `1px solid ${t.border}`,
+    fontSize: 13, color: t.textPrimary, background: t.cardBg, resize: 'vertical', outline: 'none',
+    boxSizing: 'border-box', fontFamily: 'inherit',
+  },
+  select: {
+    width: '100%', padding: '9px 12px', borderRadius: radius.md, border: `1px solid ${t.border}`,
+    fontSize: 13, color: t.textPrimary, background: t.cardBg, outline: 'none', boxSizing: 'border-box',
+    cursor: 'pointer', fontFamily: 'inherit',
+  },
+  // A person in a table cell: avatar, name, and email under it. Traveler
+  // Progress, Inactive Accounts and Suspensions & Bans all show people.
+  person:     { display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 },
+  personName: { fontWeight: 600, fontSize: 13.5, color: t.textPrimary, display: 'flex', alignItems: 'center', gap: 7, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  personSub:  { fontSize: 12, color: t.textMuted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+
+  // Long text in a table cell: one line, cut with an ellipsis (full text in
+  // the title tooltip). Set on an inner block — table cells don't truncate.
+  clampCell:   { display: 'block', maxWidth: 280, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: t.textSecondary },
+  pillStack:   { display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-start' },
+  cellActions: { display: 'flex', gap: 6, justifyContent: 'flex-end', flexWrap: 'wrap' },
+
+  // Square icon well used as an item's media when there's no photo.
+  mediaIcon: {
+    width: 38, height: 38, borderRadius: 10, flexShrink: 0,
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    background: t.sidebarBg, borderWidth: 1, borderStyle: 'solid', borderColor: t.border, color: t.textMuted,
+  },
+  mediaIconDanger: { background: t.dangerBg, borderColor: t.dangerBorder, color: t.danger },
 };
 
 // Both naming vocabularies are in use across the pages, so both resolve to the
