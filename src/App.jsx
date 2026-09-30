@@ -75,21 +75,16 @@ export default function App() {
 
                       <Route path="/mod-requests"       element={<AdminRoute><ModRequests /></AdminRoute>} />
                       <Route path="/reported-comments"  element={<AdminRoute><ReportedComments /></AdminRoute>} />
-                      {/* Both roles. The page already renders role-aware
-                          actions — moderators get "Propose Suspension",
-                          admins get "Approve Archival" — and the backend
-                          enforces that split, so the guard here only ever
-                          blocked moderators from a module the spec gives
-                          them. */}
-                      <Route path="/inactive-users"     element={<InactiveUsers />} />
+                      {/* Admin-only, like the backend: moderators work only on
+                          attractions and their own requests. */}
+                      <Route path="/inactive-users"     element={<AdminRoute><InactiveUsers /></AdminRoute>} />
                       <Route path="/banned-accounts"    element={<AdminRoute><BannedAccounts /></AdminRoute>} />
+                      <Route path="/comments"           element={<AdminRoute><Comments /></AdminRoute>} />
+                      <Route path="/user-progress"      element={<AdminRoute><UserProgress /></AdminRoute>} />
 
+                      {/* Both roles: moderators manage their municipality's
+                          attractions; admins see every one, read-only. */}
                       <Route path="/spots"     element={<Spots />} />
-                      <Route path="/comments"  element={<Comments />} />
-                      {/* Both roles: the spec gives admins and moderators the
-                          same read-only User Progress module, so this is
-                          deliberately not wrapped in a role guard. */}
-                      <Route path="/user-progress" element={<UserProgress />} />
 
                       <Route path="*" element={<Navigate to="/dashboard" replace />} />
                     </Routes>

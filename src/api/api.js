@@ -48,6 +48,9 @@ export const spotAPI = {
   getPendingProposals: ()       => api.get('/api/spots/proposals').then(r => r.data),
   getMyProposals: () => api.get('/api/spots/proposals/mine').then(r => r.data),
   getMyDeleteRequests: () => api.get('/api/spots/delete-requests/mine').then(r => r.data),
+  // Edits to existing attractions + food-spot location requests, kept after
+  // review with their status and before/after values.
+  getMyChangeRequests: () => api.get('/api/spots/change-requests/mine').then(r => r.data.requests || []),
 };
 
 // Missions — currently only used for the 2nd ("location") mission's geofence
@@ -73,11 +76,10 @@ export const commentAPI = {
     const query = new URLSearchParams(params).toString();
     return api.get(`/api/reviews/admin/all${query ? '?' + query : ''}`).then(r => r.data);
   },
-  getMine: ()                  => api.get('/api/reviews/admin/mine').then(r => r.data),
-  requestReview: (id, reason, proposedAction) =>
-    api.patch(`/api/reviews/${id}/flag`, { reason, proposedAction }).then(r => r.data),
-  decide: (id, decision, actionType) =>
-    api.patch(`/api/reviews/${id}/flag-decision`, { decision, actionType }).then(r => r.data),
+  // Applies the next warning step to the review's author (the backend decides
+  // the mute length, and the 2nd warning also suspends the account).
+  warnUser: (id, warnReason)   =>
+    api.patch(`/api/reviews/${id}/warn-user`, { warnReason }).then(r => r.data),
   delete: (id)                 => api.delete(`/api/reviews/admin/${id}`).then(r => r.data),
   banUser: (id, banReason)     =>
     api.patch(`/api/reviews/${id}/ban-user`, { banReason }).then(r => r.data),
@@ -111,18 +113,6 @@ export const inactiveUsersAPI = {
   archive: (clerkUserId)  => api.patch(`/api/admin/inactive-users/${clerkUserId}/archive`).then(r => r.data),
 };
 
-// Mod-proposed / admin-decided account actions (warnings & suspensions)
-// that aren't tied to a specific flagged comment — currently just
-// inactivity-based suspension proposals.
-export const accountActionAPI = {
-  getAll:  ()                          => api.get('/api/account-actions').then(r => r.data),
-  getMine: ()                          => api.get('/api/account-actions/mine').then(r => r.data),
-  propose: (clerkUserId, reason)       =>
-    api.post('/api/account-actions', { clerkUserId, reason }).then(r => r.data),
-  decide:  (id, decision)              =>
-    api.patch(`/api/account-actions/${id}/decision`, { decision }).then(r => r.data),
-};
-
 // User-submitted reports (mobile app users flagging a spot or a comment).
 // Admin-only — moderators have no access to this queue.
 export const reportAPI = {
@@ -137,8 +127,9 @@ export const reportAPI = {
 };
 
 export const authAPI = {
-  login: (email, password) =>
-    api.post('/api/auth/admin-login', { email, password }).then(r => r.data),
+  // Sign-in is by assigned username (the backend still accepts an email).
+  login: (username, password) =>
+    api.post('/api/auth/admin-login', { username, password }).then(r => r.data),
 };
 
 // Spot categories. The list used to be hardcoded in both this panel and the
@@ -151,8 +142,7 @@ export const categoryAPI = {
   remove: (id)       => api.delete(`/api/categories/${id}`).then(r => r.data),
 };
 
-// Traveler leaderboard + engagement figures. Read-only, and open to
-// moderators as well as admins.
+// Traveler leaderboard + engagement figures. Read-only, admins only.
 export const userProgressAPI = {
   getAll: () => api.get('/api/user-progress').then(r => r.data),
 };

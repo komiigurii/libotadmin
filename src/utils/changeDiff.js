@@ -50,10 +50,17 @@ export function fmtVal(key, v) {
 }
 
 /** Labels of the fields a spot's pendingChange actually changes. */
-export function changedFieldLabels(spot) {
-  if (!spot?.pendingChange) return [];
-  return Object.entries(spot.pendingChange)
+export function changedFieldLabels(record, labelMap = FIELD_LABELS) {
+  if (!record?.pendingChange) return [];
+  return Object.entries(record.pendingChange)
     .filter(([k]) => !META_KEYS.has(k))
-    .filter(([k, newVal]) => fmtVal(k, spot[k]) !== fmtVal(k, newVal))
-    .map(([k]) => (FIELD_LABELS[k] || k).toLowerCase());
+    .filter(([k, newVal]) => fmtVal(k, record[k]) !== fmtVal(k, newVal))
+    .map(([k]) => (labelMap[k] || k).toLowerCase());
 }
+
+/**
+ * A change-request history row (backend models/ChangeRequest) in the shape
+ * ChangeList expects: the old values on the record, the new ones under
+ * pendingChange.
+ */
+export const recordFromRequest = (req) => ({ ...(req.previous || {}), pendingChange: req.changes || {} });
