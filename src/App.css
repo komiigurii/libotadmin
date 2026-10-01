@@ -137,10 +137,14 @@ tbody tr:hover td {
   background: var(--brand-soft) !important;
 }
 
+/* Sign out and the theme switch sit on the teal frame, so they lighten on
+   hover rather than tinting towards a page colour. */
 .logout-btn:hover {
-  border-color: var(--danger-border) !important;
-  color: var(--danger) !important;
-  background: var(--danger-bg) !important;
+  background: var(--on-brand-solid-soft) !important;
+  border-color: rgba(255, 255, 255, 0.5) !important;
+}
+.theme-btn:hover:not([aria-checked="true"]) {
+  background: rgba(255, 255, 255, 0.14) !important;
 }
 
 /* ── Modern interactive utilities ── */
@@ -261,20 +265,34 @@ tbody tr:hover td {
     padding-left: 0 !important;
     padding-right: 0 !important;
   }
-  .admin-sidebar .sidebar-brand {
-    justify-content: center;
-    margin: 10px 8px !important;
-    padding: 10px 0 !important;
-  }
-  /* Role + scope don't fit a 68px rail; the brand block's accessible name
-     still says which console this is. */
-  .admin-sidebar .sidebar-identity { display: none !important; }
-  /* Three theme buttons side by side overflow a 68px rail — stack them. */
-  .admin-sidebar .sidebar-footer { padding-left: 10px !important; padding-right: 10px !important; }
+  /* Just the emblem, smaller. Title, console name and scope are hidden with
+     the other .sidebar-text; the block's accessible name still says which
+     console this is. */
+  .admin-sidebar .sidebar-brand { padding: 14px 10px 14px 0 !important; }
+  .admin-sidebar .sidebar-emblem { width: 44px !important; height: 44px !important; border-radius: 14px !important; }
+  .admin-sidebar .sidebar-emblem img { width: 32px !important; height: 32px !important; border-radius: 9px !important; }
+  .admin-sidebar .sidebar-panel { border-radius: 18px 0 0 14px !important; }
+  .admin-sidebar .sidebar-section { padding: 14px 6px 6px !important; }
+  /* No room for the drawing in a 58px panel. */
+  .admin-sidebar .sidebar-art { display: none; }
+  /* Three theme buttons side by side overflow the rail — stack everything. */
+  .admin-sidebar .sidebar-footer { flex-direction: column; padding: 10px 10px 14px 0 !important; }
   .admin-sidebar .theme-row { flex-direction: column; }
+  .admin-sidebar .logout-btn { flex: none !important; width: 40px; padding: 8px 0 !important; }
   .admin-page { padding-left: 20px !important; padding-right: 20px !important; }
   /* Dashboard's two-column rows stack. */
   .dash-split { grid-template-columns: minmax(0, 1fr) !important; }
+}
+
+/* Short laptop screens (1366×768 leaves ~650px): a tighter header and links,
+   so all eight admin links fit without scrolling. The church drawing already
+   scrolls away below them on its own. */
+@media (max-height: 760px) and (min-width: 1101px) {
+  .admin-sidebar .sidebar-brand { padding: 14px 10px 12px 0 !important; gap: 8px !important; }
+  .admin-sidebar .sidebar-emblem { width: 54px !important; height: 54px !important; border-radius: 18px !important; }
+  .admin-sidebar .sidebar-emblem img { width: 38px !important; height: 38px !important; border-radius: 11px !important; }
+  .admin-sidebar .sidebar-section { padding-top: 12px !important; }
+  .admin-sidebar .nav-link-btn { min-height: 38px !important; padding-top: 8px !important; padding-bottom: 8px !important; }
 }
 
 /* Phone: the sidebar becomes a horizontal bar across the top so the content
@@ -290,19 +308,25 @@ tbody tr:hover td {
     overflow-x: auto;
     position: sticky; top: 0; z-index: 20;
     border-right: none !important;
-    border-bottom: 1px solid var(--divider);
-    gap: 6px;
-    padding: 8px 12px;
+    gap: 8px;
+    padding: 8px 12px !important;
   }
-  .admin-sidebar .sidebar-section { padding: 0 !important; border: none !important; overflow: visible !important; }
-  .admin-sidebar .sidebar-brand { margin: 0 !important; padding: 6px !important; flex-shrink: 0; }
-  .admin-sidebar .nav-groups { flex-direction: row !important; gap: 4px !important; padding-top: 0 !important; }
+  /* The teal frame becomes the bar; the cream panel becomes a capsule in it
+     holding the links, so they keep the colours they were checked against. */
+  .admin-sidebar .sidebar-brand { padding: 0 !important; flex-shrink: 0; }
+  .admin-sidebar .sidebar-emblem { width: 40px !important; height: 40px !important; border-radius: 12px !important; }
+  .admin-sidebar .sidebar-emblem img { width: 28px !important; height: 28px !important; border-radius: 8px !important; }
+  .admin-sidebar .sidebar-panel { flex: 0 0 auto !important; border-radius: 14px !important; overflow: visible !important; }
+  .admin-sidebar .sidebar-section { padding: 4px !important; overflow: visible !important; flex-direction: row !important; }
+  .admin-sidebar .nav-groups { flex-direction: row !important; gap: 4px !important; margin: 0 !important; }
+  .admin-sidebar .nav-group { margin: 0 !important; padding: 0 !important; border: none !important; }
   .admin-sidebar .sidebar-links { flex-direction: row !important; gap: 4px; }
-  .admin-sidebar .nav-link-btn { min-width: 40px; }
-  .admin-sidebar .sidebar-footer { margin-top: 0 !important; margin-left: auto; padding: 0 !important; border: none !important; display: flex; align-items: center; gap: 8px; }
+  .admin-sidebar .nav-link-btn { min-width: 40px; min-height: 38px !important; }
+  .admin-sidebar .sidebar-art { display: none; }
+  .admin-sidebar .sidebar-footer { flex-direction: row; margin-left: auto; padding: 0 !important; }
   /* Back to a row in the top bar, where there's width but not height. */
-  .admin-sidebar .theme-row { flex-direction: row; margin-bottom: 0 !important; }
-  .admin-sidebar .sidebar-version { display: none; }
+  .admin-sidebar .theme-row { flex-direction: row; }
+  .admin-sidebar .logout-btn { width: 38px; }
   .admin-page { padding: 18px 16px !important; }
 }
 
