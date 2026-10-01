@@ -1,139 +1,81 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { authAPI, spotAPI } from '../api/api';
+import { authAPI } from '../api/api';
 import { saveSession } from '../auth/session';
-import { theme as t, radius, shadow } from '../theme';
+import { theme as t, radius, fonts, type } from '../theme';
+import { Button } from '../components/Layout';
 import Icon from '../components/Icon';
 import logo from '../assets/logo.png';
 
 /*
  * Sign-in for admins and moderators.
  *
- * The background cycles through photographs of the actual spots in the
- * database, heavily blurred. `GET /api/spots` is a public endpoint, so this
- * needs no token — which is just as well, since nobody is signed in yet.
+ * Two halves: the brand panel (the same solid teal + capiz lattice as the
+ * sidebar's brand block, so signing in already looks like the panel) and a
+ * plain form on the page background. Every colour is a theme token, so it
+ * reads correctly in light AND dark — the old frosted card was hardcoded
+ * dark, which put near-black text on dark teal for anyone in light mode.
  *
- * Blur is doing real work here, not decoration: these are arbitrary
- * user-supplied photos of wildly varying brightness and busyness, and a sharp
- * one behind a form makes the form unreadable. Blurring plus a fixed scrim
- * flattens all of them to roughly the same tone, so contrast on the card is
- * predictable whichever image is showing.
+ * The rotating blurred photo backdrop is gone: it was busy, it downloaded
+ * ~0.4 MB on the one page that loads before anything is cached, and the spot
+ * photos are low-resolution anyway.
  */
 
-const SLIDE_MS = 6500;   // how long each photo holds
-const FADE_MS  = 1400;   // cross-fade duration
-
-/*
- * Spot photos are uploaded as full-size PNGs — eight of them is ~1.7 MB, which
- * is a lot to spend on a backdrop nobody is meant to look at, on the one page
- * that loads before anything is cached. They're Cloudinary-hosted, so ask for a
- * capped, auto-format copy instead: same eight photos come down as ~0.36 MB,
- * and at 22px of blur the lost detail is invisible.
- *
- * Any URL that isn't a Cloudinary upload is returned untouched.
- */
-function backdropUrl(url) {
-  return url.includes('/image/upload/')
-    ? url.replace('/image/upload/', '/image/upload/f_auto,q_auto:eco,c_limit,w_960/')
-    : url;
-}
+const lockLabel = (s) => {
+  const m = Math.floor(s / 60), r = s % 60;
+  return m > 0 ? `${m}m ${String(r).padStart(2, '0')}s` : `${r}s`;
+};
 
 export default function Login() {
+  const navigate = useNavigate();
+  const ids = { user: useId(), pass: useId(), userErr: useId(), passErr: useId(), caps: useId() };
+
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  // Arriving from an expired or rejected session (see auth/session.js) shows
-  // why, instead of an unexplained sign-in screen.
-  const [error, setError]       = useState(() =>
+  const [showPassword, setShowPassword] = useState(false);
+  const [capsOn, setCapsOn]     = useState(false);
+  const [loading, setLoading]   = useState(false);
+  // Field errors appear after a sign-in attempt and clear as the field is fixed.
+  const [submitted, setSubmitted] = useState(false);
+  // What the server said (wrong credentials, lockout, offline).
+  const [error, setError]       = useState('');
+  // Arriving from an expired or rejected session (see auth/session.js) says
+  // why. It's information, not a mistake, so it isn't styled as an error.
+  const [notice, setNotice]     = useState(() =>
     new URLSearchParams(window.location.search).get('reason') === 'expired'
-      ? 'Your session expired. Please sign in again.'
+      ? 'Your session expired. Sign in again to continue.'
       : ''
   );
-  const [loading, setLoading]   = useState(false);
   // Seconds left on a server-side account lockout (HTTP 423). Purely a UX
   // affordance — the backend enforces the lock regardless of what this says.
   const [lockedFor, setLockedFor] = useState(0);
-  const navigate = useNavigate();
 
-  // ── Background carousel ────────────────────────────────────────────────
-  const [slides, setSlides] = useState([]);   // [{ image, name, city }]
-  const [index, setIndex]   = useState(0);
-  const timerRef = useRef(null);
+  const fieldErrors = {
+    username: !username.trim() ? 'Enter your username.' : '',
+    password: !password ? 'Enter your password.' : '',
+  };
+  const showErr = (f) => (submitted ? fieldErrors[f] : '');
 
+  // Tick the lockout down once a second and clear the banner when it ends.
   useEffect(() => {
-    let cancelled = false;
-
-    spotAPI.getAll()
-      .then((spots) => {
-        if (cancelled) return;
-        const candidates = (spots || [])
-          .filter((s) => s?.image)
-          // Several spot names carry a trailing space from data entry, which
-          // would render as "Plaridel Horse Festival , Plaridel".
-          .map((s) => ({
-            image: backdropUrl(s.image),
-            name: (s.name || '').trim(),
-            city: (s.city || '').trim(),
-          }));
-
-        // Shuffle so the same photo isn't the face of the panel every morning.
-        for (let i = candidates.length - 1; i > 0; i--) {
-          const j = Math.floor(Math.random() * (i + 1));
-          [candidates[i], candidates[j]] = [candidates[j], candidates[i]];
-        }
-
-        // Preload rather than trusting the URLs. Spot photos are uploaded by
-        // moderators and a dead Cloudinary link would otherwise show up as a
-        // blank slide mid-rotation, with no error event to catch (CSS
-        // background-image fails silently). Each one appears only once it has
-        // actually decoded, so the first good photo shows straight away
-        // instead of waiting on the slowest.
-        candidates.slice(0, 8).forEach((slide) => {
-          const img = new Image();
-          img.onload = () => { if (!cancelled) setSlides((prev) => [...prev, slide]); };
-          img.src = slide.image;
-        });
-      })
-      .catch(() => { /* no background — the gradient below stands on its own */ });
-
-    return () => { cancelled = true; };
-  }, []);
-
-  useEffect(() => {
-    if (slides.length < 2) return;
-    // Someone who has asked the OS to reduce motion should get one still image
-    // rather than a slideshow.
-    const still = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
-    if (still) return;
-
-    timerRef.current = setInterval(
-      () => setIndex((i) => (i + 1) % slides.length),
-      SLIDE_MS
-    );
-    return () => clearInterval(timerRef.current);
-  }, [slides.length]);
-
-  // Tick the lockout down once a second and clear the banner when it expires.
-  useEffect(() => {
-    if (lockedFor <= 0) return;
-    const t = setInterval(() => {
+    if (lockedFor <= 0) return undefined;
+    const timer = setInterval(() => {
       setLockedFor((s) => {
         if (s <= 1) { setError(''); return 0; }
         return s - 1;
       });
     }, 1000);
-    return () => clearInterval(t);
-  }, [lockedFor > 0]);
+    return () => clearInterval(timer);
+  }, [lockedFor > 0]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const current = slides[index];
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (lockedFor > 0 || loading) return;
+    setSubmitted(true);
+    setNotice('');
+    if (fieldErrors.username) return document.getElementById(ids.user)?.focus();
+    if (fieldErrors.password) return document.getElementById(ids.pass)?.focus();
 
-  const lockLabel = (s) => {
-    const m = Math.floor(s / 60), r = s % 60;
-    return m > 0 ? `${m}m ${String(r).padStart(2, '0')}s` : `${r}s`;
-  };
-
-  const handleLogin = async () => {
-    if (lockedFor > 0) return;
-    if (!username.trim() || !password) { setError('Enter your username and password.'); return; }
     try {
       setError('');
       setLoading(true);
@@ -143,204 +85,198 @@ export default function Login() {
         // Both roles start on the dashboard: it shows what's waiting on them.
         navigate('/dashboard', { replace: true });
       } else {
-        setError(data.message || 'Login failed');
+        setError(data.message || "Couldn't sign you in. Check your username and password.");
       }
     } catch (err) {
-      const body = err?.response?.data;
-      // 423 Locked — the account hit the failed-attempt threshold. Start a
-      // countdown so the button doesn't just sit there rejecting every press
-      // with the same message.
-      if (err?.response?.status === 423 && body?.retryAfterSeconds) {
-        setLockedFor(body.retryAfterSeconds);
-      }
-      setError(body?.message || 'Login failed');
+      const res = err?.response;
+      // 423 Locked — the account hit the failed-attempt threshold. Count it
+      // down so the button doesn't sit there rejecting every press.
+      if (res?.status === 423 && res.data?.retryAfterSeconds) setLockedFor(res.data.retryAfterSeconds);
+      setError(
+        res?.data?.message
+          || (res ? "Couldn't sign you in. Check your username and password."
+                  : "Couldn't reach the server. Check your connection and try again.")
+      );
     } finally {
       setLoading(false);
     }
   };
 
+  // Caps Lock is the usual reason a remembered password "stops working".
+  const trackCaps = (e) => setCapsOn(!!e.getModifierState?.('CapsLock'));
+
+  const locked = lockedFor > 0;
+
   return (
-    <div style={styles.container}>
-      {/* Photo layers. All of them stay mounted and cross-fade via opacity —
-          swapping a single <img> src would flash white while the next one
-          decodes. */}
-      <div style={styles.bg} aria-hidden="true">
-        {slides.map((s, i) => (
-          <div
-            key={s.image + i}
-            style={{
-              ...styles.slide,
-              backgroundImage: `url(${s.image})`,
-              opacity: i === index ? 1 : 0,
-            }}
-          />
-        ))}
-        <div style={styles.scrim} />
-      </div>
-
-      <div style={styles.card} className="login-card">
-        <div style={styles.logoWrap}>
-          <img src={logo} alt="Libot" style={styles.logo} />
+    <div className="login-shell" style={s.shell}>
+      <aside className="login-brand" style={s.brand}>
+        {/* The lattice fades out from the top-right corner (see App.css) —
+            across a whole panel at full strength it reads as graph paper. */}
+        <div className="login-lattice capiz-lattice" aria-hidden="true" />
+        <div style={s.brandMark}>
+          <img src={logo} alt="" style={s.logo} />
+          <span style={s.brandName}>Libot <span style={s.brandNameSub}>Admin</span></span>
         </div>
+        <div className="login-brand-body" style={s.brandBody}>
+          <p style={s.brandHeadline} className="display-type">Spots, reviews and travelers, in one place.</p>
+          <p style={s.brandText}>The admin and moderator panel for Libot Bulacan.</p>
+        </div>
+      </aside>
 
-        <h1 style={styles.title}>Libot Admin</h1>
-        <p style={styles.subtitle}>Sign in with the username and password you were assigned.</p>
+      <main className="login-main">
+        <form className="login-form" style={s.form} onSubmit={handleSubmit} noValidate aria-labelledby="login-title">
+          <h1 id="login-title" style={s.title}>Sign in</h1>
+          <p style={s.subtitle}>Use the username and password you were given.</p>
 
-        {error && (
-          <div style={styles.error} role="alert">
-            <Icon name={lockedFor > 0 ? 'slash' : 'alert-triangle'} size={13} />
-            <span>
-              {error}
-              {lockedFor > 0 && (
-                <> {' '}<strong>Try again in {lockLabel(lockedFor)}.</strong></>
-              )}
-            </span>
+          {notice && (
+            <div role="status" style={{ ...s.banner, ...s.bannerInfo }}>
+              <Icon name="clock" size={15} />
+              <span>{notice}</span>
+            </div>
+          )}
+
+          {error && (
+            <div role="alert" style={{ ...s.banner, ...s.bannerError }}>
+              <Icon name={locked ? 'lock' : 'alert-circle'} size={15} />
+              <span>
+                {error}
+                {locked && <> <strong>Try again in {lockLabel(lockedFor)}.</strong></>}
+              </span>
+            </div>
+          )}
+
+          <div style={s.field}>
+            <label htmlFor={ids.user} style={s.label}>Username</label>
+            <input
+              id={ids.user}
+              type="text"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              autoComplete="username"
+              autoCapitalize="none"
+              spellCheck={false}
+              autoFocus
+              aria-invalid={!!showErr('username')}
+              aria-describedby={showErr('username') ? ids.userErr : undefined}
+              className="modern-input"
+              style={{ ...s.input, ...(showErr('username') ? s.inputInvalid : null) }}
+            />
+            {showErr('username') && (
+              <p id={ids.userErr} style={s.fieldError}>
+                <Icon name="alert-circle" size={13} /> {showErr('username')}
+              </p>
+            )}
           </div>
-        )}
 
-        <div style={styles.field}>
-          <label style={styles.label} htmlFor="login-username">Username</label>
-          <input
-            id="login-username"
-            type="text"
-            placeholder="e.g. maria"
-            value={username}
-            onChange={e => setUsername(e.target.value)}
-            autoCapitalize="none"
-            spellCheck={false}
-            onKeyDown={e => e.key === 'Enter' && handleLogin()}
-            style={styles.input}
-            className="modern-input"
-            autoComplete="username"
-          />
-        </div>
+          <div style={s.field}>
+            <label htmlFor={ids.pass} style={s.label}>Password</label>
+            <div style={s.passwordWrap}>
+              <input
+                id={ids.pass}
+                type={showPassword ? 'text' : 'password'}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                onKeyDown={trackCaps}
+                onKeyUp={trackCaps}
+                onBlur={() => setCapsOn(false)}
+                autoComplete="current-password"
+                aria-invalid={!!showErr('password')}
+                aria-describedby={[showErr('password') && ids.passErr, capsOn && ids.caps].filter(Boolean).join(' ') || undefined}
+                className="modern-input"
+                style={{ ...s.input, paddingRight: 46, ...(showErr('password') ? s.inputInvalid : null) }}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((v) => !v)}
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+                aria-pressed={showPassword}
+                style={s.eyeBtn}
+              >
+                <Icon name={showPassword ? 'eye-off' : 'eye'} size={18} />
+              </button>
+            </div>
+            {showErr('password') && (
+              <p id={ids.passErr} style={s.fieldError}>
+                <Icon name="alert-circle" size={13} /> {showErr('password')}
+              </p>
+            )}
+            {capsOn && (
+              <p id={ids.caps} style={s.capsHint} role="status">
+                <Icon name="alert-triangle" size={13} /> Caps Lock is on.
+              </p>
+            )}
+          </div>
 
-        <div style={styles.field}>
-          <label style={styles.label} htmlFor="login-password">Password</label>
-          <input
-            id="login-password"
-            type="password"
-            placeholder="••••••••"
-            value={password}
-            onChange={e => setPassword(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && handleLogin()}
-            style={styles.input}
-            className="modern-input"
-            autoComplete="current-password"
-          />
-        </div>
+          <Button
+            type="submit"
+            variant="primary"
+            disabled={loading || locked}
+            style={s.submit}
+          >
+            {locked ? `Try again in ${lockLabel(lockedFor)}` : loading ? 'Signing in…' : 'Sign in'}
+          </Button>
 
-        <button
-          onClick={handleLogin}
-          disabled={loading || lockedFor > 0}
-          style={{
-            ...styles.btn,
-            opacity: loading || lockedFor > 0 ? 0.55 : 1,
-            cursor: lockedFor > 0 ? 'not-allowed' : 'pointer',
-          }}
-          className="modern-btn"
-        >
-          {lockedFor > 0
-            ? `Locked — ${lockLabel(lockedFor)}`
-            : loading ? 'Signing in…' : 'Sign In'}
-        </button>
-      </div>
-
-      {/* Quiet credit for whichever photo is showing. Doubles as a sign the
-          background is live data rather than stock imagery. */}
-      {current && (
-        // Keyed on the photo so the caption re-runs its fade each time the
-        // background changes, instead of the text swapping abruptly.
-        <div key={current.image} style={styles.caption} className="login-caption">
-          <Icon name="map-pin" size={11} />
-          <span>{current.name}{current.city ? `, ${current.city}` : ''}</span>
-        </div>
-      )}
+          <p style={s.help}>Can't sign in? Ask your Libot administrator.</p>
+        </form>
+      </main>
     </div>
   );
 }
 
-const styles = {
-  container: {
-    position: 'relative',
-    minHeight: '100vh',
-    display: 'flex', alignItems: 'center', justifyContent: 'center',
-    // Room for the photo caption at the bottom, and enough top/bottom padding
-    // that the card never touches the edge on a short window.
-    padding: '40px 20px 64px',
-    // Shows through before any photo loads, and stays the whole background if
-    // the request fails.
-    background: `radial-gradient(1200px 700px at 70% 10%, ${t.brandSoft}, transparent 60%), ${t.bg}`,
-  },
+const s = {
+  shell: { minHeight: '100dvh', background: t.bg },
 
-  // Fixed, not absolute: on a short window the card pushes the page into
-  // scrolling, and the backdrop should stay put rather than scroll away.
-  // `overflow: hidden` lives here so the scaled-up photo layers are clipped
-  // without also clipping the card.
-  bg: { position: 'fixed', inset: 0, zIndex: 0, overflow: 'hidden' },
-  slide: {
-    position: 'absolute', inset: 0,
-    backgroundSize: 'cover', backgroundPosition: 'center',
-    filter: 'blur(22px) saturate(1.15)',
-    // Overscan by more than the blur radius, otherwise the soft transparent
-    // edge blur leaves at the element bounds shows as a light rim.
-    transform: 'scale(1.12)',
-    transition: `opacity ${FADE_MS}ms ease-in-out`,
-    willChange: 'opacity',
+  brand: {
+    position: 'relative', overflow: 'hidden',
+    backgroundColor: t.brandSolid,
+    color: t.onBrandSolid,
+    padding: 'clamp(22px, 4vw, 48px)',
+    display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: 32,
   },
-  // Dark wash over the photos so the card's contrast is the same no matter
-  // which one is showing. Tinted toward the brand rather than neutral black.
-  scrim: {
-    position: 'absolute', inset: 0,
-    background:
-      `linear-gradient(180deg, rgba(14,28,30,0.82) 0%, rgba(14,28,30,0.70) 45%, rgba(12,52,56,0.86) 100%)`,
+  brandMark: { position: 'relative', display: 'flex', alignItems: 'center', gap: 12 },
+  logo: { width: 40, height: 40, borderRadius: radius.md, objectFit: 'contain', background: 'transparent' },
+  brandName: { fontFamily: fonts.display, fontSize: 22, fontWeight: 600, letterSpacing: '-0.01em', color: t.onBrandSolid },
+  brandNameSub: { fontFamily: fonts.sans, fontSize: 14, fontWeight: 600, color: t.onBrandSolidMuted, marginLeft: 4 },
+  brandBody: { position: 'relative', maxWidth: 420 },
+  brandHeadline: {
+    fontFamily: fonts.display, fontSize: 'clamp(28px, 3.2vw, 40px)', fontWeight: 600,
+    lineHeight: 1.15, letterSpacing: '-0.02em', color: t.onBrandSolid, margin: 0,
   },
+  brandText: { fontSize: 15, lineHeight: 1.5, color: t.onBrandSolidMuted, marginTop: 14, marginBottom: 0 },
 
-  card: {
-    position: 'relative', zIndex: 1,
-    background: 'rgba(23,44,47,0.82)',
-    // Frosted panel: the photo behind stays legible as colour and movement
-    // without competing with the form.
-    backdropFilter: 'blur(18px) saturate(1.2)',
-    WebkitBackdropFilter: 'blur(18px) saturate(1.2)',
-    borderRadius: radius.xl + 6,
-    // Tightens on a phone so the fields aren't squeezed by the padding.
-    padding: 'clamp(28px, 7vw, 42px) clamp(22px, 7vw, 44px)',
-    width: '100%', maxWidth: 410,
-    boxShadow: shadow.lg,
-    // Lighter than `t.border`: a flat opaque hairline reads as a seam against
-    // a moving photo, where a translucent one catches the light behind it.
-    border: '1px solid rgba(234,246,247,0.13)',
+  form: { width: '100%', maxWidth: 380 },
+
+  title:    { ...type.pageTitle, fontSize: 30, color: t.textPrimary, margin: 0 },
+  subtitle: { ...type.body, fontSize: 14.5, color: t.textSecondary, marginTop: 6, marginBottom: 26 },
+
+  banner: {
+    display: 'flex', alignItems: 'flex-start', gap: 9,
+    borderRadius: radius.md, padding: '11px 14px', fontSize: 13.5, lineHeight: 1.45,
+    marginBottom: 18, borderWidth: 1, borderStyle: 'solid',
   },
+  bannerInfo:  { background: t.infoBg,   color: t.info,   borderColor: 'transparent' },
+  bannerError: { background: t.dangerBg, color: t.danger, borderColor: t.dangerBorder },
 
-  logoWrap:  { display: 'flex', justifyContent: 'center', marginBottom: 18 },
-  logo:      { width: 60, height: 60, borderRadius: radius.lg, objectFit: 'contain', boxShadow: shadow.sm },
-  title:     { fontSize: 23, fontWeight: 800, color: t.textPrimary, textAlign: 'center', marginBottom: 6, letterSpacing: '-0.02em' },
-  subtitle:  { fontSize: 13.5, color: t.textSecondary, textAlign: 'center', marginBottom: 26, lineHeight: 1.45 },
-
-  error: {
-    display: 'flex', alignItems: 'center', gap: 8,
-    background: t.dangerBg, border: `1px solid ${t.dangerBorder}`, borderRadius: radius.md,
-    padding: '10px 14px', color: t.danger, fontSize: 13, marginBottom: 16,
-  },
-
-  field: { marginBottom: 16 },
-  label: { display: 'block', fontSize: 11.5, fontWeight: 700, color: t.textSecondary, marginBottom: 7, textTransform: 'uppercase', letterSpacing: '0.06em' },
+  field: { marginBottom: 18 },
+  label: { display: 'block', fontSize: 13.5, fontWeight: 600, color: t.textPrimary, marginBottom: 7 },
   input: {
-    width: '100%', padding: '12px 14px', borderRadius: radius.md,
-    border: `1px solid ${t.border}`, fontSize: 14, color: t.textPrimary,
-    outline: 'none', background: 'rgba(12,52,56,0.6)', boxSizing: 'border-box',
+    width: '100%', height: 46, padding: '0 14px', boxSizing: 'border-box',
+    borderRadius: radius.md, borderWidth: 1, borderStyle: 'solid', borderColor: t.border,
+    background: t.cardBg, color: t.textPrimary, fontFamily: 'inherit', fontSize: 15, outline: 'none',
   },
-  btn: {
-    width: '100%', padding: 13, borderRadius: radius.md, border: 'none',
-    background: t.accent, color: t.onAccent, fontWeight: 800, fontSize: 15,
-    cursor: 'pointer', marginTop: 10, boxShadow: shadow.sm,
+  // Same longhand as `input`, so React swaps it cleanly (see the SpotForm note
+  // in the design-system docs about shorthand/longhand mixing).
+  inputInvalid: { borderColor: t.danger },
+  passwordWrap: { position: 'relative' },
+  eyeBtn: {
+    position: 'absolute', top: 0, right: 0, height: 46, width: 46,
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    background: 'transparent', border: 'none', color: t.textMuted, cursor: 'pointer',
+    borderRadius: radius.md,
   },
+  fieldError: { display: 'flex', alignItems: 'center', gap: 6, margin: '7px 0 0', fontSize: 13, color: t.danger },
+  capsHint:   { display: 'flex', alignItems: 'center', gap: 6, margin: '7px 0 0', fontSize: 13, color: t.warning },
 
-  caption: {
-    position: 'fixed', zIndex: 1, bottom: 20, left: 0, right: 0,
-    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-    color: 'rgba(234,246,247,0.55)', fontSize: 12, fontWeight: 500,
-    pointerEvents: 'none',
-  },
+  submit: { width: '100%', minHeight: 46, fontSize: 15, marginTop: 6 },
+  help: { fontSize: 13, lineHeight: 1.5, color: t.textMuted, textAlign: 'center', marginTop: 18, marginBottom: 0 },
 };
