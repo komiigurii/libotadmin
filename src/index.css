@@ -21,6 +21,10 @@
    Both are variable fonts, so the sans is a single file covering 400..900
    instead of the four fixed weights this used to import. */
 @import '@fontsource-variable/newsreader';
+/* The italic for the sidebar's tagline. font-synthesis is off (below), so
+   without the real italic file it would render upright. The browser only
+   downloads it where italic Newsreader is actually used. */
+@import '@fontsource-variable/newsreader/wght-italic.css';
 @import '@fontsource-variable/schibsted-grotesk';
 
 /* ── LIGHT (default) ─────────────────────────────────────────────────────────
@@ -73,6 +77,10 @@
   --lattice:         rgba(255,255,255,0.10);
   /* Over photographs (the login artwork): none in light, a soft dark veil in dark. */
   --photo-veil:      transparent;
+  /* The church drawing at the foot of the sidebar: clouds and the adobe wall
+     it stands on. Its lines are --brand, its walls --card-bg, the sun --accent. */
+  --illus-cloud:     rgba(10,111,120,0.12);
+  --illus-wall:      #E8DFCC;
 
   /* Chart marks (dashboard meters/bars). NOT --brand: that teal is tuned for
      text and falls below the chart chroma floor (reads grey as a bar). These
@@ -139,6 +147,8 @@
     --on-brand-solid-soft:  rgba(255,255,255,0.22);
     --lattice:         rgba(255,255,255,0.08);
     --photo-veil:      rgba(8,20,22,0.38);
+    --illus-cloud:     rgba(86,214,226,0.10);
+    --illus-wall:      #16383B;
     --data-1:          #12A7B5;
     --data-1-track:    rgba(18,167,181,0.20);
 
@@ -197,6 +207,8 @@
   --on-brand-solid-soft:  rgba(255,255,255,0.22);
   --lattice:         rgba(255,255,255,0.08);
   --photo-veil:      rgba(8,20,22,0.38);
+  --illus-cloud:     rgba(86,214,226,0.10);
+  --illus-wall:      #16383B;
   --data-1:          #12A7B5;
   --data-1-track:    rgba(18,167,181,0.20);
 
