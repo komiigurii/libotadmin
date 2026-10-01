@@ -3,7 +3,7 @@ import { reportAPI, commentAPI } from '../api/api';
 import { notify, confirmAction } from '../components/AppAlert';
 import {
   Page, PageHeader, Toolbar, FilterTabs, List, Button, StatusPill, Tag,
-  Loading, ErrorBanner, EmptyState, Avatar, pageStyles as s,
+  Loading, ErrorBanner, EmptyState, Avatar, ReviewPhotos, pageStyles as s,
 } from '../components/Layout';
 import { fmtDateTime } from '../utils/format';
 import Icon from '../components/Icon';
@@ -196,6 +196,7 @@ function ReportRow({ report, expanded, acting, setActing, onToggle, onUpdated })
           <p style={s.itemText}>
             {review ? `“${review.comment}”` : 'This review has been deleted.'}
           </p>
+          <ReviewPhotos photos={review?.photos} />
 
           <div style={s.itemFacts}>
             {review?.rating != null && <span style={s.itemFact}><Icon name="star" size={12} /> {review.rating}/5</span>}

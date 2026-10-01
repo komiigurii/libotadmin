@@ -227,6 +227,41 @@ export function SpotThumb({ src, size = 38, radius: r = 10 }) {
   );
 }
 
+/* Photos a traveler attached to a review (up to 4). Small squares; each opens
+   the full photo in a new tab, so an admin judging a review or a report can
+   see exactly what was posted. Cloudinary sends a 128px crop for the square
+   rather than the full upload. */
+const thumbOf = (url) =>
+  /res\.cloudinary\.com\/.+\/image\/upload\//.test(url || '')
+    ? url.replace('/image/upload/', '/image/upload/c_fill,w_128,h_128,f_auto,q_auto/')
+    : url;
+
+export function ReviewPhotos({ photos }) {
+  if (!photos?.length) return null;
+  return (
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, margin: '8px 0 2px' }}>
+      {photos.map((p, i) => (
+        <a
+          key={p.url}
+          href={p.url}
+          target="_blank"
+          rel="noreferrer"
+          title={`Open photo ${i + 1} of ${photos.length}`}
+          aria-label={`Open photo ${i + 1} of ${photos.length} in a new tab`}
+          style={{ display: 'block', lineHeight: 0, borderRadius: radius.sm, outlineOffset: 2 }}
+        >
+          <img
+            src={thumbOf(p.url)}
+            alt=""
+            loading="lazy"
+            style={{ width: 64, height: 64, objectFit: 'cover', borderRadius: radius.sm, border: `1px solid ${t.border}`, background: t.sidebarBg }}
+          />
+        </a>
+      ))}
+    </div>
+  );
+}
+
 /* ── Pill ─────────────────────────────────────────────────────────
    Status chips: one shape and size everywhere, colour supplied by the page. */
 export function Pill({ children, color = t.textSecondary, background = t.brandSoft, icon }) {
