@@ -73,14 +73,14 @@
   --on-brand-solid:       #FFFFFF;
   --on-brand-solid-muted: rgba(255,255,255,0.86);
   --on-brand-solid-soft:  rgba(255,255,255,0.22);
-  /* The capiz-window lattice drawn over solid teal — decoration only. */
-  --lattice:         rgba(255,255,255,0.10);
   /* Over photographs (the login artwork): none in light, a soft dark veil in dark. */
   --photo-veil:      transparent;
-  /* The church drawing at the foot of the sidebar: clouds and the adobe wall
-     it stands on. Its lines are --brand, its walls --card-bg, the sun --accent. */
-  --illus-cloud:     rgba(10,111,120,0.12);
-  --illus-wall:      #E8DFCC;
+  /* Risograph inks for the church print at the foot of the sidebar. They
+     overprint (multiply) where they cross, like stacked riso passes. Dark mode
+     uses lighter inks so the print still reads on the dark panel. */
+  --riso-teal:       #0A6F78;
+  --riso-aqua:       #9FDDE3;
+  --riso-yellow:     #F2CE1B;
 
   /* Chart marks (dashboard meters/bars). NOT --brand: that teal is tuned for
      text and falls below the chart chroma floor (reads grey as a bar). These
@@ -145,10 +145,10 @@
     --on-brand-solid:       #FFFFFF;
     --on-brand-solid-muted: rgba(255,255,255,0.96); /* 0.86 was 4.19:1 on the darker-mode teal */
     --on-brand-solid-soft:  rgba(255,255,255,0.22);
-    --lattice:         rgba(255,255,255,0.08);
     --photo-veil:      rgba(8,20,22,0.38);
-    --illus-cloud:     rgba(86,214,226,0.10);
-    --illus-wall:      #16383B;
+    --riso-teal:       #45AEB8;
+    --riso-aqua:       #2C5F64;
+    --riso-yellow:     #F2CE1B;
     --data-1:          #12A7B5;
     --data-1-track:    rgba(18,167,181,0.20);
 
@@ -205,10 +205,10 @@
   --on-brand-solid:       #FFFFFF;
   --on-brand-solid-muted: rgba(255,255,255,0.96); /* 0.86 was 4.19:1 on the darker-mode teal */
   --on-brand-solid-soft:  rgba(255,255,255,0.22);
-  --lattice:         rgba(255,255,255,0.08);
   --photo-veil:      rgba(8,20,22,0.38);
-  --illus-cloud:     rgba(86,214,226,0.10);
-  --illus-wall:      #16383B;
+  --riso-teal:       #45AEB8;
+  --riso-aqua:       #2C5F64;
+  --riso-yellow:     #F2CE1B;
   --data-1:          #12A7B5;
   --data-1-track:    rgba(18,167,181,0.20);
 
