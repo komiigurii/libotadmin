@@ -2,28 +2,34 @@ import { useEffect, useId, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { authAPI } from '../api/api';
 import { saveSession } from '../auth/session';
-import { theme as t, radius, fonts, type } from '../theme';
+import { theme as t, radius, fonts, type, shadow } from '../theme';
 import { Button } from '../components/Layout';
 import Icon from '../components/Icon';
 import logo from '../assets/logo.png';
 // The mobile app's sign-in background (LibotBulacan/assets/bg.png: Bulacan
 // landmarks under the cyan→yellow wash), re-encoded as JPEG — 478 KB → 54 KB.
 import loginBg from '../assets/login-bg.jpg';
+import './Login.css';
 
 /*
  * Sign-in for admins and moderators.
  *
- * Two halves: a brand panel carrying the app's own sign-in artwork (bg.png,
- * so the panel and the app's front door look like one product) and a plain
- * form on the page background. The form uses theme tokens throughout, so it
- * reads correctly in light AND dark.
+ * Built from the console's own frame, so signing in already looks like the
+ * panel you land in: the teal rail with the emblem in its dark well, LIBOT in
+ * tracked capitals and the console name; the app's sign-in artwork (bg.png)
+ * framed on the rail the way the church print sits at the foot of the
+ * sidebar; the app slogan in the sidebar tagline's italic with its yellow
+ * misregistration; and a cream panel with the rail's one oversized top-left
+ * corner, holding the form in a dashboard-style card.
  *
- * The artwork is light, and white text on it measures ~1.5:1. A dark gradient
- * (.login-scrim in App.css) sits behind the logo at the top and the headline
- * at the bottom and leaves the middle of the picture almost clear. Measured
- * on the real pixels at 900–1920 px widths: logo ≥ 5.0:1, headline ≥ 6.4:1,
- * small text ≥ 8.2:1. Re-measure if the image or the gradient changes.
+ * No text sits on the picture: the slogan is on solid teal (white, ≥ 5:1 in
+ * both themes), so the artwork needs no scrim.
  */
+
+const SLOGAN = ['Discover,', 'Explore,', 'Experience', 'Bulacan.'];
+
+// Same dark wash the sidebar uses for its emblem well and chips.
+const ON_FRAME_WELL = 'rgba(0,0,0,0.18)';
 
 const lockLabel = (s) => {
   const m = Math.floor(s / 60), r = s % 60;
@@ -112,22 +118,31 @@ export default function Login() {
   const locked = lockedFor > 0;
 
   return (
-    <div className="login-shell" style={s.shell}>
-      <aside className="login-brand" style={{ ...s.brand, backgroundImage: `url(${loginBg})` }}>
-        <div className="login-scrim" aria-hidden="true" />
-        <div className="login-veil" aria-hidden="true" />
-        <div style={s.brandMark}>
-          <img src={logo} alt="" style={s.logo} />
-          <span style={s.brandName}>Libot <span style={s.brandNameSub}>Admin</span></span>
+    <div className="signin">
+      <aside className="signin-rail" aria-label="Libot">
+        {/* The sidebar's brand block, larger. */}
+        <div className="signin-brand" style={s.brand}>
+          <span className="signin-emblem" style={s.emblem}>
+            <img src={logo} alt="" style={s.logo} />
+          </span>
+          <div className="signin-brand-text" style={s.brandText}>
+            <div className="signin-wordmark" style={s.wordmark}>Libot</div>
+            <div style={s.console}>Admin &amp; Moderator Console</div>
+          </div>
         </div>
-        <div className="login-brand-body" style={s.brandBody}>
-          <p style={s.brandHeadline} className="display-type">Spots, reviews and travelers, in one place.</p>
-          <p style={s.brandText}>The admin and moderator panel for Libot Bulacan.</p>
-        </div>
+
+        {/* The app's sign-in artwork, framed like the church print at the foot
+            of the sidebar. Decorative: the slogan below carries the words. */}
+        <div className="signin-art" style={{ backgroundImage: `url(${loginBg})` }} aria-hidden="true" />
+
+        <p className="signin-slogan" style={s.slogan}>
+          {SLOGAN.map((line, i) => <span key={line} style={s.sloganLine}>{line}{i < SLOGAN.length - 1 ? ' ' : ''}</span>)}
+        </p>
       </aside>
 
-      <main className="login-main">
-        <form className="login-form" style={s.form} onSubmit={handleSubmit} noValidate aria-labelledby="login-title">
+      <main className="signin-panel">
+        <form className="signin-card" style={s.card} onSubmit={handleSubmit} noValidate aria-labelledby="login-title">
+          <p style={s.eyebrow}>Admins and moderators</p>
           <h1 id="login-title" style={s.title}>Sign in</h1>
           <p style={s.subtitle}>Use the username and password you were given.</p>
 
@@ -227,34 +242,48 @@ export default function Login() {
 }
 
 const s = {
-  shell: { minHeight: '100dvh', background: t.bg },
-
-  // Text on the artwork is white in both themes: it sits on the scrim over a
-  // picture, not on a page surface, so it doesn't follow the theme tokens.
-  // The teal fill shows only while the image loads.
+  // ── Rail (the sidebar's brand block, scaled up) ──
   brand: {
-    position: 'relative', overflow: 'hidden',
-    backgroundColor: t.brandSolid,
-    backgroundSize: 'cover', backgroundPosition: 'center',
-    color: '#FFFFFF',
-    padding: 'clamp(22px, 4vw, 48px)',
-    display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: 32,
+    display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', gap: 14,
   },
-  brandMark: { position: 'relative', display: 'flex', alignItems: 'center', gap: 12 },
-  logo: { width: 40, height: 40, borderRadius: radius.md, objectFit: 'contain', background: 'transparent' },
-  brandName: { fontFamily: fonts.display, fontSize: 22, fontWeight: 600, letterSpacing: '-0.01em', color: '#FFFFFF' },
-  brandNameSub: { fontFamily: fonts.sans, fontSize: 14, fontWeight: 600, color: 'rgba(255,255,255,0.86)', marginLeft: 4 },
-  brandBody: { position: 'relative', maxWidth: 420 },
-  brandHeadline: {
-    fontFamily: fonts.display, fontSize: 'clamp(28px, 3.2vw, 40px)', fontWeight: 600,
-    lineHeight: 1.15, letterSpacing: '-0.02em', color: '#FFFFFF', margin: 0,
+  emblem: {
+    display: 'grid', placeItems: 'center', width: 88, height: 88, borderRadius: 28,
+    background: ON_FRAME_WELL, boxShadow: 'inset 0 0 0 1px var(--on-brand-solid-soft)', flexShrink: 0,
   },
-  brandText: { fontSize: 15, lineHeight: 1.5, color: 'rgba(255,255,255,0.86)', marginTop: 14, marginBottom: 0 },
+  logo: { width: 62, height: 62, objectFit: 'contain', borderRadius: 17, display: 'block' },
+  brandText: { display: 'flex', flexDirection: 'column', alignItems: 'center' },
+  wordmark: {
+    fontFamily: fonts.display, color: t.onBrandSolid, fontWeight: 700, fontSize: 32,
+    lineHeight: 1, letterSpacing: '0.18em', textTransform: 'uppercase',
+    // Tracking also pads the last letter; this re-centres the word.
+    paddingLeft: '0.18em',
+  },
+  // Full white, not onBrandSolidMuted: at 10.5px this needs 4.5:1, and 86%
+  // white is 4.2:1 on the dark theme's teal (white: 5.1, light theme 5.9).
+  console: {
+    marginTop: 8, color: t.onBrandSolid, fontSize: 10.5, fontWeight: 700,
+    letterSpacing: '0.24em', textTransform: 'uppercase',
+  },
+  // The sidebar tagline's type, on teal instead of cream: white carries the
+  // contrast (≥ 5:1 on the rail teal in both themes); the yellow pass slips
+  // out from under it the way the print's inks are off-register.
+  slogan: {
+    width: '100%', maxWidth: 400, margin: 0,
+    fontFamily: fonts.display, fontStyle: 'italic', fontWeight: 700,
+    fontSize: 'clamp(24px, 2.4vw, 32px)', lineHeight: 1.04, letterSpacing: '-0.01em',
+    color: t.onBrandSolid, textShadow: `2px 1.6px 0 ${t.accent}`,
+  },
+  sloganLine: { display: 'block' },
 
-  form: { width: '100%', maxWidth: 380 },
-
+  // ── Panel (a dashboard card) ──
+  card: {
+    width: '100%', maxWidth: 420, boxSizing: 'border-box',
+    background: t.cardBg, border: `1px solid ${t.border}`, borderRadius: radius.xl,
+    boxShadow: shadow.sm, padding: 'clamp(22px, 4vw, 36px)',
+  },
+  eyebrow:  { ...type.label, color: t.textMuted, margin: '0 0 6px' },
   title:    { ...type.pageTitle, fontSize: 30, color: t.textPrimary, margin: 0 },
-  subtitle: { ...type.body, fontSize: 14.5, color: t.textSecondary, marginTop: 6, marginBottom: 26 },
+  subtitle: { ...type.body, fontSize: 14.5, color: t.textSecondary, marginTop: 6, marginBottom: 24 },
 
   banner: {
     display: 'flex', alignItems: 'flex-start', gap: 9,
@@ -269,7 +298,8 @@ const s = {
   input: {
     width: '100%', height: 46, padding: '0 14px', boxSizing: 'border-box',
     borderRadius: radius.md, borderWidth: 1, borderStyle: 'solid', borderColor: t.border,
-    background: t.cardBg, color: t.textPrimary, fontFamily: 'inherit', fontSize: 15, outline: 'none',
+    // Cream inside the white card, the same fill the spot form's inputs use.
+    background: t.sidebarBg, color: t.textPrimary, fontFamily: 'inherit', fontSize: 15, outline: 'none',
   },
   // Same longhand as `input`, so React swaps it cleanly (see the SpotForm note
   // in the design-system docs about shorthand/longhand mixing).

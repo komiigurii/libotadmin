@@ -1,0 +1,78 @@
+/* Sign-in page. Kept out of App.css on purpose: it's the only page that uses
+   these rules, and the layout mirrors the console's own frame (see Login.jsx).
+
+   Desktop: teal rail on the left (emblem, wordmark, artwork, slogan) and a
+   cream panel on the right with the rail's one oversized top-left corner.
+   ≤ 860px: the rail becomes a short teal band on top, the artwork is dropped,
+   and the panel's corner turns the bend just under the band. */
+
+.signin {
+  display: grid;
+  grid-template-columns: minmax(340px, 0.8fr) 1.2fr;
+  min-height: 100dvh;
+  background: var(--brand-solid);
+}
+
+.signin-rail {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 28px;
+  padding: clamp(28px, 5vh, 52px) clamp(24px, 3.4vw, 48px);
+  min-height: 0;
+}
+
+.signin-art {
+  position: relative;
+  flex: 1 1 auto;
+  width: 100%;
+  max-width: 400px;
+  min-height: 180px;
+  border-radius: 22px;
+  overflow: hidden;
+  background-size: cover;
+  background-position: center;
+  box-shadow: inset 0 0 0 1px var(--on-brand-solid-soft);
+}
+/* Dark theme only: tones the bright artwork down beside the dark panel. */
+.signin-art::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--photo-veil);
+}
+
+.signin-panel {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg);
+  border-radius: 56px 0 0 0;
+  padding: clamp(28px, 6vw, 72px) 20px;
+}
+
+.signin-card {
+  animation: fadeInUp 0.35s ease both;
+}
+
+@media (max-width: 860px) {
+  .signin { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
+  .signin-rail {
+    flex-direction: row;
+    justify-content: flex-start;
+    gap: 14px;
+    padding: 18px 20px 30px;
+  }
+  .signin-art,
+  .signin-slogan { display: none; }
+  .signin-brand { flex-direction: row !important; text-align: left !important; gap: 12px !important; }
+  .signin-brand-text { align-items: flex-start !important; }
+  .signin-emblem { width: 52px !important; height: 52px !important; border-radius: 17px !important; }
+  .signin-emblem img { width: 36px !important; height: 36px !important; border-radius: 10px !important; }
+  .signin-wordmark { font-size: 21px !important; }
+  .signin-panel {
+    align-items: flex-start;
+    border-radius: 32px 0 0 0;
+    padding: 28px 16px 40px;
+  }
+}
