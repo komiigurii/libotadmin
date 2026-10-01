@@ -7,11 +7,12 @@ import { clearSession } from '../auth/session';
 /*
  * Persistent left rail.
  *
- * Shape: a solid teal frame (with the capiz lattice) holding a cream panel.
- * The emblem and title sit on the teal at the top, the links on the panel,
- * a drawing of Barasoain Church at the foot of the panel, and the theme switch
- * and sign-out back on the teal at the bottom. The panel's single oversized
- * corner is the same signature as the mobile app's sign-in screens.
+ * Shape: a plain teal rail holding a cream panel edge to edge. The emblem and
+ * title sit on the teal at the top, the links on the panel, a risograph print
+ * of Barasoain Church at the foot of the panel whose teal ground runs straight
+ * into the band below, and the theme switch and sign-out on that band. The
+ * panel's single oversized corner is the same signature as the mobile app's
+ * sign-in screens.
  *
  * Responsive behaviour lives in App.css keyed off `.admin-sidebar`, because
  * inline styles can't express a media query:
@@ -60,42 +61,79 @@ const MODERATOR_NAV = [
   ] },
 ];
 
-/* Barasoain Church, Malolos, in line on the panel colour: bell tower, the
-   baroque pediment, rose window and arched door, standing on an adobe wall
-   with the sun behind it. Every colour is a theme variable, so it redraws
-   itself for dark mode. Decorative, so hidden from screen readers. */
+/* Barasoain Church, Malolos, as a three-colour risograph print: yellow,
+   aqua and teal passes that overprint (multiply) where they cross, each with
+   print grain and a slightly-off registration. The church is a solid teal
+   silhouette with its windows knocked out, so the yellow pass shows through
+   as lit windows. Halftone dots shade the wall.
+
+   The ground at the bottom is NOT an ink: it is the exact frame teal, with
+   no grain, so the print runs straight into the band below with no seam.
+
+   Inks are theme variables (index.css), so dark mode prints lighter inks.
+   Decorative, so hidden from screen readers. */
+const SILHOUETTE =
+  // tower, with two arched windows
+  'M16 142 V76 H20 V56 Q31 38 42 56 V76 H46 V142 Z ' +
+  'M28 70 V64 a3 3 0 0 1 6 0 V70 Z M27 102 V92 a4 4 0 0 1 8 0 V102 Z ' +
+  // facade and baroque pediment: rose window, cornice line, two windows, door
+  'M46 142 V68 L56 64 Q62 62 64 57 L80 41 L96 57 Q98 62 104 64 L114 68 V142 Z ' +
+  'M75 60 a5 5 0 1 0 10 0 a5 5 0 1 0 -10 0 Z M48 73 H112 V75 H48 Z ' +
+  'M54 102 V92 a4.5 4.5 0 0 1 9 0 V102 Z M97 102 V92 a4.5 4.5 0 0 1 9 0 V102 Z ' +
+  'M69 142 V116 a11 11 0 0 1 22 0 V142 Z';
+
 function SidebarArt() {
-  const line  = { fill: 'none', stroke: t.brand, strokeWidth: 1.6, strokeLinejoin: 'round', strokeLinecap: 'round' };
-  const solid = { ...line, fill: t.cardBg };
+  const ink = (color) => ({ fill: color, mixBlendMode: 'multiply' });
   return (
     <div className="sidebar-art" style={s.art} aria-hidden="true">
-      <svg viewBox="0 0 228 150" style={s.artSvg} preserveAspectRatio="xMinYMax meet">
-        {/* clouds */}
-        <path d="M-6 58 a12 12 0 0 1 20 -10 a14 14 0 0 1 26 4 a10 10 0 0 1 4 18 h-50 z" style={{ fill: 'var(--illus-cloud)' }} />
-        <path d="M150 128 a16 16 0 0 1 22 -18 a20 20 0 0 1 36 2 a14 14 0 0 1 26 16 z" style={{ fill: 'var(--illus-cloud)' }} />
-        {/* sun */}
-        <circle cx="108" cy="40" r="17" style={{ fill: t.accent }} />
-        {/* bell tower */}
-        <path d="M18 128 V72 H46 V128 Z" style={solid} />
-        <path d="M21 72 V52 H43 V72" style={solid} />
-        <path d="M24 52 Q32 38 40 52" style={solid} />
-        <path d="M32 44 V34 M29 37.5 H35" style={line} />
-        <path d="M28 66 V60 a4 4 0 0 1 8 0 V66" style={line} />
-        <path d="M27 96 V86 a5 5 0 0 1 10 0 V96" style={line} />
-        {/* facade and pediment */}
-        <path d="M46 128 V64 Q54 52 64 52 Q71 38 80 35 Q89 38 96 52 Q106 52 114 64 V128 Z" style={solid} />
-        <path d="M80 35 V24 M76 28 H84" style={line} />
-        <circle cx="80" cy="56" r="5.5" style={line} />
-        <path d="M46 70 H114" style={line} />
-        <path d="M69 128 V106 a11 11 0 0 1 22 0 V128" style={line} />
-        <path d="M54 98 V88 a4.5 4.5 0 0 1 9 0 V98 Z M97 98 V88 a4.5 4.5 0 0 1 9 0 V98 Z" style={line} />
-        {/* adobe wall */}
-        <path d="M0 128 H228 V150 H0 Z" style={{ ...line, fill: 'var(--illus-wall)' }} />
-        <path d="M0 139 H228 M14 128 V139 M44 139 V150 M74 128 V139 M104 139 V150 M134 128 V139 M164 139 V150 M194 128 V139 M224 139 V150"
-          style={{ ...line, strokeWidth: 1, strokeOpacity: 0.4 }} />
+      <svg viewBox="0 0 248 172" style={s.artSvg} preserveAspectRatio="xMidYMax slice">
+        <defs>
+          {/* Print grain: knocks random specks out of each pass. */}
+          <filter id="libot-riso-grain" x="-5%" y="-5%" width="110%" height="110%">
+            <feTurbulence type="fractalNoise" baseFrequency="1.15" numOctaves="2" seed="7" result="noise" />
+            <feColorMatrix in="noise" type="matrix" result="specks"
+              values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  -3.2 0 0 0 2.75" />
+            <feComposite in="SourceGraphic" in2="specks" operator="in" />
+          </filter>
+          <pattern id="libot-riso-dots" width="3.4" height="3.4" patternUnits="userSpaceOnUse" patternTransform="rotate(30)">
+            <circle cx="1.7" cy="1.7" r="0.95" style={{ fill: 'var(--riso-teal)' }} />
+          </pattern>
+        </defs>
+
+        {/* Yellow pass, a touch off-register up and right. */}
+        <g filter="url(#libot-riso-grain)" transform="translate(1.6 -1.1)" style={{ mixBlendMode: 'multiply' }}>
+          <circle cx="116" cy="46" r="21" style={ink('var(--riso-yellow)')} />
+          <rect x="27" y="62" width="8" height="9" style={ink('var(--riso-yellow)')} />
+          <rect x="26" y="88" width="10" height="15" style={ink('var(--riso-yellow)')} />
+          <circle cx="80" cy="60" r="6" style={ink('var(--riso-yellow)')} />
+          <rect x="53" y="87" width="11" height="16" style={ink('var(--riso-yellow)')} />
+          <rect x="96" y="87" width="11" height="16" style={ink('var(--riso-yellow)')} />
+          <rect x="68" y="104" width="24" height="38" style={ink('var(--riso-yellow)')} />
+        </g>
+
+        {/* Aqua pass, off-register the other way. */}
+        <g filter="url(#libot-riso-grain)" transform="translate(-1 0.9)" style={{ mixBlendMode: 'multiply' }}>
+          <path d="M-8 74 a13 13 0 0 1 22 -11 a16 16 0 0 1 29 5 a11 11 0 0 1 5 20 H-8 Z" style={ink('var(--riso-aqua)')} />
+          <path d="M150 140 a18 18 0 0 1 26 -20 a22 22 0 0 1 40 3 a15 15 0 0 1 28 17 Z" style={ink('var(--riso-aqua)')} />
+          {/* Kept clear of the tagline: teal text on aqua would drop below 4.5:1. */}
+          <path d="M126 102 a8 8 0 0 1 13 -6 a10 10 0 0 1 18 2 a7 7 0 0 1 6 10 H126 Z" style={ink('var(--riso-aqua)')} />
+        </g>
+
+        {/* Teal pass: the church, its crosses, halftone shading, the wall. */}
+        <g filter="url(#libot-riso-grain)" style={{ mixBlendMode: 'multiply' }}>
+          <path d={SILHOUETTE} fillRule="evenodd" style={ink('var(--riso-teal)')} />
+          <path d="M30 42 V30 H32 V42 Z M27 33 H35 V35 H27 Z M79 42 V28 H81 V42 Z M75 31 H85 V33 H75 Z" style={ink('var(--riso-teal)')} />
+          <rect x="102" y="68" width="12" height="74" fill="url(#libot-riso-dots)" style={{ mixBlendMode: 'multiply' }} />
+          <rect x="0" y="130" width="248" height="2.4" style={ink('var(--riso-teal)')} />
+          <rect x="0" y="132" width="248" height="16" fill="url(#libot-riso-dots)" style={{ mixBlendMode: 'multiply' }} />
+        </g>
+
+        {/* Ground: plain frame teal, the same colour as the band below. */}
+        <path d="M0 152 C 26 142, 46 158, 74 149 S 122 141, 148 150 S 204 158, 248 146 V172 H0 Z"
+          style={{ fill: 'var(--brand-solid)' }} />
       </svg>
       <p className="sidebar-tagline" style={s.tagline}>
-        Discover,<br />Explore,<br />Experience<br /><span style={s.taglineMark}>Bulacan.</span>
+        Discover,<br />Explore,<br />Experience<br />Bulacan.
       </p>
     </div>
   );
@@ -124,7 +162,7 @@ export default function Navbar() {
   ];
 
   return (
-    <nav className="admin-sidebar capiz-lattice" style={s.sidebar} aria-label="Main">
+    <nav className="admin-sidebar" style={s.sidebar} aria-label="Main">
       <div
         className="sidebar-brand"
         style={s.brand}
@@ -240,18 +278,13 @@ const s = {
     // dvh, not vh: on mobile browsers vh includes the collapsing URL bar, so a
     // 100vh rail is taller than the visible viewport and clips its own footer.
     height: '100dvh', boxSizing: 'border-box',
-    // background-COLOR so the capiz-lattice image layer from App.css survives.
-    backgroundColor: t.brandSolid,
-    paddingLeft: 10,
+    background: t.brandSolid,
     position: 'sticky', top: 0, flexShrink: 0,
   },
 
   brand: {
     display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center',
-    gap: 12, cursor: 'pointer',
-    // The frame's 10px sits on the left, so pad the right to match and keep
-    // the emblem centred on the whole rail.
-    padding: '24px 10px 20px 0',
+    gap: 12, cursor: 'pointer', padding: '24px 0 20px',
   },
   emblem: {
     display: 'grid', placeItems: 'center', width: 72, height: 72, borderRadius: 24,
@@ -278,11 +311,11 @@ const s = {
     overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
   },
 
-  // One big corner on the top left, a smaller one at the foot — the panel
-  // reads as a sheet tucked into the frame, open towards the page.
+  // Edge to edge, with one big corner on the top left. No corner at the foot:
+  // the print's teal ground carries the panel straight into the band below.
   panel: {
     flex: '1 1 auto', minHeight: 0, display: 'flex', flexDirection: 'column',
-    background: t.sidebarBg, borderRadius: '30px 0 0 22px', overflow: 'hidden',
+    background: t.sidebarBg, borderRadius: '30px 0 0 0', overflow: 'hidden',
   },
   navSection: {
     flex: '1 1 auto', minHeight: 0, overflowY: 'auto', overflowX: 'hidden',
@@ -308,18 +341,20 @@ const s = {
 
   // Bleeds to the panel's edges (cancelling the list's 12px padding) and is
   // pushed to the bottom by the auto top margin.
-  art: { position: 'relative', flexShrink: 0, height: 150, margin: 'auto -12px 0' },
-  artSvg: { position: 'absolute', left: 0, bottom: 0, width: '100%', height: '100%', overflow: 'visible' },
+  // isolation: the inks overprint each other, not the panel behind them.
+  art: { position: 'relative', flexShrink: 0, height: 172, margin: 'auto -12px 0', isolation: 'isolate' },
+  artSvg: { position: 'absolute', left: 0, bottom: 0, width: '100%', height: '100%', display: 'block' },
+  // Printed in teal with the yellow pass slipping out from under it — the
+  // same misregistration as the print. The teal carries the contrast; the
+  // yellow is decoration.
   tagline: {
-    position: 'absolute', right: 14, top: 6, margin: 0, textAlign: 'right',
-    fontFamily: fonts.display, fontStyle: 'italic', fontWeight: 600, fontSize: 17,
+    position: 'absolute', right: 14, top: 4, margin: 0, textAlign: 'right',
+    fontFamily: fonts.display, fontStyle: 'italic', fontWeight: 700, fontSize: 17,
     lineHeight: 1.04, color: t.brand, letterSpacing: '-0.01em',
+    textShadow: `1.4px 1.1px 0 ${t.accent}`,
   },
-  // The brand yellow as a marker stroke under the last word. Yellow can't be
-  // the text colour on cream (it fails contrast), but it can underline it.
-  taglineMark: { boxShadow: `inset 0 -0.16em 0 ${t.accent}`, padding: '0 2px' },
 
-  footer: { display: 'flex', alignItems: 'center', gap: 8, padding: '12px 14px 16px 4px' },
+  footer: { display: 'flex', alignItems: 'center', gap: 8, padding: '12px 14px 16px' },
   themeRow: {
     display: 'flex', gap: 2, padding: 3, borderRadius: radius.md, background: ON_FRAME_WELL,
   },
