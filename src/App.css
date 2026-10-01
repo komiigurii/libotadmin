@@ -180,19 +180,33 @@ tbody tr:hover td {
 }
 
 /* ── Login page ────────────────────────────────────────────────
-   The sign-in card deliberately does NOT use .modern-card: that class lifts on
-   hover, which is right for a grid of clickable cards and wrong for a form —
-   the card would jump every time the pointer travels to the password field. */
-.login-card {
+   Brand panel | form, side by side. Below 860px the brand panel becomes a
+   slim strip (logo + name) above the form, so a phone gets the form at once. */
+.login-shell {
+  display: grid;
+  grid-template-columns: minmax(300px, 0.85fr) 1.15fr;
+}
+.login-lattice {
+  position: absolute;
+  inset: 0;
+  -webkit-mask-image: radial-gradient(110% 75% at 100% 0%, #000 0%, transparent 72%);
+          mask-image: radial-gradient(110% 75% at 100% 0%, #000 0%, transparent 72%);
+  pointer-events: none;
+}
+.login-main {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: clamp(28px, 6vw, 64px) 20px;
+}
+.login-form {
   animation: fadeInUp 0.35s ease both;
 }
-
-@keyframes captionFade {
-  from { opacity: 0; }
-  to   { opacity: 1; }
-}
-.login-caption {
-  animation: captionFade 0.9s ease both;
+@media (max-width: 860px) {
+  .login-shell { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
+  .login-brand-body { display: none; }
+  /* Top-aligned on a phone, so the on-screen keyboard doesn't cover the form. */
+  .login-main { align-items: flex-start; padding-top: 40px; }
 }
 
 /* For div-based list rows (not <table> — those get `tbody tr:hover td` above) */
