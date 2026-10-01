@@ -167,51 +167,7 @@ tbody tr:hover td {
   box-shadow: 0 0 0 3px var(--brand-soft);
 }
 
-/* ── Login page ────────────────────────────────────────────────
-   Brand panel | form, side by side. Below 860px the brand panel becomes a
-   slim strip (logo + name) above the form, so a phone gets the form at once. */
-.login-shell {
-  display: grid;
-  grid-template-columns: minmax(300px, 0.85fr) 1.15fr;
-}
-/* Over the bg.png artwork: dark behind the logo (top) and the headline
-   (bottom), almost clear in the middle. Stops were measured, not eyeballed —
-   see the note at the top of pages/Login.jsx before changing them. */
-.login-scrim,
-.login-veil {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-}
-.login-scrim {
-  background: linear-gradient(180deg,
-    rgba(8, 24, 26, 0.80) 0%,
-    rgba(8, 24, 26, 0.05) 36%,
-    rgba(8, 24, 26, 0.05) 40%,
-    rgba(8, 24, 26, 0.62) 70%,
-    rgba(8, 24, 26, 0.88) 100%);
-}
-/* Dark theme only: tones the bright artwork down so it doesn't glare next to
-   the dark form. Only ever adds contrast. */
-.login-veil { background: var(--photo-veil); }
-.login-main {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: clamp(28px, 6vw, 64px) 20px;
-}
-.login-form {
-  animation: fadeInUp 0.35s ease both;
-}
-@media (max-width: 860px) {
-  .login-shell { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
-  .login-brand-body { display: none; }
-  /* The strip is too short for the two-ended gradient: an even wash keeps
-     the logo at 5.4:1 wherever the crop lands. */
-  .login-scrim { background: rgba(8, 24, 26, 0.62); }
-  /* Top-aligned on a phone, so the on-screen keyboard doesn't cover the form. */
-  .login-main { align-items: flex-start; padding-top: 40px; }
-}
+/* The sign-in page's rules live in pages/Login.css. */
 
 /* For div-based list rows (not <table> — those get `tbody tr:hover td` above) */
 .modern-row {
