@@ -94,22 +94,6 @@ tbody tr:hover td {
   color: var(--text-primary) !important;
 }
 
-/* ── Capiz lattice ──
-   The shell-paned windows of Bulacan's bahay na bato: small square panes in a
-   thin frame, with a heavier muntin every fourth pane, and a pearly sheen in
-   one corner the way capiz catches light. Decoration only, drawn over a solid
-   fill set inline (background-color, so this image layer survives). */
-.capiz-lattice {
-  background-image:
-    radial-gradient(120% 90% at 100% 0%, var(--lattice), transparent 60%),
-    linear-gradient(var(--lattice) 1px, transparent 1px),
-    linear-gradient(90deg, var(--lattice) 1px, transparent 1px),
-    linear-gradient(var(--lattice) 2px, transparent 2px),
-    linear-gradient(90deg, var(--lattice) 2px, transparent 2px);
-  background-size: 100% 100%, 13px 13px, 13px 13px, 52px 52px, 52px 52px;
-  background-position: 0 0, -1px -1px, -1px -1px, -2px -2px, -2px -2px;
-}
-
 /* ── Dashboard ── */
 /* One orchestrated entrance (sections stagger in via inline animation-delay)
    rather than motion scattered across every widget. Reduced-motion users get
@@ -268,15 +252,15 @@ tbody tr:hover td {
   /* Just the emblem, smaller. Title, console name and scope are hidden with
      the other .sidebar-text; the block's accessible name still says which
      console this is. */
-  .admin-sidebar .sidebar-brand { padding: 14px 10px 14px 0 !important; }
+  .admin-sidebar .sidebar-brand { padding: 14px 0 !important; }
   .admin-sidebar .sidebar-emblem { width: 44px !important; height: 44px !important; border-radius: 14px !important; }
   .admin-sidebar .sidebar-emblem img { width: 32px !important; height: 32px !important; border-radius: 9px !important; }
-  .admin-sidebar .sidebar-panel { border-radius: 18px 0 0 14px !important; }
+  .admin-sidebar .sidebar-panel { border-radius: 18px 0 0 0 !important; }
   .admin-sidebar .sidebar-section { padding: 14px 6px 6px !important; }
   /* No room for the drawing in a 58px panel. */
   .admin-sidebar .sidebar-art { display: none; }
   /* Three theme buttons side by side overflow the rail — stack everything. */
-  .admin-sidebar .sidebar-footer { flex-direction: column; padding: 10px 10px 14px 0 !important; }
+  .admin-sidebar .sidebar-footer { flex-direction: column; padding: 10px 0 14px !important; }
   .admin-sidebar .theme-row { flex-direction: column; }
   .admin-sidebar .logout-btn { flex: none !important; width: 40px; padding: 8px 0 !important; }
   .admin-page { padding-left: 20px !important; padding-right: 20px !important; }
@@ -288,7 +272,7 @@ tbody tr:hover td {
    so all eight admin links fit without scrolling. The church drawing already
    scrolls away below them on its own. */
 @media (max-height: 760px) and (min-width: 1101px) {
-  .admin-sidebar .sidebar-brand { padding: 14px 10px 12px 0 !important; gap: 8px !important; }
+  .admin-sidebar .sidebar-brand { padding: 14px 0 12px !important; gap: 8px !important; }
   .admin-sidebar .sidebar-emblem { width: 54px !important; height: 54px !important; border-radius: 18px !important; }
   .admin-sidebar .sidebar-emblem img { width: 38px !important; height: 38px !important; border-radius: 11px !important; }
   .admin-sidebar .sidebar-section { padding-top: 12px !important; }
