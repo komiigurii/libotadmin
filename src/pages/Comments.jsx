@@ -3,7 +3,7 @@ import { commentAPI, bannedAccountsAPI } from '../api/api';
 import { notify, confirmAction } from '../components/AppAlert';
 import {
   Page, PageHeader, Toolbar, SearchInput, List, Button, Tag,
-  Loading, ErrorBanner, EmptyState, Avatar, pageStyles as s,
+  Loading, ErrorBanner, EmptyState, Avatar, ReviewPhotos, pageStyles as s,
 } from '../components/Layout';
 import { fmtDateTime } from '../utils/format';
 import Icon from '../components/Icon';
@@ -174,6 +174,7 @@ function CommentRow({ comment, expanded, onToggle, onUpdated }) {
             <Tag icon="map-pin">{spotName}{spotCity ? ` · ${spotCity}` : ''}</Tag>
           </div>
           <p style={s.itemText}>{comment.comment}</p>
+          <ReviewPhotos photos={comment.photos} />
           <div style={s.itemFacts}>
             {comment.rating != null && <span style={s.itemFact}><Icon name="star" size={12} /> {comment.rating}/5</span>}
             <span style={s.itemFact}><Icon name="thumbs-up" size={12} /> {comment.likes || 0}</span>
