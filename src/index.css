@@ -71,6 +71,8 @@
   --on-brand-solid-soft:  rgba(255,255,255,0.22);
   /* The capiz-window lattice drawn over solid teal — decoration only. */
   --lattice:         rgba(255,255,255,0.10);
+  /* Over photographs (the login artwork): none in light, a soft dark veil in dark. */
+  --photo-veil:      transparent;
 
   /* Chart marks (dashboard meters/bars). NOT --brand: that teal is tuned for
      text and falls below the chart chroma floor (reads grey as a bar). These
@@ -136,6 +138,7 @@
     --on-brand-solid-muted: rgba(255,255,255,0.96); /* 0.86 was 4.19:1 on the darker-mode teal */
     --on-brand-solid-soft:  rgba(255,255,255,0.22);
     --lattice:         rgba(255,255,255,0.08);
+    --photo-veil:      rgba(8,20,22,0.38);
     --data-1:          #12A7B5;
     --data-1-track:    rgba(18,167,181,0.20);
 
@@ -193,6 +196,7 @@
   --on-brand-solid-muted: rgba(255,255,255,0.96); /* 0.86 was 4.19:1 on the darker-mode teal */
   --on-brand-solid-soft:  rgba(255,255,255,0.22);
   --lattice:         rgba(255,255,255,0.08);
+  --photo-veil:      rgba(8,20,22,0.38);
   --data-1:          #12A7B5;
   --data-1-track:    rgba(18,167,181,0.20);
 

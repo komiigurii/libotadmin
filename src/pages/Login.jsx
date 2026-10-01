@@ -6,19 +6,23 @@ import { theme as t, radius, fonts, type } from '../theme';
 import { Button } from '../components/Layout';
 import Icon from '../components/Icon';
 import logo from '../assets/logo.png';
+// The mobile app's sign-in background (LibotBulacan/assets/bg.png: Bulacan
+// landmarks under the cyan→yellow wash), re-encoded as JPEG — 478 KB → 54 KB.
+import loginBg from '../assets/login-bg.jpg';
 
 /*
  * Sign-in for admins and moderators.
  *
- * Two halves: the brand panel (the same solid teal + capiz lattice as the
- * sidebar's brand block, so signing in already looks like the panel) and a
- * plain form on the page background. Every colour is a theme token, so it
- * reads correctly in light AND dark — the old frosted card was hardcoded
- * dark, which put near-black text on dark teal for anyone in light mode.
+ * Two halves: a brand panel carrying the app's own sign-in artwork (bg.png,
+ * so the panel and the app's front door look like one product) and a plain
+ * form on the page background. The form uses theme tokens throughout, so it
+ * reads correctly in light AND dark.
  *
- * The rotating blurred photo backdrop is gone: it was busy, it downloaded
- * ~0.4 MB on the one page that loads before anything is cached, and the spot
- * photos are low-resolution anyway.
+ * The artwork is light, and white text on it measures ~1.5:1. A dark gradient
+ * (.login-scrim in App.css) sits behind the logo at the top and the headline
+ * at the bottom and leaves the middle of the picture almost clear. Measured
+ * on the real pixels at 900–1920 px widths: logo ≥ 5.0:1, headline ≥ 6.4:1,
+ * small text ≥ 8.2:1. Re-measure if the image or the gradient changes.
  */
 
 const lockLabel = (s) => {
@@ -109,10 +113,9 @@ export default function Login() {
 
   return (
     <div className="login-shell" style={s.shell}>
-      <aside className="login-brand" style={s.brand}>
-        {/* The lattice fades out from the top-right corner (see App.css) —
-            across a whole panel at full strength it reads as graph paper. */}
-        <div className="login-lattice capiz-lattice" aria-hidden="true" />
+      <aside className="login-brand" style={{ ...s.brand, backgroundImage: `url(${loginBg})` }}>
+        <div className="login-scrim" aria-hidden="true" />
+        <div className="login-veil" aria-hidden="true" />
         <div style={s.brandMark}>
           <img src={logo} alt="" style={s.logo} />
           <span style={s.brandName}>Libot <span style={s.brandNameSub}>Admin</span></span>
@@ -226,23 +229,27 @@ export default function Login() {
 const s = {
   shell: { minHeight: '100dvh', background: t.bg },
 
+  // Text on the artwork is white in both themes: it sits on the scrim over a
+  // picture, not on a page surface, so it doesn't follow the theme tokens.
+  // The teal fill shows only while the image loads.
   brand: {
     position: 'relative', overflow: 'hidden',
     backgroundColor: t.brandSolid,
-    color: t.onBrandSolid,
+    backgroundSize: 'cover', backgroundPosition: 'center',
+    color: '#FFFFFF',
     padding: 'clamp(22px, 4vw, 48px)',
     display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: 32,
   },
   brandMark: { position: 'relative', display: 'flex', alignItems: 'center', gap: 12 },
   logo: { width: 40, height: 40, borderRadius: radius.md, objectFit: 'contain', background: 'transparent' },
-  brandName: { fontFamily: fonts.display, fontSize: 22, fontWeight: 600, letterSpacing: '-0.01em', color: t.onBrandSolid },
-  brandNameSub: { fontFamily: fonts.sans, fontSize: 14, fontWeight: 600, color: t.onBrandSolidMuted, marginLeft: 4 },
+  brandName: { fontFamily: fonts.display, fontSize: 22, fontWeight: 600, letterSpacing: '-0.01em', color: '#FFFFFF' },
+  brandNameSub: { fontFamily: fonts.sans, fontSize: 14, fontWeight: 600, color: 'rgba(255,255,255,0.86)', marginLeft: 4 },
   brandBody: { position: 'relative', maxWidth: 420 },
   brandHeadline: {
     fontFamily: fonts.display, fontSize: 'clamp(28px, 3.2vw, 40px)', fontWeight: 600,
-    lineHeight: 1.15, letterSpacing: '-0.02em', color: t.onBrandSolid, margin: 0,
+    lineHeight: 1.15, letterSpacing: '-0.02em', color: '#FFFFFF', margin: 0,
   },
-  brandText: { fontSize: 15, lineHeight: 1.5, color: t.onBrandSolidMuted, marginTop: 14, marginBottom: 0 },
+  brandText: { fontSize: 15, lineHeight: 1.5, color: 'rgba(255,255,255,0.86)', marginTop: 14, marginBottom: 0 },
 
   form: { width: '100%', maxWidth: 380 },
 
