@@ -15,7 +15,7 @@ import './Login.css';
  * Sign-in for admins and moderators.
  *
  * Built from the console's own frame, so signing in already looks like the
- * panel you land in: the teal rail with the emblem in its dark well, LIBOT in
+ * panel you land in: the teal rail with the emblem in its dark well, LIBOT BULACAN in
  * tracked capitals and the console name; the app's sign-in artwork (bg.png)
  * framed on the rail the way the church print sits at the foot of the
  * sidebar; the app slogan in the sidebar tagline's italic with its yellow
@@ -119,14 +119,14 @@ export default function Login() {
 
   return (
     <div className="signin">
-      <aside className="signin-rail" aria-label="Libot">
+      <aside className="signin-rail" aria-label="Libot Bulacan">
         {/* The sidebar's brand block, larger. */}
         <div className="signin-brand" style={s.brand}>
           <span className="signin-emblem" style={s.emblem}>
             <img src={logo} alt="" style={s.logo} />
           </span>
           <div className="signin-brand-text" style={s.brandText}>
-            <div className="signin-wordmark" style={s.wordmark}>Libot</div>
+            <div className="signin-wordmark" style={s.wordmark}>Libot Bulacan</div>
             <div style={s.console}>Admin &amp; Moderator Console</div>
           </div>
         </div>
@@ -234,7 +234,7 @@ export default function Login() {
             {locked ? `Try again in ${lockLabel(lockedFor)}` : loading ? 'Signing in…' : 'Sign in'}
           </Button>
 
-          <p style={s.help}>Can't sign in? Ask your Libot administrator.</p>
+          <p style={s.help}>Can't sign in? Ask your Libot Bulacan administrator.</p>
         </form>
       </main>
     </div>
@@ -252,9 +252,12 @@ const s = {
   },
   logo: { width: 62, height: 62, objectFit: 'contain', borderRadius: 17, display: 'block' },
   brandText: { display: 'flex', flexDirection: 'column', alignItems: 'center' },
+  // Fluid, not a flat 32px: "LIBOT BULACAN" is 357px wide at 32px, more than
+  // the rail holds just above the 860px breakpoint (~286px); 2.2vw keeps it
+  // one line there and reaches 32px on wide screens.
   wordmark: {
-    fontFamily: fonts.display, color: t.onBrandSolid, fontWeight: 700, fontSize: 32,
-    lineHeight: 1, letterSpacing: '0.18em', textTransform: 'uppercase',
+    fontFamily: fonts.display, color: t.onBrandSolid, fontWeight: 700, fontSize: 'clamp(22px, 2.2vw, 32px)',
+    lineHeight: 1, letterSpacing: '0.18em', textTransform: 'uppercase', whiteSpace: 'nowrap',
     // Tracking also pads the last letter; this re-centres the word.
     paddingLeft: '0.18em',
   },

@@ -69,7 +69,7 @@
   .signin-brand-text { align-items: flex-start !important; }
   .signin-emblem { width: 52px !important; height: 52px !important; border-radius: 17px !important; }
   .signin-emblem img { width: 36px !important; height: 36px !important; border-radius: 10px !important; }
-  .signin-wordmark { font-size: 21px !important; }
+  .signin-wordmark { font-size: 18px !important; }
   .signin-panel {
     align-items: flex-start;
     border-radius: 32px 0 0 0;
