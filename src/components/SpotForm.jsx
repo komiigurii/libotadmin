@@ -1,8 +1,9 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import './SpotMap.css';
 import { theme as t, radius, shadow } from '../theme';
-import { uploadAPI, missionAPI, categoryAPI } from '../api/api';
+import { uploadAPI, missionAPI, categoryAPI, spotAPI } from '../api/api';
 import { notify, confirmAction } from './AppAlert';
 import Icon from './Icon';
 import { spotHasAR } from '../utils/spotHasAR';
@@ -82,6 +83,77 @@ function coordError(lat, lng) {
   };
   return check(lat, 90, 'Latitude') || check(lng, 180, 'Longitude');
 }
+
+// ── Radius rings ──────────────────────────────────────────────────
+// Each map draws the radius the app actually uses around the pins it edits,
+// so a moderator can see when two of them sit on the same ground.
+
+// How close a traveler must be for the app to count a visit
+// (ARRIVAL_RADIUS_METERS in the app's context/ArrivalContext.js). Two spots
+// whose pins are under twice this apart overlap: someone standing between
+// them arrives at both at once.
+const ARRIVAL_RADIUS_M = 50;
+
+// An AR model's trigger radius (BASE_MODEL_RADIUS_METERS in the app's
+// Screens/ARScreen.js). For AR pins under twice this apart the app shrinks
+// both rings to half the gap, never below AR_MIN_RADIUS_M.
+const AR_RADIUS_M = 6;
+const AR_MIN_RADIUS_M = 3;
+
+const MISSION_RADIUS_DEFAULT_M = 60;
+
+function distanceM(lat1, lng1, lat2, lng2) {
+  const toRad = (d) => (d * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+  return 6371000 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+const fmtDistance = (m) =>
+  m >= 1000 ? `${(m / 1000).toFixed(1)} km` : m < 10 ? `${m.toFixed(1)} m` : `${Math.round(m)} m`;
+
+// Where the app places a spot (getSpotCoords): its pin, then the older
+// latitude/longitude fields, then the middle of its AR anchors.
+function spotPosition(spot) {
+  const c = spot?.coordinates;
+  if (toNum(c?.lat) !== null && toNum(c?.lng) !== null) return { lat: toNum(c.lat), lng: toNum(c.lng) };
+  if (toNum(spot?.latitude) !== null && toNum(spot?.longitude) !== null) {
+    return { lat: toNum(spot.latitude), lng: toNum(spot.longitude) };
+  }
+  const anchors = (Array.isArray(spot?.modelsCoordinates) ? spot.modelsCoordinates : [])
+    .filter((a) => toNum(a?.lat) !== null && toNum(a?.lng) !== null);
+  if (!anchors.length) return null;
+  return {
+    lat: anchors.reduce((sum, a) => sum + Number(a.lat), 0) / anchors.length,
+    lng: anchors.reduce((sum, a) => sum + Number(a.lng), 0) / anchors.length,
+  };
+}
+
+// Pairs of AR pins whose rings overlap. `points` may hold nulls (a pin whose
+// coordinates are half-typed); those are skipped but keep their index, so
+// i/j still line up with "AR 1", "AR 2"…
+function arOverlaps(points) {
+  const pairs = [];
+  for (let i = 0; i < points.length; i++) {
+    for (let j = i + 1; j < points.length; j++) {
+      const a = points[i];
+      const b = points[j];
+      if (!a || !b) continue;
+      const distance = distanceM(a.lat, a.lng, b.lat, b.lng);
+      if (distance < 2 * AR_RADIUS_M) pairs.push({ i, j, distance });
+    }
+  }
+  return pairs;
+}
+
+const missionRadiusOf = (v) => (Number(v) > 0 ? Number(v) : MISSION_RADIUS_DEFAULT_M);
+
+// Rings are SVG paths whose colour comes from a class (SpotMap.css), so an
+// overlap is shown by toggling one.
+const markClash = (layer, on) => layer?.getElement()?.classList.toggle('is-clash', on);
 
 // ── Editable lat/lng pair ─────────────────────────────────────────
 // Clicking the map is the quick way to drop a pin, but coordinates often
@@ -379,11 +451,18 @@ function MapSearch({ mapRef }) {
 // mounts its own, with `mode` fixed to that tab: only that mode's pin(s) are
 // draggable and map clicks only affect them. The other pins stay visible for
 // reference — AR models are placed relative to the spot, and so is the eatery.
+//
+// The pins a map edits also get a ring at the radius the app uses for them
+// (spot: arrival, AR: trigger, food: completion). The Location map adds every
+// other spot with its own arrival ring, and rings that overlap turn red — live
+// while a pin is dragged, not just once it's dropped.
 function SpotMapPicker({
   spotLat, spotLng, onSpotChange,
   arModels, onPlaceAr, onArMove,
   mode = 'spot', // 'spot' | 'ar' | 'mission'
   missionLat, missionLng, onMissionChange,
+  missionRadius = MISSION_RADIUS_DEFAULT_M,
+  otherSpots = [], // [{ id, name, lat, lng }] — drawn on the Location map only
   active = true, // false while this map's tab is hidden
   height = 320,
 }) {
@@ -392,6 +471,33 @@ function SpotMapPicker({
   const spotMarkerRef = useRef(null);
   const arMarkersRef  = useRef({});
   const missionMarkerRef = useRef(null);
+  const spotRingRef    = useRef(null);
+  const arRingsRef     = useRef({});
+  const missionRingRef = useRef(null);
+  const othersRef      = useRef([]); // [{ lat, lng, ring, dot }]
+
+  // Both read only refs, so the drag handlers (bound once, when a marker is
+  // created) can call them without going stale.
+  const paintSpotClash = (lat, lng) => {
+    let any = false;
+    othersRef.current.forEach((o) => {
+      const on = lat != null && distanceM(lat, lng, o.lat, o.lng) < 2 * ARRIVAL_RADIUS_M;
+      markClash(o.ring, on);
+      markClash(o.dot, on);
+      if (on) any = true;
+    });
+    markClash(spotRingRef.current, any);
+  };
+
+  const paintArClash = () => {
+    const rings = Object.values(arRingsRef.current);
+    const hit = new Set();
+    arOverlaps(rings.map((r) => r.getLatLng())).forEach(({ i, j }) => { hit.add(i); hit.add(j); });
+    rings.forEach((r, i) => markClash(r, hit.has(i)));
+  };
+
+  const ring = (latlng, radiusM, kind) =>
+    L.circle(latlng, { radius: radiusM, className: `map-ring map-ring--${kind}`, interactive: false });
 
   // Always-fresh refs so the map's event handlers (bound once) see current props/callbacks
   const stateRef = useRef({ mode, onSpotChange, onPlaceAr, onArMove, onMissionChange });
@@ -446,9 +552,12 @@ function SpotMapPicker({
     if (mode === 'ar') arModels.forEach((m) => add(m.lat, m.lng));
     if (mode === 'mission') add(missionLat, missionLng);
 
-    const map = L.map(containerRef.current, { zoomControl: false });
-    if (pts.length > 1) map.fitBounds(pts, { padding: [48, 48], maxZoom: 18 });
-    else if (pts.length === 1) map.setView(pts[0], 16);
+    // Close enough that each tab's rings are bigger than its pins: a 50 m
+    // arrival ring is ~45 px across at 17, a 6 m AR ring ~40 px at 20.
+    const zoom = mode === 'ar' ? 20 : mode === 'spot' ? 17 : 16;
+    const map = L.map(containerRef.current, { zoomControl: false, maxZoom: 21 });
+    if (pts.length > 1) map.fitBounds(pts, { padding: [48, 48], maxZoom: zoom });
+    else if (pts.length === 1) map.setView(pts[0], zoom);
     else map.setView([DEFAULT_CENTER.lat, DEFAULT_CENTER.lng], 13);
     mapRef.current = map;
 
@@ -456,9 +565,12 @@ function SpotMapPicker({
     // Leaflet's default top-left placement.
     L.control.zoom({ position: 'bottomright' }).addTo(map);
 
+    // OSM serves nothing past 19; beyond that Leaflet enlarges the z19 tiles,
+    // which is what lets AR pins a few metres apart be told apart.
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '© OpenStreetMap contributors',
-      maxZoom: 19,
+      maxNativeZoom: 19,
+      maxZoom: 21,
     }).addTo(map);
 
     map.on('click', (e) => {
@@ -477,6 +589,10 @@ function SpotMapPicker({
       spotMarkerRef.current = null;
       arMarkersRef.current = {};
       missionMarkerRef.current = null;
+      spotRingRef.current = null;
+      arRingsRef.current = {};
+      missionRingRef.current = null;
+      othersRef.current = [];
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -493,6 +609,9 @@ function SpotMapPicker({
       if (spotLat === '' && spotLng === '' && spotMarkerRef.current) {
         mapRef.current.removeLayer(spotMarkerRef.current);
         spotMarkerRef.current = null;
+        spotRingRef.current?.remove();
+        spotRingRef.current = null;
+        paintSpotClash(null, null);
       }
       return;
     }
@@ -512,6 +631,12 @@ function SpotMapPicker({
       // transform under the hood) — firing a React state update on every
       // 'drag' tick forces the whole form to re-render dozens of times a
       // second and fights with that native smoothness, causing stutter.
+      // The ring follows on 'drag' the same way: Leaflet only, no React.
+      spotMarkerRef.current.on('drag', () => {
+        const pos = spotMarkerRef.current.getLatLng();
+        spotRingRef.current?.setLatLng(pos);
+        paintSpotClash(pos.lat, pos.lng);
+      });
       spotMarkerRef.current.on('dragend', () => {
         const pos = spotMarkerRef.current.getLatLng();
         stateRef.current.onSpotChange(pos.lat, pos.lng);
@@ -524,8 +649,38 @@ function SpotMapPicker({
         mapRef.current.setView([la, ln], mapRef.current.getZoom());
       }
     }
+
+    // The arrival ring, on the map that moves this pin.
+    if (mode === 'spot') {
+      if (spotRingRef.current) spotRingRef.current.setLatLng([la, ln]);
+      else spotRingRef.current = ring([la, ln], ARRIVAL_RADIUS_M, 'spot').addTo(mapRef.current);
+      paintSpotClash(la, ln);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [spotLat, spotLng]);
+
+  // Every other spot with its arrival ring, Location map only. Added after
+  // the spot's own ring, so theirs draw on top and stay readable where the
+  // two overlap.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || mode !== 'spot') return;
+    const layer = L.layerGroup().addTo(map);
+    othersRef.current = otherSpots.map((o) => ({
+      lat: o.lat,
+      lng: o.lng,
+      ring: ring([o.lat, o.lng], ARRIVAL_RADIUS_M, 'other').addTo(layer),
+      dot: L.circleMarker([o.lat, o.lng], { radius: 5, className: 'map-dot' })
+        .bindTooltip(o.name || 'Unnamed spot')
+        .addTo(layer),
+    }));
+    const cur = spotMarkerRef.current?.getLatLng();
+    paintSpotClash(cur?.lat ?? null, cur?.lng ?? null);
+    return () => {
+      layer.remove();
+      othersRef.current = [];
+    };
+  }, [otherSpots, mode]);
 
   // Keep AR position markers in sync: add new ones, move existing ones,
   // remove deleted ones, and renumber icons/tooltips when the list changes.
@@ -537,6 +692,8 @@ function SpotMapPicker({
       if (!currentIds.has(id)) {
         mapRef.current.removeLayer(arMarkersRef.current[id]);
         delete arMarkersRef.current[id];
+        arRingsRef.current[id]?.remove();
+        delete arRingsRef.current[id];
       }
     });
 
@@ -560,6 +717,10 @@ function SpotMapPicker({
           .bindTooltip(`AR ${num}`, { permanent: false });
 
         const thisId = model.id;
+        marker.on('drag', () => {
+          arRingsRef.current[thisId]?.setLatLng(marker.getLatLng());
+          paintArClash();
+        });
         marker.on('dragend', () => {
           const pos = marker.getLatLng();
           stateRef.current.onArMove(thisId, pos.lat, pos.lng);
@@ -567,7 +728,16 @@ function SpotMapPicker({
 
         arMarkersRef.current[model.id] = marker;
       }
+
+      // Trigger rings on the AR map only — at the spot's zoom they'd be
+      // specks under the pins anyway.
+      if (mode === 'ar') {
+        const r = arRingsRef.current[model.id];
+        if (r) r.setLatLng([la, ln]);
+        else arRingsRef.current[model.id] = ring([la, ln], AR_RADIUS_M, 'ar').addTo(mapRef.current);
+      }
     });
+    paintArClash();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [arModels]);
 
@@ -582,6 +752,8 @@ function SpotMapPicker({
       if (missionLat === '' && missionLng === '' && missionMarkerRef.current) {
         mapRef.current.removeLayer(missionMarkerRef.current);
         missionMarkerRef.current = null;
+        missionRingRef.current?.remove();
+        missionRingRef.current = null;
       }
       return;
     }
@@ -596,13 +768,23 @@ function SpotMapPicker({
         .addTo(mapRef.current)
         .bindTooltip('Food mission', { permanent: false });
 
+      missionMarkerRef.current.on('drag', () => {
+        missionRingRef.current?.setLatLng(missionMarkerRef.current.getLatLng());
+      });
       missionMarkerRef.current.on('dragend', () => {
         const pos = missionMarkerRef.current.getLatLng();
         stateRef.current.onMissionChange(pos.lat, pos.lng);
       });
     }
+
+    // The completion ring follows the Radius field as it's typed.
+    if (mode === 'mission') {
+      const r = missionRadiusOf(missionRadius);
+      if (missionRingRef.current) missionRingRef.current.setLatLng([la, ln]).setRadius(r);
+      else missionRingRef.current = ring([la, ln], r, 'food').addTo(mapRef.current);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [missionLat, missionLng]);
+  }, [missionLat, missionLng, missionRadius]);
 
   // Follow a typed coordinate that lands off-screen, so the pin doesn't
   // silently move somewhere the user can't see.
@@ -738,22 +920,105 @@ function TabPanel({ id, active, children }) {
 
 // Which pin is which, now that there's no Spot / AR / Food toggle above the
 // map carrying the coloured dots. The pins this tab edits are listed first
-// and in full colour; the rest are there for reference.
-function MapLegend({ mode, spotPinned, arCount, missionPinned }) {
+// and in full colour; the rest are there for reference. The last entry says
+// what the ring around this tab's pins measures.
+function MapLegend({ mode, spotPinned, arCount, missionPinned, otherCount = 0, missionRadius }) {
   const items = [
     (spotPinned || mode === 'spot') && { key: 'spot', color: MAP_PIN.spot, label: 'Spot' },
+    mode === 'spot' && otherCount > 0 && { key: 'other', color: t.mapOther, label: 'Other spots' },
     (arCount > 0 || mode === 'ar') && { key: 'ar', color: MAP_PIN.ar, label: arCount === 1 ? 'AR position' : 'AR positions' },
     (missionPinned || mode === 'mission') && { key: 'mission', color: MAP_PIN.mission, label: 'Food spot' },
   ].filter(Boolean).sort((a, b) => (b.key === mode) - (a.key === mode));
-  if (items.length < 2) return null;
+  const ringKey =
+    mode === 'ar' ? { color: t.mapAr, label: `${AR_RADIUS_M} m AR trigger radius · red where two overlap` }
+    : mode === 'mission' ? { color: t.mapFood, label: `${missionRadiusOf(missionRadius)} m completion radius` }
+    : { color: t.mapSpot, label: `${ARRIVAL_RADIUS_M} m arrival radius · red where two spots overlap` };
   return (
     <div style={styles.legend}>
-      {items.map((it) => (
+      {items.length > 1 && items.map((it) => (
         <span key={it.key} style={it.key === mode ? styles.legendItemActive : styles.legendItem}>
           <span style={{ ...styles.modeDot, background: it.color }} />
           {it.label}{it.key === mode ? '' : ' (reference)'}
         </span>
       ))}
+      <span style={styles.legendItem}>
+        <span style={{ ...styles.ringSwatch, borderColor: ringKey.color }} />
+        {ringKey.label}
+      </span>
+    </div>
+  );
+}
+
+// Under the Location map: does this spot's arrival ring overlap another
+// spot's? Spelled out, because a red ring alone doesn't say what it costs.
+// `neighbours` is every other spot with its distance, nearest first; null
+// while they load, false if they couldn't be.
+function SpotOverlapNote({ neighbours }) {
+  if (neighbours === null) return <p style={styles.overlapMuted}>Checking the spots nearby…</p>;
+  if (neighbours === false) {
+    return <p style={styles.overlapMuted}>Couldn’t load the other spots, so overlaps can’t be checked right now.</p>;
+  }
+  const clashes = neighbours.filter((n) => n.distance < 2 * ARRIVAL_RADIUS_M);
+  if (!clashes.length) {
+    const nearest = neighbours[0];
+    return (
+      <p style={styles.overlapOk}>
+        <Icon name="check-circle" size={13} />
+        <span>
+          No overlap
+          {nearest ? ` — the nearest spot, ${nearest.name || 'unnamed'}, is ${fmtDistance(nearest.distance)} away.` : '.'}
+        </span>
+      </p>
+    );
+  }
+  return (
+    <div style={styles.overlapWarn} role="status">
+      <p style={styles.overlapTitle}>
+        <Icon name="alert-triangle" size={13} />
+        Overlaps {clashes.length === 1 ? 'another spot' : `${clashes.length} other spots`}
+      </p>
+      <ul style={styles.overlapList}>
+        {clashes.map((c) => (
+          <li key={c.id}>
+            <strong>{c.name || 'Unnamed spot'}</strong> — {fmtDistance(c.distance)} apart
+            {c.distance < ARRIVAL_RADIUS_M ? ', so standing on either pin counts as arriving at both' : ''}
+          </li>
+        ))}
+      </ul>
+      <p style={styles.overlapText}>
+        A traveler arrives within {ARRIVAL_RADIUS_M} m of a pin, so pins closer than {2 * ARRIVAL_RADIUS_M} m
+        share ground: someone standing between them arrives at both at once.
+      </p>
+    </div>
+  );
+}
+
+// Under the AR map: AR pins whose trigger rings overlap.
+function ArOverlapNote({ arModels }) {
+  const pairs = arOverlaps(arModels.map((m) => {
+    const lat = toNum(m.lat);
+    const lng = toNum(m.lng);
+    return lat === null || lng === null ? null : { lat, lng };
+  }));
+  if (!pairs.length) return null;
+  return (
+    <div style={styles.overlapWarn} role="status">
+      <p style={styles.overlapTitle}>
+        <Icon name="alert-triangle" size={13} />
+        AR rings overlap
+      </p>
+      <ul style={styles.overlapList}>
+        {pairs.map(({ i, j, distance }) => (
+          <li key={`${i}-${j}`}>
+            <strong>AR {i + 1}</strong> and <strong>AR {j + 1}</strong> — {fmtDistance(distance)} apart
+            {distance < 2 * AR_MIN_RADIUS_M ? ', too close for the app to tell apart' : ''}
+          </li>
+        ))}
+      </ul>
+      <p style={styles.overlapText}>
+        Each AR model triggers within {AR_RADIUS_M} m. For pins closer than {2 * AR_RADIUS_M} m the app
+        shrinks both rings to half the gap, and below {2 * AR_MIN_RADIUS_M} m it can’t keep them apart.
+      </p>
     </div>
   );
 }
@@ -807,6 +1072,30 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
       .catch(() => { /* keep the fallback */ });
     return () => { cancelled = true; };
   }, []);
+
+  // Every published spot, so the Location map can show whether this one's
+  // arrival ring overlaps another's. All cities, not just this moderator's:
+  // the app checks every spot, and two towns' spots can face each other across
+  // a boundary road. null while loading, false if the request failed.
+  const [allSpots, setAllSpots] = useState(null);
+  useEffect(() => {
+    let cancelled = false;
+    spotAPI.getAll()
+      .then((rows) => { if (!cancelled) setAllSpots(rows || []); })
+      .catch(() => { if (!cancelled) setAllSpots(false); });
+    return () => { cancelled = true; };
+  }, []);
+
+  const otherSpots = useMemo(
+    () => (allSpots || [])
+      .filter((s) => s._id !== initial?._id)
+      .map((s) => {
+        const at = spotPosition(s);
+        return at && { id: s._id, name: s.name, ...at };
+      })
+      .filter(Boolean),
+    [allSpots, initial?._id]
+  );
 
   // Any category already on this spot that isn't in the list still gets a chip,
   // so an older or since-renamed value stays visible and removable instead of
@@ -1126,6 +1415,18 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
   const spotPinned    = toNum(form.coordinates_lat) !== null && toNum(form.coordinates_lng) !== null;
   const missionPinned = toNum(missionLat) !== null && toNum(missionLng) !== null;
 
+  // Every other spot's distance from this pin, nearest first, for the note
+  // under the Location map. The map recolours its rings live during a drag;
+  // this catches up when the pin is dropped.
+  const spotNeighbours =
+    allSpots === null ? null
+    : allSpots === false ? false
+    : spotPinned && !coordError(form.coordinates_lat, form.coordinates_lng)
+      ? otherSpots
+          .map((o) => ({ ...o, distance: distanceM(toNum(form.coordinates_lat), toNum(form.coordinates_lng), o.lat, o.lng) }))
+          .sort((a, b) => a.distance - b.distance)
+      : [];
+
   // Per-tab map instructions — each map has one fixed mode now.
   const mapHintFor = (m) =>
     m === 'ar'
@@ -1164,8 +1465,10 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
     missionLat,
     missionLng,
     onMissionChange: handleMissionChange,
+    missionRadius: radiusMeters,
+    otherSpots,
   };
-  const legendProps = { spotPinned, arCount: arModels.length, missionPinned };
+  const legendProps = { spotPinned, arCount: arModels.length, missionPinned, otherCount: otherSpots.length, missionRadius: radiusMeters };
   const busy = saving || savingMission;
 
   return (
@@ -1284,6 +1587,7 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
 
                 <SpotMapPicker {...mapProps} mode="spot" active={tab === 'location'} />
                 <MapLegend mode="spot" {...legendProps} />
+                {spotPinned && <SpotOverlapNote neighbours={spotNeighbours} />}
 
                 <div style={styles.coordBlock}>
                   <p style={styles.coordBlockTitle}>Spot coordinates <span style={styles.required}>*</span></p>
@@ -1332,6 +1636,7 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
 
                 <SpotMapPicker {...mapProps} mode="ar" active={tab === 'ar'} />
                 <MapLegend mode="ar" {...legendProps} />
+                <ArOverlapNote arModels={arModels} />
 
                 {arModels.length === 0 ? (
                   <div style={styles.emptyNote}>No AR positions yet — click the map above to drop one.</div>
@@ -1595,6 +1900,15 @@ const styles = {
   legendItem:       { display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, color: t.textMuted },
   legendItemActive: { display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, color: t.textPrimary, fontWeight: 600 },
   modeDot:          { width: 8, height: 8, borderRadius: '50%', display: 'inline-block', flexShrink: 0 },
+  ringSwatch:       { width: 11, height: 11, borderRadius: '50%', borderWidth: 2, borderStyle: 'solid', display: 'inline-block', flexShrink: 0, boxSizing: 'border-box' },
+
+  // ── Overlap notes under the maps ──
+  overlapOk:    { display: 'flex', alignItems: 'flex-start', gap: 6, fontSize: 12.5, color: t.success, margin: 0, lineHeight: 1.45 },
+  overlapMuted: { fontSize: 12.5, color: t.textMuted, margin: 0 },
+  overlapWarn:  { display: 'flex', flexDirection: 'column', gap: 6, padding: '10px 12px', borderRadius: radius.md, background: t.dangerBg, border: `1px solid ${t.dangerBorder}` },
+  overlapTitle: { display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 700, color: t.danger, margin: 0 },
+  overlapList:  { margin: 0, paddingLeft: 18, fontSize: 12.5, color: t.textPrimary, lineHeight: 1.55 },
+  overlapText:  { fontSize: 12, color: t.textSecondary, margin: 0, lineHeight: 1.5 },
 
   mapHintRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 },
   mapHint: { fontSize: 12, color: t.textSecondary, margin: 0 },
