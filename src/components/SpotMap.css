@@ -1,0 +1,60 @@
+/* Radius rings on the spot editor's maps (SpotForm.jsx).
+ *
+ * Leaflet draws circles as SVG paths and writes their colour as presentation
+ * attributes (stroke="…"), which can't take var(). Any CSS rule beats a
+ * presentation attribute, so the colours live here as classes instead of in
+ * the circle options. `is-clash` is toggled from JS while a pin is dragged. */
+
+.map-ring {
+  stroke-width: 2;
+  stroke-opacity: 1;
+}
+
+/* This spot's arrival circle. */
+.map-ring--spot {
+  stroke: var(--map-spot);
+  fill: var(--map-spot);
+  fill-opacity: 0.14;
+}
+
+/* Other spots' arrival circles: dashed and grey, so they read as reference. */
+.map-ring--other {
+  stroke: var(--map-other);
+  fill: var(--map-other);
+  fill-opacity: 0.07;
+  stroke-width: 1.5;
+  stroke-dasharray: 5 5;
+}
+
+.map-ring--ar {
+  stroke: var(--map-ar);
+  fill: var(--map-ar);
+  fill-opacity: 0.18;
+}
+
+.map-ring--food {
+  stroke: var(--map-food);
+  fill: var(--map-food-fill);
+  fill-opacity: 0.22;
+}
+
+/* Two rings that overlap. Two classes, so it outranks every ring type above. */
+.map-ring.is-clash {
+  stroke: var(--map-clash);
+  fill: var(--map-clash);
+  fill-opacity: 0.16;
+  stroke-dasharray: none;
+  stroke-width: 2.5;
+}
+
+/* The centre point of another spot (hover for its name). */
+.map-dot {
+  stroke: #fff;
+  stroke-width: 2;
+  fill: var(--map-other);
+  fill-opacity: 1;
+}
+
+.map-dot.is-clash {
+  fill: var(--map-clash);
+}

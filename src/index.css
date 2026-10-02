@@ -88,6 +88,17 @@
   --data-1:          #008C99;
   --data-1-track:    rgba(0,140,153,0.14);
 
+  /* Radius rings on the spot editor's maps (components/SpotMap.css). Set here
+     ONLY, not in the dark blocks: the OpenStreetMap tiles under them stay light
+     in both themes, so a ring tuned for a dark surface (dark mode's pale
+     --danger, --info) would wash out on the map. */
+  --map-spot:        #0A6F78;
+  --map-other:       #56686A;
+  --map-ar:          #1D5FA8;
+  --map-food:        #8A5610;
+  --map-food-fill:   #F2CE1B;
+  --map-clash:       #C42B1F;
+
   --shadow-sm:       0 1px 2px rgba(28,36,38,0.05), 0 4px 14px rgba(28,36,38,0.05);
   --shadow-md:       0 4px 10px rgba(28,36,38,0.06), 0 10px 28px rgba(28,36,38,0.07);
   --shadow-lg:       0 10px 20px rgba(28,36,38,0.08), 0 18px 48px rgba(28,36,38,0.10);
