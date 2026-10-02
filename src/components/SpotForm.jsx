@@ -5,6 +5,7 @@ import { theme as t, radius, shadow } from '../theme';
 import { uploadAPI, missionAPI, categoryAPI } from '../api/api';
 import { notify, confirmAction } from './AppAlert';
 import Icon from './Icon';
+import { spotHasAR } from '../utils/spotHasAR';
 
 // Fix default marker icons breaking under Vite/webpack bundling
 import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
@@ -1061,7 +1062,9 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
   const badAr = arModels.findIndex(
     (m) => (m.lat !== '' || m.lng !== '') && (toNum(m.lat) === null || toNum(m.lng) === null)
   );
-  if (badAr !== -1) {
+  // Not checked for a Nature or Festivals spot: its AR tab doesn't show the
+  // positions, so there'd be nothing for the admin to fix.
+  if (badAr !== -1 && spotHasAR(form.category)) {
     return fail('ar', `AR ${badAr + 1} has an incomplete coordinate — fix or remove it.`);
   }
 
@@ -1142,11 +1145,12 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
     !form.city.trim() && 'city',
     !form.category.length && 'category',
   ].filter(Boolean);
+  const hasAR = spotHasAR(form.category);
   const tabStatus = {
     details:  { missing: missingDetails.length ? `Still needed: ${missingDetails.join(', ')}` : '' },
     media:    { missing: form.image ? '' : 'Spot image is required' },
     location: { missing: spotPinned ? coordError(form.coordinates_lat, form.coordinates_lng) : 'Spot location is required' },
-    ar:       { count: arModels.length },
+    ar:       { count: hasAR ? arModels.length : 0 },
   };
 
   // Shared by the three maps; each adds its own mode.
@@ -1300,6 +1304,16 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
 
           {visited.has('ar') && (
             <TabPanel id="ar" active={tab === 'ar'}>
+              {!hasAR ? (
+                // Anything already set here is kept (it comes back if the
+                // category changes) but the app ignores it for this spot.
+                <section style={styles.section}>
+                  <div style={styles.emptyNote}>
+                    Nature and Festivals spots have no AR. The app shows no AR View button and no
+                    AR mission for this spot, so there's nothing to set here.
+                  </div>
+                </section>
+              ) : (<>
               <section style={styles.section}>
                 <p style={styles.sectionTitle}>AR model</p>
                 <FileUploadField label="AR 3D model" hint=".glb — what users see through the AR camera" accept=".glb,.gltf" uploadType="model" previewType="file" value={form.ARModelUrl} onUploaded={setField('ARModelUrl')} />
@@ -1347,6 +1361,7 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
                   <textarea id="spot-trivia" name="trivia" value={form.trivia} onChange={handleChange} style={styles.textarea} className="modern-input" rows={6} placeholder={'The present church was built from 1885 to 1888.\nThe Malolos Congress opened here on September 15, 1898.'} />
                 </div>
               </section>
+              </>)}
             </TabPanel>
           )}
 
