@@ -65,6 +65,12 @@ export const theme = {
   // Chart marks only — see index.css for why these aren't --brand.
   data1:             'var(--data-1)',
   data1Track:        'var(--data-1-track)',
+  // Spot editor map rings — the same in both themes, see index.css.
+  mapSpot:           'var(--map-spot)',
+  mapOther:          'var(--map-other)',
+  mapAr:             'var(--map-ar)',
+  mapFood:           'var(--map-food)',
+  mapClash:          'var(--map-clash)',
 };
 
 export const radius = {
