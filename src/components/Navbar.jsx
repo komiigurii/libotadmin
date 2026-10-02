@@ -170,13 +170,13 @@ export default function Navbar() {
         role="button"
         tabIndex={0}
         onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate(home); } }}
-        aria-label={`Libot ${isModerator ? 'Moderator' : 'Admin'} Console — go to dashboard`}
+        aria-label={`Libot Bulacan ${isModerator ? 'Moderator' : 'Admin'} Console — go to dashboard`}
       >
         <span className="sidebar-emblem" style={s.emblem}>
           <img src={logo} alt="" style={s.logo} />
         </span>
         <div className="sidebar-text" style={s.brandText}>
-          <div style={s.brandName}>Libot</div>
+          <div style={s.brandName}>Libot Bulacan</div>
           <div style={s.brandSub}>{isModerator ? 'Moderator Console' : 'Admin Console'}</div>
           <div style={s.scope}>
             <Icon name="map-pin" size={11} color={t.onBrandSolid} />
@@ -292,9 +292,12 @@ const s = {
   },
   logo: { width: 50, height: 50, objectFit: 'contain', borderRadius: 14, display: 'block' },
   brandText: { minWidth: 0, display: 'flex', flexDirection: 'column', alignItems: 'center' },
+  // 19px, not the 25px "LIBOT" had: "LIBOT BULACAN" in these capitals is
+  // 212px wide at 19px (279px at 25px), so it stays one line in the 248px rail
+  // with ~18px clear on each side.
   brandName: {
-    fontFamily: fonts.display, color: t.onBrandSolid, fontWeight: 700, fontSize: 25,
-    lineHeight: 1, letterSpacing: '0.18em', textTransform: 'uppercase',
+    fontFamily: fonts.display, color: t.onBrandSolid, fontWeight: 700, fontSize: 19,
+    lineHeight: 1, letterSpacing: '0.18em', textTransform: 'uppercase', whiteSpace: 'nowrap',
     // Tracking adds space after the last letter too; this evens it out so the
     // word sits on the centre line.
     paddingLeft: '0.18em',
