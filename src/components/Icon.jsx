@@ -19,7 +19,7 @@
 import {
   Aperture, Archive, ArrowClockwise, ArrowRight, Bell, CaretDown, CaretRight, CaretUp,
   ChatCircleText, Check, CheckCircle, Clock, Desktop, Eye, EyeSlash, Flag, ForkKnife, Hand, Image, Info,
-  LockSimple, MapPin, Moon, Package, PaperPlaneTilt, Pause, PencilSimple, Plus, Prohibit, WarningCircle,
+  List, LockSimple, MapPin, Moon, Package, PaperPlaneTilt, Pause, PencilSimple, Plus, Prohibit, WarningCircle,
   SignOut, Sparkle, SquaresFour, Star, Sun, ThumbsDown, ThumbsUp, Tray, Trash, Trophy,
   Users, Warning, Wrench, X,
 } from '@phosphor-icons/react';
@@ -51,6 +51,7 @@ const MAP = {
   'info':           Info,
   'log-out':        SignOut,
   'map-pin':        MapPin,
+  'menu':           List,
   'message-square': ChatCircleText,
   'monitor':        Desktop,
   'moon':           Moon,
