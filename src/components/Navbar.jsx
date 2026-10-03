@@ -1,8 +1,10 @@
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { theme as t, radius, fonts, useThemePref } from '../theme';
 import Icon from './Icon';
 import logo from '../assets/logo.png';
 import { clearSession } from '../auth/session';
+import { confirmAction } from './AppAlert';
 
 /*
  * Persistent left rail.
@@ -19,7 +21,12 @@ import { clearSession } from '../auth/session';
  *   > 1100px  full 248px rail with labels
  *   ≤ 1100px  68px icon rail — labels are visually hidden, NOT removed, so
  *             screen readers still announce them
- *   ≤ 720px   horizontal bar across the top
+ *   ≤ 720px   a slim top bar (emblem, the page you're on, a menu button);
+ *             the menu opens this same rail, full labels and all, as a
+ *             drawer from the left. It used to be a single row of eight
+ *             unlabelled icons plus the theme switch and sign-out, ~560px
+ *             wide on a ~390px phone, so it scrolled sideways and you had to
+ *             guess what each icon was.
  *   short screens drop the drawing before the links run out of room.
  */
 
@@ -146,7 +153,13 @@ export default function Navbar() {
   const city     = localStorage.getItem('city') || '';
   const [pref, setPref] = useThemePref();
 
-  const logout = () => {
+  // Asks first: a stray click on the band at the foot of the rail used to sign
+  // you straight out.
+  const logout = async () => {
+    const ok = await confirmAction('You will need your username and password to sign back in.', {
+      title: 'Sign out of the console?', confirmText: 'Sign out', tone: 'warning',
+    });
+    if (!ok) return;
     clearSession(); // token, role and city — city used to be left behind
     navigate('/login');
   };
@@ -154,6 +167,36 @@ export default function Navbar() {
   const isModerator = role === 'moderator';
   const nav = isModerator ? MODERATOR_NAV : ADMIN_NAV;
   const home = '/dashboard';
+  const current = nav.flatMap((g) => g.items).find((i) => i.path === location.pathname);
+
+  // ── Phone drawer (App.css shows it only at ≤ 720px) ──
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuBtnRef = useRef(null);
+  const closeBtnRef = useRef(null);
+  const wasOpen = useRef(false);
+
+  // Picking a page closes it.
+  useEffect(() => { setMenuOpen(false); }, [location.pathname]);
+
+  // While open: Esc closes, the page behind doesn't scroll, and focus moves
+  // into the drawer — then back to the menu button when it closes.
+  useEffect(() => {
+    if (!menuOpen) {
+      if (wasOpen.current) menuBtnRef.current?.focus();
+      wasOpen.current = false;
+      return undefined;
+    }
+    wasOpen.current = true;
+    closeBtnRef.current?.focus();
+    const onKey = (e) => { if (e.key === 'Escape') setMenuOpen(false); };
+    window.addEventListener('keydown', onKey);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [menuOpen]);
 
   const themeOptions = [
     { key: 'light',  label: 'Light',  icon: 'sun' },
@@ -162,7 +205,42 @@ export default function Navbar() {
   ];
 
   return (
-    <nav className="admin-sidebar" style={s.sidebar} aria-label="Main">
+    <>
+    <header className="mobile-bar" style={s.mobileBar}>
+      <button
+        type="button"
+        onClick={() => navigate(home)}
+        style={s.mobileBrand}
+        aria-label="Go to dashboard"
+      >
+        <img src={logo} alt="" style={s.mobileLogo} />
+      </button>
+      <div style={s.mobileTitle}>{current?.label || (isModerator ? 'Moderator Console' : 'Admin Console')}</div>
+      <button
+        ref={menuBtnRef}
+        type="button"
+        onClick={() => setMenuOpen(true)}
+        style={s.menuBtn}
+        aria-label="Open menu"
+        aria-expanded={menuOpen}
+        aria-controls="admin-nav"
+      >
+        <Icon name="menu" size={22} color={t.onBrandSolid} />
+      </button>
+    </header>
+    {menuOpen && <div className="nav-backdrop" onClick={() => setMenuOpen(false)} aria-hidden="true" />}
+
+    <nav id="admin-nav" className={`admin-sidebar${menuOpen ? ' open' : ''}`} style={s.sidebar} aria-label="Main">
+      <button
+        ref={closeBtnRef}
+        type="button"
+        className="drawer-close"
+        onClick={() => setMenuOpen(false)}
+        style={s.drawerClose}
+        aria-label="Close menu"
+      >
+        <Icon name="x" size={18} color={t.onBrandSolid} />
+      </button>
       <div
         className="sidebar-brand"
         style={s.brand}
@@ -264,6 +342,7 @@ export default function Navbar() {
         </button>
       </div>
     </nav>
+    </>
   );
 }
 
@@ -358,6 +437,32 @@ const s = {
   },
 
   footer: { display: 'flex', alignItems: 'center', gap: 8, padding: '12px 14px 16px' },
+
+  // ── Phone top bar + drawer close. Display comes from App.css. ──
+  mobileBar: {
+    position: 'sticky', top: 0, zIndex: 30, alignItems: 'center', gap: 12,
+    minHeight: 56, padding: '8px 10px 8px 12px', boxSizing: 'border-box',
+    background: t.brandSolid, color: t.onBrandSolid,
+  },
+  mobileBrand: {
+    display: 'grid', placeItems: 'center', width: 40, height: 40, borderRadius: 12, flexShrink: 0,
+    border: 'none', padding: 0, cursor: 'pointer', background: ON_FRAME_WELL,
+    boxShadow: 'inset 0 0 0 1px var(--on-brand-solid-soft)',
+  },
+  mobileLogo: { width: 28, height: 28, objectFit: 'contain', borderRadius: 8, display: 'block' },
+  mobileTitle: {
+    flex: 1, minWidth: 0, fontSize: 15.5, fontWeight: 650, letterSpacing: '-0.01em',
+    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+  },
+  menuBtn: {
+    display: 'grid', placeItems: 'center', width: 44, height: 44, borderRadius: 12, flexShrink: 0,
+    border: 'none', padding: 0, cursor: 'pointer', background: ON_FRAME_WELL,
+  },
+  drawerClose: {
+    position: 'absolute', top: 12, right: 12, zIndex: 1,
+    placeItems: 'center', width: 36, height: 36, borderRadius: 10,
+    border: 'none', padding: 0, cursor: 'pointer', background: ON_FRAME_WELL,
+  },
   themeRow: {
     display: 'flex', gap: 2, padding: 3, borderRadius: radius.md, background: ON_FRAME_WELL,
   },

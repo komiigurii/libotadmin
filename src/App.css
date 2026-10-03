@@ -184,8 +184,14 @@ tbody tr:hover td {
 
 /* Tablet / small laptop: the sidebar collapses to an icon rail. Labels are
    hidden rather than removed so the accessible name survives for screen
-   readers (see .nav-label in Navbar). */
+   readers (see .nav-label in Navbar). Not on phones: there the rail is a
+   drawer with its full labels (below). */
 @media (max-width: 1100px) {
+  .admin-page { padding-left: 20px !important; padding-right: 20px !important; }
+  /* Dashboard's two-column rows stack. */
+  .dash-split { grid-template-columns: minmax(0, 1fr) !important; }
+}
+@media (max-width: 1100px) and (min-width: 721px) {
   .admin-sidebar {
     width: 68px !important;
     min-width: 68px !important;
@@ -219,9 +225,6 @@ tbody tr:hover td {
   .admin-sidebar .sidebar-footer { flex-direction: column; padding: 10px 0 14px !important; }
   .admin-sidebar .theme-row { flex-direction: column; }
   .admin-sidebar .logout-btn { flex: none !important; width: 40px; padding: 8px 0 !important; }
-  .admin-page { padding-left: 20px !important; padding-right: 20px !important; }
-  /* Dashboard's two-column rows stack. */
-  .dash-split { grid-template-columns: minmax(0, 1fr) !important; }
 }
 
 /* Short laptop screens (1366×768 leaves ~650px): a tighter header and links,
@@ -235,38 +238,33 @@ tbody tr:hover td {
   .admin-sidebar .nav-link-btn { min-height: 38px !important; padding-top: 8px !important; padding-bottom: 8px !important; }
 }
 
-/* Phone: the sidebar becomes a horizontal bar across the top so the content
-   column gets the full width. */
+/* Phone: a slim top bar with the page you're on and a menu button; the menu
+   opens the full sidebar, labels and all, as a drawer from the left (see
+   Navbar.jsx). Hidden off-canvas with visibility too, so its links aren't in
+   the tab order while it's closed. */
+.mobile-bar, .nav-backdrop, .drawer-close { display: none; }
 @media (max-width: 720px) {
   .admin-shell { flex-direction: column !important; }
+  .mobile-bar { display: flex; }
+  .drawer-close { display: grid; }
   .admin-sidebar {
-    width: 100% !important;
-    min-width: 0 !important;
-    height: auto !important;
-    flex-direction: row !important;
-    align-items: center;
-    overflow-x: auto;
-    position: sticky; top: 0; z-index: 20;
-    border-right: none !important;
-    gap: 8px;
-    padding: 8px 12px !important;
+    position: fixed !important; top: 0; left: 0; bottom: 0; z-index: 60;
+    width: min(300px, 86vw) !important; min-width: 0 !important;
+    height: 100dvh !important;
+    transform: translateX(-100%);
+    visibility: hidden;
+    transition: transform 0.24s ease, visibility 0s linear 0.24s;
+    box-shadow: 0 0 40px rgba(0, 0, 0, 0.35);
   }
-  /* The teal frame becomes the bar; the cream panel becomes a capsule in it
-     holding the links, so they keep the colours they were checked against. */
-  .admin-sidebar .sidebar-brand { padding: 0 !important; flex-shrink: 0; }
-  .admin-sidebar .sidebar-emblem { width: 40px !important; height: 40px !important; border-radius: 12px !important; }
-  .admin-sidebar .sidebar-emblem img { width: 28px !important; height: 28px !important; border-radius: 8px !important; }
-  .admin-sidebar .sidebar-panel { flex: 0 0 auto !important; border-radius: 14px !important; overflow: visible !important; }
-  .admin-sidebar .sidebar-section { padding: 4px !important; overflow: visible !important; flex-direction: row !important; }
-  .admin-sidebar .nav-groups { flex-direction: row !important; gap: 4px !important; margin: 0 !important; }
-  .admin-sidebar .nav-group { margin: 0 !important; padding: 0 !important; border: none !important; }
-  .admin-sidebar .sidebar-links { flex-direction: row !important; gap: 4px; }
-  .admin-sidebar .nav-link-btn { min-width: 40px; min-height: 38px !important; }
-  .admin-sidebar .sidebar-art { display: none; }
-  .admin-sidebar .sidebar-footer { flex-direction: row; margin-left: auto; padding: 0 !important; }
-  /* Back to a row in the top bar, where there's width but not height. */
-  .admin-sidebar .theme-row { flex-direction: row; }
-  .admin-sidebar .logout-btn { width: 38px; }
+  .admin-sidebar.open {
+    transform: none;
+    visibility: visible;
+    transition: transform 0.24s ease;
+  }
+  .nav-backdrop {
+    display: block; position: fixed; inset: 0; z-index: 55;
+    background: rgba(6, 16, 18, 0.5);
+  }
   .admin-page { padding: 18px 16px !important; }
 }
 
