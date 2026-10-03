@@ -283,7 +283,8 @@ function FileUploadField({ label, required, hint, accept, uploadType, value, onU
       if (fileToUpload.size > UPLOAD_MAX_BYTES) {
         setError(
           `This file is ${formatBytes(fileToUpload.size)}, over the ${formatBytes(UPLOAD_MAX_BYTES)} limit. ` +
-          `Reduce the model's polygon count or export it with Draco compression, then try again.`
+          // Not Draco: the app's 3D engine can't decode it, so the server refuses those files.
+          `Reduce the model's polygon count or texture sizes (JPEG textures are much smaller than PNG), then try again.`
         );
         return;
       }
