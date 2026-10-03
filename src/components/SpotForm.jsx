@@ -1336,6 +1336,17 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
   if (!form.city.trim()) {
     return fail('details', 'City is required');
   }
+  // The spot page in the app shows all three, so a spot without them looked
+  // unfinished. A place with no fee says "Free" rather than leaving it blank.
+  if (!form.entranceFee.trim()) {
+    return fail('details', 'Entrance fee is required — type "Free" if there is none.');
+  }
+  if (!form.visitingHours.trim()) {
+    return fail('details', 'Visiting hours are required');
+  }
+  if (!form.description.trim()) {
+    return fail('details', 'Description is required');
+  }
   if (!form.image) {
     return fail('media', 'Spot image is required');
   }
@@ -1446,6 +1457,9 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
     !form.name.trim() && 'name',
     !form.city.trim() && 'city',
     !form.category.length && 'category',
+    !form.entranceFee.trim() && 'entrance fee',
+    !form.visitingHours.trim() && 'visiting hours',
+    !form.description.trim() && 'description',
   ].filter(Boolean);
   const hasAR = spotHasAR(form.category);
   const tabStatus = {
@@ -1533,17 +1547,17 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
 
                 <div style={styles.twoCol}>
                   <div style={styles.field}>
-                    <label style={styles.label}>Entrance fee</label>
+                    <label style={styles.label}>Entrance fee <span style={styles.required}>*</span></label>
                     <input name="entranceFee" value={form.entranceFee} onChange={handleChange} style={styles.input} className="modern-input" placeholder="Free or ₱50" />
                   </div>
                   <div style={styles.field}>
-                    <label style={styles.label}>Visiting hours</label>
+                    <label style={styles.label}>Visiting hours <span style={styles.required}>*</span></label>
                     <input name="visitingHours" value={form.visitingHours} onChange={handleChange} style={styles.input} className="modern-input" placeholder="6am – 10pm" />
                   </div>
                 </div>
 
                 <div style={styles.field}>
-                  <label style={styles.label}>Description</label>
+                  <label style={styles.label}>Description <span style={styles.required}>*</span></label>
                   <textarea name="description" value={form.description} onChange={handleChange} style={styles.textarea} className="modern-input" rows={4} placeholder="Short description of the spot..." />
                 </div>
 
