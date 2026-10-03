@@ -28,15 +28,15 @@
 @import '@fontsource-variable/schibsted-grotesk';
 
 /* ── LIGHT (default) ─────────────────────────────────────────────────────────
-   The warm capiz-cream page from the mobile app, so the admin reads as the same
-   brand rather than a separate product. */
+   The warm capiz-cream page from the mobile app, value for value, so the admin
+   reads as the same product. The website uses the same values. */
 :root {
   --bg:              #FBF8F2;
   --sidebar-bg:      #F4EFE4;
   --card-bg:         #FFFFFF;
   --card-bg-hover:   #F7F3EA;
-  --border:          #E4DCCB;
-  --divider:         #EDE6D8;
+  --border:          #E8E0D0;
+  --divider:         #EAE3D6;
 
   --text-primary:    #1C2426;
   --text-secondary:  #455254;
@@ -114,20 +114,22 @@
 }
 
 /* ── DARK ────────────────────────────────────────────────────────────────────
-   Warmed from the previous #0E1C1E so it sits in the same family as the cream
-   light mode instead of reading as a different product's palette. */
+   The mobile app's dark mode, value for value (context/ThemeContext.js
+   darkColors), and the website's too: the thesis panel asked for one palette
+   across app, admin and web. Every text token holds 4.5:1 on bg, sidebar,
+   card, card hover and on its own tinted badge. */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) {
-    --bg:              #12191B;
-    --sidebar-bg:      #0E2A2D;
-    --card-bg:         #1A2426;
-    --card-bg-hover:   #212D30;
-    --border:          #2E403F;
-    --divider:         #263635;
+    --bg:              #0E1C1E;
+    --sidebar-bg:      #16292C;
+    --card-bg:         #172C2F;
+    --card-bg-hover:   #1B3134;
+    --border:          #2A4443;
+    --divider:         #233C3C;
 
     --text-primary:    #EDF4F4;
-    --text-secondary:  #AFC4C5;
-    --text-muted:      #90A8A9;
+    --text-secondary:  #B4C7C8;
+    --text-muted:      #97AEAF;
 
     --brand:           #56D6E2;
     --brand-solid:     #0C7A84;
@@ -167,7 +169,7 @@
     --shadow-md:       0 10px 28px rgba(0,0,0,0.38);
     --shadow-lg:       0 18px 48px rgba(0,0,0,0.46);
 
-    --scrollbar-thumb:       #2E403F;
+    --scrollbar-thumb:       #2A4443;
     --scrollbar-thumb-hover: #415B59;
 
     color-scheme: dark;
@@ -178,16 +180,16 @@
    shared because a :is() / :where() list would lose to the media-query block
    above on specificity grounds in some browsers. */
 :root[data-theme='dark'] {
-  --bg:              #12191B;
-  --sidebar-bg:      #0E2A2D;
-  --card-bg:         #1A2426;
-  --card-bg-hover:   #212D30;
-  --border:          #2E403F;
-  --divider:         #263635;
+  --bg:              #0E1C1E;
+  --sidebar-bg:      #16292C;
+  --card-bg:         #172C2F;
+  --card-bg-hover:   #1B3134;
+  --border:          #2A4443;
+  --divider:         #233C3C;
 
   --text-primary:    #EDF4F4;
-  --text-secondary:  #AFC4C5;
-  --text-muted:      #90A8A9;
+  --text-secondary:  #B4C7C8;
+  --text-muted:      #97AEAF;
 
   --brand:           #56D6E2;
   --brand-solid:     #0C7A84;
@@ -227,7 +229,7 @@
   --shadow-md:       0 10px 28px rgba(0,0,0,0.38);
   --shadow-lg:       0 18px 48px rgba(0,0,0,0.46);
 
-  --scrollbar-thumb:       #2E403F;
+  --scrollbar-thumb:       #2A4443;
   --scrollbar-thumb-hover: #415B59;
 
   color-scheme: dark;
