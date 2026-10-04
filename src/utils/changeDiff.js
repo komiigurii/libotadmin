@@ -9,7 +9,7 @@
 export const FIELD_LABELS = {
   name: 'Name', category: 'Category', description: 'Description', visitingHours: 'Visiting hours',
   entranceFee: 'Entrance fee', image: 'Image', modelUrl: '3D display model', AR3DModelURL: 'AR model',
-  Badge: 'Badge', City: 'City', city: 'City', coordinates: 'Coordinates', modelsCoordinates: 'AR positions',
+  Badge: 'Badge', city: 'City', coordinates: 'Coordinates', modelsCoordinates: 'AR positions',
   trivia: 'AR trivia',
 };
 

@@ -196,7 +196,7 @@ export default function Dashboard() {
             <Stat icon="map-pin" label="Spot visits" to="/user-progress" value={loading ? '…' : fmt(stats?.totalVisits)}
               hint={loading ? null : stats ? `by ${plural(stats.explorers, 'traveler')}` : null} />
             <Stat icon="image" label="Published spots" to="/spots" value={loading ? '…' : fmt(spots?.length)}
-              hint={loading ? null : spots ? `across ${plural(new Set(spots.map((x) => (x.city || x.City || '').trim().toLowerCase()).filter(Boolean)).size, 'city', 'cities')}` : null} />
+              hint={loading ? null : spots ? `across ${plural(new Set(spots.map((x) => (x.city || '').trim().toLowerCase()).filter(Boolean)).size, 'city', 'cities')}` : null} />
             <Stat icon="inbox" label="Waiting on you" to="/mod-requests"
               emphasis={waiting > 0}
               value={loading ? '…' : fmt(waiting)}

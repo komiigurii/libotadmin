@@ -222,7 +222,7 @@ export default function Spots() {
                   )}
 
                   <div style={s.facts}>
-                    <span style={s.itemFact}><Icon name="map-pin" size={12} /> {spot.city || spot.City || 'City not set'}</span>
+                    <span style={s.itemFact}><Icon name="map-pin" size={12} /> {spot.city || 'City not set'}</span>
                     <span style={s.itemFact}><Icon name="clock" size={12} /> {spot.visitingHours || 'Hours not set'}</span>
                     {/* Not "Free": a missing fee is unknown, not zero. */}
                     <span style={s.itemFact}><Icon name="star" size={12} /> {spot.entranceFee || 'Fee not set'}</span>
