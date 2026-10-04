@@ -1574,7 +1574,7 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
                 <div style={styles.uploadGrid}>
                   <FileUploadField label="Spot image" required accept="image/*" uploadType="image" previewType="image" value={form.image} onUploaded={setField('image')} />
                   <FileUploadField label="Badge image" hint="Reward for visiting" accept="image/*" uploadType="badge" previewType="badge" value={form.Badge} onUploaded={setField('Badge')} />
-                  <FileUploadField label="Display 3D model" hint=".glb — spot detail screen" accept=".glb,.gltf" uploadType="model" previewType="file" value={form.modelUrl} onUploaded={setField('modelUrl')} />
+                  <FileUploadField label="Display 3D model" hint=".glb — spot detail screen" accept=".glb,.gltf" uploadType="model" previewType="file"  onUploaded={setField('modelUrl')} />
                 </div>
               </section>
             </TabPanel>
