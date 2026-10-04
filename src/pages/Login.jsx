@@ -59,6 +59,14 @@ export default function Login() {
   // Seconds left on a server-side account lockout (HTTP 423). Purely a UX
   // affordance — the backend enforces the lock regardless of what this says.
   const [lockedFor, setLockedFor] = useState(0);
+  // A sign-in still waiting after a few seconds is almost always the API's
+  // server waking up (it sleeps when idle, 30–60 s) — say so.
+  const [slow, setSlow] = useState(false);
+  useEffect(() => {
+    if (!loading) return undefined;
+    const timer = setTimeout(() => setSlow(true), 4000);
+    return () => clearTimeout(timer);
+  }, [loading]);
 
   const fieldErrors = {
     username: !username.trim() ? 'Enter your username.' : '',
@@ -109,6 +117,7 @@ export default function Login() {
       );
     } finally {
       setLoading(false);
+      setSlow(false);
     }
   };
 
@@ -233,6 +242,9 @@ export default function Login() {
           >
             {locked ? `Try again in ${lockLabel(lockedFor)}` : loading ? 'Signing in…' : 'Sign in'}
           </Button>
+          {slow && (
+            <p style={s.help} role="status">Waking up the server. The first sign-in can take up to a minute.</p>
+          )}
 
           <p style={s.help}>Can't sign in? Ask your Libot Bulacan administrator.</p>
         </form>

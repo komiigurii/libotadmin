@@ -55,6 +55,14 @@ export default function Spots() {
     setSearchParams({}, { replace: true });
   }, [searchParams, setSearchParams, isModerator]);
 
+  // Esc closes the deletion-request dialog, like every other dialog here.
+  useEffect(() => {
+    if (!deleteTarget) return undefined;
+    const onKey = (e) => { if (e.key === 'Escape') setDeleteTarget(null); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [deleteTarget]);
+
   // Moderators only — opens our custom modal instead of window.prompt
   const openDeleteModal = (id) => {
     setDeleteTarget(id);
