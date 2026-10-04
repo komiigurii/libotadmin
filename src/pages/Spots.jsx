@@ -31,7 +31,9 @@ export default function Spots() {
     setLoading(true);
     setError('');
     try {
-      const data = isModerator ? await spotAPI.getMine() : await spotAPI.getAll();
+      // The admin list, not the public one: only it carries the pending edit /
+      // deletion behind the "waiting for approval" labels on each card.
+      const data = isModerator ? await spotAPI.getMine() : await spotAPI.getAllAdmin();
       setSpots(data || []);
     } catch (err) {
       console.error('Failed to load spots:', err);

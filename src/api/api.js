@@ -33,11 +33,15 @@ api.interceptors.response.use(
   },
 );
 
+// There is no create or update here: every spot change is proposed, then
+// approved. The backend's direct-write routes were removed for that reason.
 export const spotAPI = {
+  // The public list — what the app shows. It leaves out pending edits and
+  // deletions, so it suits counts and maps, not the approval status of a spot.
   getAll:        ()             => api.get('/api/spots').then(r => r.data.spots),
+  // Every spot with its pending edit / deletion. Admins only.
+  getAllAdmin:   ()             => api.get('/api/spots/admin').then(r => r.data.spots),
   getMine:       ()             => api.get('/api/spots/moderator').then(r => r.data.spots),
-  create:        (data)         => api.post('/api/spots', data).then(r => r.data),
-  update:        (id, data)     => api.put(`/api/spots/${id}`, data).then(r => r.data),
   delete:        (id)           => api.delete(`/api/spots/${id}`).then(r => r.data),
   getPending:    ()             => api.get('/api/spots/pending').then(r => r.data),
   proposeChange: (id, data)     => api.patch(`/api/spots/${id}/propose`, data).then(r => r.data),
@@ -81,8 +85,6 @@ export const commentAPI = {
   warnUser: (id, warnReason)   =>
     api.patch(`/api/reviews/${id}/warn-user`, { warnReason }).then(r => r.data),
   delete: (id)                 => api.delete(`/api/reviews/admin/${id}`).then(r => r.data),
-  banUser: (id, banReason)     =>
-    api.patch(`/api/reviews/${id}/ban-user`, { banReason }).then(r => r.data),
 };
 
 export const bannedAccountsAPI = {
@@ -157,35 +159,6 @@ export const uploadAPI = {
         headers: { 'Content-Type': 'multipart/form-data' },
       })
       .then(r => r.data);
-  },
-};
-
-export const spotProposalAPI = {
-  create: async (payload) => {
-    const response = await api.post('/spot-proposals', payload);
-    return response.data;
-  },
-
-  getAll: async () => {
-    const response = await api.get('/spot-proposals');
-    return response.data;
-  },
-
-  getPending: async () => {
-    const response = await api.get('/spot-proposals/pending');
-    return response.data;
-  },
-
-  reviewProposal: async (id, action, rejectionReason = '') => {
-    const response = await api.patch(
-      `/spot-proposals/${id}/review`,
-      {
-        action,
-        rejectionReason,
-      }
-    );
-
-    return response.data;
   },
 };
 
