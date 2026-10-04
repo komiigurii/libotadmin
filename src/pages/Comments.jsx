@@ -102,7 +102,7 @@ function CommentRow({ comment, expanded, onToggle, onUpdated }) {
 
   const userName = (comment.userId && typeof comment.userId === 'object' ? comment.userId.name : comment.userName) || 'Anonymous';
   const spotName = (comment.spotId && typeof comment.spotId === 'object' ? comment.spotId.name : '') || '—';
-  const spotCity = (comment.spotId && typeof comment.spotId === 'object' ? comment.spotId.City : '') || '';
+  const spotCity = (comment.spotId && typeof comment.spotId === 'object' ? comment.spotId.city : '') || '';
 
   // clerkUserId lives directly on the review doc; fall back to a populated
   // userId object just in case the endpoint ever starts populating it.
