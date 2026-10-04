@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { theme as t, radius } from '../theme';
 import Icon from './Icon';
-import { FIELD_LABELS, META_KEYS, LONG_FIELDS, THUMB_FIELDS, FILE_LINK_FIELDS, fmtVal } from '../utils/changeDiff';
+import { FIELD_LABELS, MISSION_FIELD_LABELS, META_KEYS, LONG_FIELDS, THUMB_FIELDS, FILE_LINK_FIELDS, fmtVal } from '../utils/changeDiff';
 
 /*
  * "What changed" for a spot or food-mission proposal: old value struck
@@ -102,20 +102,37 @@ export function ChangeList({ record, labelMap, keys }) {
   );
 }
 
-/** A new-spot proposal has nothing to diff against — show what was submitted. */
+const filled = (v) => v !== null && v !== undefined && v !== '' && !(Array.isArray(v) && v.length === 0);
+
+// One submitted value, drawn like the diff draws its new side: a thumbnail for
+// an image, a link for a 3D model, plain text otherwise.
+function SubmittedField({ fieldKey, value, label }) {
+  const body = THUMB_FIELDS.has(fieldKey) ? <Thumb url={value} />
+    : FILE_LINK_FIELDS.has(fieldKey) ? <a href={value} target="_blank" rel="noreferrer" style={s.linkNew}>{fileNameOf(value)}</a>
+    : <span style={{ ...s.new, whiteSpace: 'pre-wrap' }}>{fmtVal(fieldKey, value)}</span>;
+  return (
+    <div style={s.row}>
+      <span style={s.label}>{label}</span>
+      {body}
+    </div>
+  );
+}
+
+/** A new-spot proposal has nothing to diff against — show what was submitted,
+ *  including the food recommendation that becomes its 2nd mission. */
 export function ProposalFieldList({ proposal }) {
-  const keys = Object.keys(FIELD_LABELS).filter((k) => {
-    const v = proposal[k];
-    return v !== null && v !== undefined && v !== '' && !(Array.isArray(v) && v.length === 0);
-  });
-  if (!keys.length) return null;
+  const keys = Object.keys(FIELD_LABELS).filter((k) => filled(proposal[k]));
+  const food = proposal.foodMission || {};
+  const foodKeys = Object.keys(MISSION_FIELD_LABELS).filter((k) => filled(food[k]));
+  if (!keys.length && !foodKeys.length) return null;
   return (
     <div style={s.list}>
       {keys.map((k) => (
-        <div style={s.row} key={k}>
-          <span style={s.label}>{FIELD_LABELS[k]}</span>
-          <span style={{ ...s.new, whiteSpace: 'pre-wrap' }}>{fmtVal(k, proposal[k])}</span>
-        </div>
+        <SubmittedField key={k} fieldKey={k} value={proposal[k]} label={FIELD_LABELS[k]} />
+      ))}
+      {foodKeys.length > 0 && <p style={s.groupTitle}>Food mission</p>}
+      {foodKeys.map((k) => (
+        <SubmittedField key={`food-${k}`} fieldKey={k} value={food[k]} label={MISSION_FIELD_LABELS[k]} />
       ))}
     </div>
   );
@@ -130,6 +147,7 @@ const s = {
   arrow: { color: t.textMuted, flexShrink: 0, display: 'inline-flex' },
   dash:  { color: t.textMuted },
   pair:  { display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
+  groupTitle: { fontSize: 12, fontWeight: 700, color: t.textSecondary, margin: '14px 0 2px' },
 
   thumbLink:  { display: 'block', lineHeight: 0 },
   thumb:      { width: 44, height: 44, objectFit: 'cover', borderRadius: radius.sm, border: `1px solid ${t.border}` },

@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useId, useRef, useState } from 'react';
-import { theme as t, radius, shadow } from '../theme';
+import { theme as t, radius, shadow, type } from '../theme';
 import Icon from './Icon';
 
 /*
@@ -148,7 +148,7 @@ export function AppAlertProvider({ children }) {
 
 const s = {
   overlay: {
-    position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)',
+    position: 'fixed', inset: 0, background: t.overlay,
     display: 'flex', alignItems: 'center', justifyContent: 'center',
     zIndex: 2000, padding: 20,
   },
@@ -161,7 +161,7 @@ const s = {
     width: 46, height: 46, borderRadius: '50%', display: 'flex', alignItems: 'center',
     justifyContent: 'center', margin: '0 auto 14px', fontSize: 20, fontWeight: 700,
   },
-  title:   { fontSize: 17, fontWeight: 700, color: t.textPrimary, margin: '0 0 8px' },
+  title:   { ...type.dialogTitle, color: t.textPrimary, margin: '0 0 8px' },
   message: { fontSize: 14, color: t.textSecondary, lineHeight: 1.5, margin: 0, whiteSpace: 'pre-wrap' },
 
   actions: { display: 'flex', gap: 10, marginTop: 22 },
