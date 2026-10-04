@@ -102,6 +102,8 @@
   --shadow-sm:       0 1px 2px rgba(28,36,38,0.05), 0 4px 14px rgba(28,36,38,0.05);
   --shadow-md:       0 4px 10px rgba(28,36,38,0.06), 0 10px 28px rgba(28,36,38,0.07);
   --shadow-lg:       0 10px 20px rgba(28,36,38,0.08), 0 18px 48px rgba(28,36,38,0.10);
+  /* Behind every dialog (the app's colors.overlay, same values). */
+  --overlay:         rgba(0,0,0,0.45);
 
   --scrollbar-thumb:       #D8CFBC;
   --scrollbar-thumb-hover: #C2B69E;
@@ -168,6 +170,7 @@
     --shadow-sm:       0 4px 14px rgba(0,0,0,0.30);
     --shadow-md:       0 10px 28px rgba(0,0,0,0.38);
     --shadow-lg:       0 18px 48px rgba(0,0,0,0.46);
+    --overlay:         rgba(0,0,0,0.6);
 
     --scrollbar-thumb:       #2A4443;
     --scrollbar-thumb-hover: #415B59;
@@ -228,6 +231,7 @@
   --shadow-sm:       0 4px 14px rgba(0,0,0,0.30);
   --shadow-md:       0 10px 28px rgba(0,0,0,0.38);
   --shadow-lg:       0 18px 48px rgba(0,0,0,0.46);
+  --overlay:         rgba(0,0,0,0.6);
 
   --scrollbar-thumb:       #2A4443;
   --scrollbar-thumb-hover: #415B59;
