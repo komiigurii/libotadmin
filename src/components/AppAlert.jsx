@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useId, useRef, useState } from 'react';
 import { theme as t, radius, shadow } from '../theme';
 import Icon from './Icon';
 
@@ -53,27 +53,38 @@ const TONE = {
 function AlertModal({ data, onClose }) {
   const isConfirm = data.kind === 'confirm';
   const tone = TONE[data.tone] || (isConfirm && data.danger ? TONE.danger : TONE.info);
+  const titleId = useId();
+  const messageId = useId();
 
-  // Esc closes/cancels; Enter confirms (mirrors native confirm()/alert()).
+  // Esc cancels. Enter is left to the button that has focus: a window-level
+  // Enter handler used to confirm before the focused button's own click ran,
+  // so Tab to Cancel + Enter went ahead with the action. Focus starts on
+  // Cancel when the action is destructive, so Enter alone can't delete or ban,
+  // and on the action otherwise, so Enter still confirms like confirm() does.
   useEffect(() => {
-    const onKey = (e) => {
-      if (e.key === 'Escape') onClose(false);
-      else if (e.key === 'Enter') onClose(true);
-    };
+    const onKey = (e) => { if (e.key === 'Escape') onClose(false); };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
 
+  const focusCancel = isConfirm && !!data.danger;
+
   return (
     <div style={s.overlay} onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(false); }}>
-      <div style={s.card} role="alertdialog" aria-modal="true">
+      <div
+        style={s.card}
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby={data.title ? titleId : undefined}
+        aria-describedby={data.message ? messageId : undefined}
+      >
         <div style={{ ...s.iconWrap, background: tone.bg, color: tone.color }}>
           {/* `weight` is Phosphor's stroke control — the inline SVG set this
               replaced took a numeric strokeWidth, which no longer applies. */}
           <Icon name={tone.icon} size={22} weight="bold" />
         </div>
-        {data.title && <h2 style={s.title}>{data.title}</h2>}
-        {data.message && <p style={s.message}>{data.message}</p>}
+        {data.title && <h2 id={titleId} style={s.title}>{data.title}</h2>}
+        {data.message && <p id={messageId} style={s.message}>{data.message}</p>}
 
         <div style={s.actions}>
           {isConfirm && (
@@ -81,7 +92,7 @@ function AlertModal({ data, onClose }) {
               onClick={() => onClose(false)}
               style={s.btnCancel}
               className="modern-btn"
-              autoFocus={!data.danger}
+              autoFocus={focusCancel}
             >
               {data.cancelText || 'Cancel'}
             </button>
@@ -90,7 +101,7 @@ function AlertModal({ data, onClose }) {
             onClick={() => onClose(true)}
             style={{ ...s.btnPrimary, ...(isConfirm && data.danger ? s.btnDanger : {}) }}
             className="modern-btn"
-            autoFocus={isConfirm ? data.danger : true}
+            autoFocus={!focusCancel}
           >
             {isConfirm ? (data.confirmText || 'Confirm') : (data.confirmText || 'OK')}
           </button>
