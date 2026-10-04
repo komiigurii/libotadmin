@@ -1034,7 +1034,6 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
     // the loss. Anything unrecognised is shown as a chip below instead.
     category:        Array.isArray(initial?.category) ? initial.category : (initial?.category ? [initial.category] : []),
     description:     initial?.description      || '',
-    history:         initial?.history          || '',
     city:            initial?.city             || lockedCity || '',
     entranceFee:     initial?.entranceFee      || '',
     visitingHours:   initial?.visitingHours    || '',
@@ -1373,7 +1372,6 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
     name: form.name.trim(),
     category: form.category,
     description: form.description.trim(),
-    history: form.history.trim(),
     city: form.city.trim(),
     entranceFee: form.entranceFee.trim(),
     visitingHours: form.visitingHours.trim(),
@@ -1560,14 +1558,8 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
                   <label style={styles.label}>Description <span style={styles.required}>*</span></label>
                   <textarea name="description" value={form.description} onChange={handleChange} style={styles.textarea} className="modern-input" rows={4} placeholder="Short description of the spot..." />
                 </div>
-
-                {/* The spec lists "the description and history of the place" as
-                    editable; the Spot model has always had the field, the
-                    form just never offered it. */}
-                <div style={styles.field}>
-                  <label style={styles.label} htmlFor="spot-history">History</label>
-                  <textarea id="spot-history" name="history" value={form.history} onChange={handleChange} style={styles.textarea} className="modern-input" rows={5} placeholder="When and how the place came to be, and the events that happened there…" />
-                </div>
+                {/* No History field: removed from the Spot model on 2026-10-04
+                    (the app never showed it). */}
               </section>
             </TabPanel>
           )}
