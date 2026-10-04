@@ -100,6 +100,13 @@ const ARRIVAL_RADIUS_M = 50;
 const AR_RADIUS_M = 6;
 const AR_MIN_RADIUS_M = 3;
 
+// How far from the spot pin the AR mission still counts (ON_SITE_RADIUS_M in
+// LibotBackend utils/onSite.js, AR_RANGE_METERS in the app's
+// utils/arLocationGate.js). The app walks the AR pins in list order, so one
+// left outside this — say, at the spot's old location after its pin moved —
+// sends everyone there before they can find the rest.
+const AR_SPOT_RANGE_M = 120;
+
 const MISSION_RADIUS_DEFAULT_M = 60;
 // The backend refuses a new spot's food mission below this
 // (MIN_FOOD_RADIUS_M in LibotBackend utils/newSpotProposal.js).
@@ -150,6 +157,15 @@ function arOverlaps(points) {
     }
   }
   return pairs;
+}
+
+// AR pins farther than AR_SPOT_RANGE_M from the spot pin, as { i, distance }.
+// Same null handling as arOverlaps; no spot pin, nothing to measure from.
+function arFarFromSpot(points, spot) {
+  if (!spot) return [];
+  return points
+    .map((p, i) => (p ? { i, distance: distanceM(spot.lat, spot.lng, p.lat, p.lng) } : null))
+    .filter((f) => f && f.distance > AR_SPOT_RANGE_M);
 }
 
 const missionRadiusOf = (v) => (Number(v) > 0 ? Number(v) : MISSION_RADIUS_DEFAULT_M);
@@ -1009,13 +1025,40 @@ function SpotOverlapNote({ neighbours }) {
   );
 }
 
+const arPoints = (arModels) => arModels.map((m) => {
+  const lat = toNum(m.lat);
+  const lng = toNum(m.lng);
+  return lat === null || lng === null ? null : { lat, lng };
+});
+
+// Under the AR map: AR pins too far from the spot pin to be part of its trail.
+function ArFarNote({ arModels, spot }) {
+  const far = arFarFromSpot(arPoints(arModels), spot);
+  if (!far.length) return null;
+  return (
+    <div style={styles.overlapWarn} role="status">
+      <p style={styles.overlapTitle}>
+        <Icon name="alert-triangle" size={13} />
+        AR pins away from the spot
+      </p>
+      <ul style={styles.overlapList}>
+        {far.map(({ i, distance }) => (
+          <li key={i}>
+            <strong>AR {i + 1}</strong> — {fmtDistance(distance)} from the spot pin
+          </li>
+        ))}
+      </ul>
+      <p style={styles.overlapText}>
+        The AR mission only counts within {AR_SPOT_RANGE_M} m of the spot pin, and the app shows the AR
+        pins in order, so these must be moved or removed before saving.
+      </p>
+    </div>
+  );
+}
+
 // Under the AR map: AR pins whose trigger rings overlap.
 function ArOverlapNote({ arModels }) {
-  const pairs = arOverlaps(arModels.map((m) => {
-    const lat = toNum(m.lat);
-    const lng = toNum(m.lng);
-    return lat === null || lng === null ? null : { lat, lng };
-  }));
+  const pairs = arOverlaps(arPoints(arModels));
   if (!pairs.length) return null;
   return (
     <div style={styles.overlapWarn} role="status">
@@ -1420,6 +1463,10 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
   if (badAr !== -1 && withAR) {
     return fail('ar', `AR ${badAr + 1} has an incomplete coordinate — fix or remove it.`);
   }
+  const [farAr] = arFarFromSpot(arPoints(arModels), { lat: spotLatNum, lng: spotLngNum });
+  if (farAr && withAR) {
+    return fail('ar', `AR ${farAr.i + 1} is ${fmtDistance(farAr.distance)} from the spot pin — AR only counts within ${AR_SPOT_RANGE_M} m of the spot. Move or remove it.`);
+  }
   if (isNew && withAR) {
     if (!form.ARModelUrl) return fail('ar', 'AR 3D model is required');
     if (!arModels.length) return fail('ar', 'Pin at least one AR position on the AR map');
@@ -1518,6 +1565,10 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
   // `missionLat && missionLng` reads a legitimate 0 as "not pinned".
   const spotPinned    = toNum(form.coordinates_lat) !== null && toNum(form.coordinates_lng) !== null;
   const missionPinned = toNum(missionLat) !== null && toNum(missionLng) !== null;
+
+  const spotPoint = spotPinned && !coordError(form.coordinates_lat, form.coordinates_lng)
+    ? { lat: toNum(form.coordinates_lat), lng: toNum(form.coordinates_lng) }
+    : null;
 
   // Every other spot's distance from this pin, nearest first, for the note
   // under the Location map. The map recolours its rings live during a drag;
@@ -1867,6 +1918,7 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
 
                 <SpotMapPicker {...mapProps} mode="ar" active={tab === 'ar'} />
                 <MapLegend mode="ar" {...legendProps} />
+                <ArFarNote arModels={arModels} spot={spotPoint} />
                 <ArOverlapNote arModels={arModels} />
 
                 {arModels.length === 0 ? (
