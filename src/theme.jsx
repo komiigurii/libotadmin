@@ -71,6 +71,8 @@ export const theme = {
   mapAr:             'var(--map-ar)',
   mapFood:           'var(--map-food)',
   mapClash:          'var(--map-clash)',
+  // The dimmed page behind every dialog.
+  overlay:           'var(--overlay)',
 };
 
 export const radius = {
@@ -101,6 +103,9 @@ export const fonts = {
 
 export const type = {
   pageTitle: { fontFamily: fonts.display, fontSize: 26, fontWeight: 600, letterSpacing: '-0.015em', lineHeight: 1.2 },
+  // Dialogs (alerts, confirms, the spot form, request deletion): the page
+  // title's face at a dialog's size, so every title on the panel matches.
+  dialogTitle: { fontFamily: fonts.display, fontSize: 21, fontWeight: 600, letterSpacing: '-0.01em', lineHeight: 1.25 },
   cardTitle: { fontFamily: fonts.sans,    fontSize: 15, fontWeight: 600, letterSpacing: '-0.01em' },
   body:      { fontFamily: fonts.sans,    fontSize: 13.5, lineHeight: 1.5 },
   label:     { fontFamily: fonts.sans,    fontSize: 11, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase' },

@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { spotAPI } from '../api/api';
 import SpotForm from '../components/SpotForm';
 import { notify } from '../components/AppAlert';
-import { theme as t, radius, shadow } from '../theme';
+import { theme as t, radius, shadow, type } from '../theme';
 import {
   Page, PageHeader, Toolbar, SearchInput, Button, StatusPill, Loading, EmptyState, ErrorBanner, pageStyles,
 } from '../components/Layout';
@@ -263,9 +263,9 @@ const s = {
   // Page shell, header, toolbar, states, facts and buttons come from
   // components/Layout; only the photo card is this page's own.
   ...pageStyles,
-  modalOverlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 20 },
+  modalOverlay: { position: 'fixed', inset: 0, background: t.overlay, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 20 },
   modalBox:     { background: t.cardBg, borderRadius: radius.xl, padding: 22, width: '100%', maxWidth: 400, boxShadow: shadow.lg, border: `1px solid ${t.border}` },
-  modalTitle:   { ...pageStyles.pageTitle, fontSize: 20, margin: '0 0 6px' },
+  modalTitle:   { ...type.dialogTitle, color: t.textPrimary, margin: '0 0 6px' },
   modalText:    { fontSize: 13, color: t.textSecondary, margin: '0 0 10px', lineHeight: 1.5 },
   formWrap:     { marginBottom: 18 },
 
