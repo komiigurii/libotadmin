@@ -4,9 +4,10 @@
  * that). Used by the Approval Queue and My Submissions.
  */
 
+// A spot has no `location`, `history` or `recommendations` any more (removed
+// 2026-10-04; food recommendations are the spot's Food mission).
 export const FIELD_LABELS = {
-  name: 'Name', location: 'Location', category: 'Category', description: 'Description',
-  history: 'History', recommendations: 'Recommendations', visitingHours: 'Visiting hours',
+  name: 'Name', category: 'Category', description: 'Description', visitingHours: 'Visiting hours',
   entranceFee: 'Entrance fee', image: 'Image', modelUrl: '3D display model', AR3DModelURL: 'AR model',
   Badge: 'Badge', City: 'City', city: 'City', coordinates: 'Coordinates', modelsCoordinates: 'AR positions',
   trivia: 'AR trivia',
@@ -23,7 +24,7 @@ export const MISSION_FIELD_LABELS = {
 // Bookkeeping keys on a pendingChange that aren't spot fields.
 export const META_KEYS = new Set(['submittedBy', 'submittedByName', 'submittedAt', 'status']);
 
-export const LONG_FIELDS = new Set(['description', 'history', 'recommendations', 'trivia', 'locationInfo']);
+export const LONG_FIELDS = new Set(['description', 'trivia', 'locationInfo']);
 export const THUMB_FIELDS = new Set(['image', 'Badge']);
 export const FILE_LINK_FIELDS = new Set(['modelUrl', 'AR3DModelURL']);
 
