@@ -46,7 +46,6 @@ export const spotAPI = {
   // Every spot with its pending edit / deletion. Admins only.
   getAllAdmin:   ()             => api.get('/api/spots/admin').then(r => r.data.spots),
   getMine:       ()             => api.get('/api/spots/moderator').then(r => r.data.spots),
-  delete:        (id)           => api.delete(`/api/spots/${id}`).then(r => r.data),
   getPending:    ()             => api.get('/api/spots/pending').then(r => r.data),
   proposeChange: (id, data)     => api.patch(`/api/spots/${id}/propose`, data).then(r => r.data),
   proposeCreate: (data)         => api.post('/api/spots/propose', data).then(r => r.data),
@@ -140,12 +139,10 @@ export const authAPI = {
 
 // Spot categories. The list used to be hardcoded in both this panel and the
 // mobile app; it now lives in the database so it can be changed without a
-// release. GET is public; create/update/delete are admin-only.
+// release. The panel only reads it; the backend's admin-only create / update /
+// delete routes have no screen here.
 export const categoryAPI = {
   getAll: () => api.get('/api/categories').then(r => r.data.categories || []),
-  create: (data)     => api.post('/api/categories', data).then(r => r.data),
-  update: (id, data) => api.put(`/api/categories/${id}`, data).then(r => r.data),
-  remove: (id)       => api.delete(`/api/categories/${id}`).then(r => r.data),
 };
 
 // Traveler leaderboard + engagement figures. Read-only, admins only.
