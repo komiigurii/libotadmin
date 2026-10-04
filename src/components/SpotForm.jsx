@@ -260,6 +260,11 @@ const UPLOAD_MAX_BYTES = 20 * 1024 * 1024;
 const formatBytes = (n) =>
   n >= 1024 * 1024 ? `${(n / (1024 * 1024)).toFixed(1)} MB` : `${Math.round(n / 1024)} KB`;
 
+const fileNameFromUrl = (url) => {
+  const name = url.split('?')[0].split('/').pop();
+  try { return decodeURIComponent(name); } catch { return name; }
+};
+
 // ── Reusable file upload field ────────────────────────────────────
 function FileUploadField({ label, required, hint, accept, uploadType, value, onUploaded, previewType = 'image' }) {
   const [uploading, setUploading] = useState(false);
@@ -345,7 +350,14 @@ function FileUploadField({ label, required, hint, accept, uploadType, value, onU
         </div>
 
         {error && <p style={styles.warningText}><Icon name="alert-triangle" size={12} /> {error}</p>}
-        {value && previewType === 'file' && !error && <p style={styles.okText}><Icon name="check-circle" size={12} /> {value.split('/').pop()}</p>}
+        {value && previewType === 'file' && !error && (
+          <p style={styles.okText}>
+            <Icon name="check-circle" size={12} />{' '}
+            <a href={value} target="_blank" rel="noreferrer" title="Open or download the uploaded file" style={styles.fileLink}>
+              {fileNameFromUrl(value)}
+            </a>
+          </p>
+        )}
       </div>
     </div>
   );
@@ -1574,7 +1586,7 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
                 <div style={styles.uploadGrid}>
                   <FileUploadField label="Spot image" required accept="image/*" uploadType="image" previewType="image" value={form.image} onUploaded={setField('image')} />
                   <FileUploadField label="Badge image" hint="Reward for visiting" accept="image/*" uploadType="badge" previewType="badge" value={form.Badge} onUploaded={setField('Badge')} />
-                  <FileUploadField label="Display 3D model" hint=".glb — spot detail screen" accept=".glb,.gltf" uploadType="model" previewType="file"  onUploaded={setField('modelUrl')} />
+                  <FileUploadField label="Display 3D model" hint=".glb — spot detail screen" accept=".glb,.gltf" uploadType="model" previewType="file" value={form.modelUrl} onUploaded={setField('modelUrl')} />
                 </div>
               </section>
             </TabPanel>
@@ -1627,7 +1639,7 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
               ) : (<>
               <section style={styles.section}>
                 <p style={styles.sectionTitle}>AR model</p>
-                <FileUploadField label="AR 3D model" hint=".glb — what users see through the AR camera" accept=".glb,.gltf" uploadType="model" previewType="file" onUploaded={setField('ARModelUrl')} />
+                <FileUploadField label="AR 3D model" hint=".glb — what users see through the AR camera" accept=".glb,.gltf" uploadType="model" previewType="file" value={form.ARModelUrl} onUploaded={setField('ARModelUrl')} />
               </section>
 
               <section style={styles.section}>
@@ -1952,5 +1964,6 @@ const styles = {
   saveBtn:   { padding: '9px 18px', borderRadius: radius.md, border: 'none', background: t.accent, color: t.onAccent, fontWeight: 700, fontSize: 13, cursor: 'pointer', boxShadow: shadow.sm },
 
   warningText: { fontSize: 12, color: t.danger, fontWeight: 500, margin: 0 },
-  okText:      { fontSize: 12, color: t.success, fontWeight: 500, margin: 0 },
+  okText:      { fontSize: 12, color: t.success, fontWeight: 500, margin: 0, overflowWrap: 'anywhere' },
+  fileLink:    { color: 'inherit', textDecoration: 'underline', textUnderlineOffset: 2 },
 };
