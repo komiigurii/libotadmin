@@ -61,7 +61,7 @@ export default function UserProgress() {
       <PageHeader
         title="Traveler Progress"
         count={rows.length}
-        subtitle="The traveler leaderboard — spots visited, missions completed, badges and points for everyone using the app."
+        subtitle="The traveler leaderboard, ranked by points as in the app — with spots visited, missions completed and badges for everyone using it."
         actions={<Button icon="refresh-cw" onClick={load} disabled={loading}>Refresh</Button>}
       />
 
@@ -141,10 +141,10 @@ export default function UserProgress() {
                   </div>
                 </div>
               </Td>
-              <Td align="right" strong>{r.spotsVisited}</Td>
+              <Td align="right">{r.spotsVisited}</Td>
               <Td align="right">{r.badges}</Td>
               <Td align="right">{r.missionsCompleted}</Td>
-              <Td align="right">{fmtNum(r.points)}</Td>
+              <Td align="right" strong>{fmtNum(r.points)}</Td>
               <Td align="right" muted>{r.lastActiveAt ? timeAgo(r.lastActiveAt) : 'Never'}</Td>
             </tr>
           ))}
