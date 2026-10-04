@@ -1627,7 +1627,7 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
               ) : (<>
               <section style={styles.section}>
                 <p style={styles.sectionTitle}>AR model</p>
-                <FileUploadField label="AR 3D model" hint=".glb — what users see through the AR camera" accept=".glb,.gltf" uploadType="model" previewType="file" value={form.ARModelUrl} onUploaded={setField('ARModelUrl')} />
+                <FileUploadField label="AR 3D model" hint=".glb — what users see through the AR camera" accept=".glb,.gltf" uploadType="model" previewType="file" onUploaded={setField('ARModelUrl')} />
               </section>
 
               <section style={styles.section}>
