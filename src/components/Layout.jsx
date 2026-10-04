@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { theme as t, radius, shadow, type } from '../theme';
 import Icon from './Icon';
@@ -107,8 +107,22 @@ export function Card({ children, pad = true, style }) {
 /* ── States ───────────────────────────────────────────────────────
    Loading, error and empty all render at the same size in the same place, so
    a page doesn't jump as it settles. */
+// The API's server sleeps when idle and takes 30–60 s to answer the first
+// request, so after a few seconds the loading state says why it's slow.
+const WAKING_AFTER_MS = 4000;
+
 export function Loading({ label = 'Loading…' }) {
-  return <div style={s.state}>{label}</div>;
+  const [slow, setSlow] = useState(false);
+  useEffect(() => {
+    const timer = setTimeout(() => setSlow(true), WAKING_AFTER_MS);
+    return () => clearTimeout(timer);
+  }, []);
+  return (
+    <div style={s.state} role="status" aria-live="polite">
+      {label}
+      {slow && <div style={s.stateHint}>Waking up the server. The first load can take up to a minute.</div>}
+    </div>
+  );
 }
 
 export function ErrorBanner({ children, onDismiss }) {
@@ -464,6 +478,7 @@ const base = {
     background: t.cardBg, border: `1px solid ${t.border}`, borderRadius: radius.lg,
     padding: 48, textAlign: 'center', color: t.textSecondary, fontSize: 14,
   },
+  stateHint: { marginTop: 8, fontSize: 12.5, color: t.textMuted },
 
   errorBanner: {
     display: 'flex', alignItems: 'center', gap: 9,

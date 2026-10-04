@@ -1,9 +1,13 @@
 import axios from 'axios';
 import { getToken, isExpired, endSession } from '../auth/session';
 
+// A time limit, so a dead connection ends in an error instead of a page that
+// says "Loading…" forever. 60 s outlasts the sleeping server waking up (30–60 s).
+// Media uploads set their own, longer one.
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL,
   headers: { 'Content-Type': 'application/json' },
+  timeout: 60_000,
 });
 
 api.interceptors.request.use((config) => {
@@ -157,6 +161,8 @@ export const uploadAPI = {
     return api
       .post(`/api/upload/spot?type=${type}`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
+        // A 3D model can be up to 20 MB; on a slow uplink that is minutes.
+        timeout: 5 * 60_000,
       })
       .then(r => r.data);
   },
