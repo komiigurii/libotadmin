@@ -50,7 +50,7 @@ export default function UserProgress() {
     return rows.filter((r) => {
       if (onlyExplorers && r.spotsVisited === 0) return false;
       if (!q) return true;
-      return r.name.toLowerCase().includes(q) || (r.email || '').toLowerCase().includes(q);
+      return [r.name, r.email, r.municipality].some((v) => (v || '').toLowerCase().includes(q));
     });
   }, [rows, search, onlyExplorers]);
 
@@ -61,7 +61,7 @@ export default function UserProgress() {
       <PageHeader
         title="Traveler Progress"
         count={rows.length}
-        subtitle="The traveler leaderboard, ranked by points as in the app — with spots visited, missions completed and badges for everyone using it."
+        subtitle="The traveler leaderboard, ranked as in the app by spots visited, then points — with badges, missions and home municipality for everyone using it."
         actions={<Button icon="refresh-cw" onClick={load} disabled={loading}>Refresh</Button>}
       />
 
@@ -97,7 +97,7 @@ export default function UserProgress() {
         <SearchInput
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search by name or email…"
+          placeholder="Search by name, email or municipality…"
         />
       </Toolbar>
 
@@ -115,6 +115,7 @@ export default function UserProgress() {
           head={<>
             <Th width={64}>Rank</Th>
             <Th>Traveler</Th>
+            <Th>Municipality</Th>
             <Th align="right">Spots visited</Th>
             <Th align="right">Badges</Th>
             <Th align="right">Missions</Th>
@@ -141,10 +142,12 @@ export default function UserProgress() {
                   </div>
                 </div>
               </Td>
-              <Td align="right">{r.spotsVisited}</Td>
+              {/* Blank for accounts made before sign-up asked for it. */}
+              <Td muted={!r.municipality}>{r.municipality || '—'}</Td>
+              <Td align="right" strong>{r.spotsVisited}</Td>
               <Td align="right">{r.badges}</Td>
               <Td align="right">{r.missionsCompleted}</Td>
-              <Td align="right" strong>{fmtNum(r.points)}</Td>
+              <Td align="right">{fmtNum(r.points)}</Td>
               <Td align="right" muted>{r.lastActiveAt ? timeAgo(r.lastActiveAt) : 'Never'}</Td>
             </tr>
           ))}
