@@ -14,5 +14,5 @@
     if (p === 'light' || p === 'dark') {
       document.documentElement.setAttribute('data-theme', p);
     }
-  } catch (e) { /* private mode — fall back to the OS preference */ }
+  } catch { /* private mode — fall back to the OS preference */ }
 })();

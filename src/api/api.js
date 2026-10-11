@@ -92,9 +92,9 @@ export const commentAPI = {
 
 export const bannedAccountsAPI = {
   getAll: () => api.get('/api/admin/banned-users').then(r => r.data.users),
-  // No custom duration — the backend applies the next escalating step
-  // itself (1st suspension = 7 days, 2nd = 14 days, 3rd auto-escalates to
-  // a permanent ban), so manual and automatic suspensions stay consistent.
+  // No custom duration — the backend decides: 30 days, up to three
+  // suspensions, then a permanent ban instead, so manual and automatic
+  // suspensions stay consistent.
   suspend: (clerkUserId, reason) =>
     api.patch(`/api/admin/users/${clerkUserId}/suspend`, { reason }).then(r => r.data),
   ban:    (clerkUserId, reason) =>
