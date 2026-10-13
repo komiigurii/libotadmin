@@ -167,9 +167,10 @@ export default function BannedAccounts() {
                       <p style={{ ...s.itemText, margin: 0, whiteSpace: 'pre-wrap' }}>
                         {u.appealText || '(No appeal text provided.)'}
                       </p>
-                      {u.deletionDeadline && (
+                      {u.appealDeadline && (
                         <p style={s.panelNote}>
-                          The account is scheduled for permanent deletion on {fmtDay(u.deletionDeadline)} if no decision is made.
+                          {new Date(u.appealDeadline) < new Date() ? 'Appeals for this ban closed on ' : 'Appeals for this ban close on '}
+                          {fmtDay(u.appealDeadline)}. The account stays archived until you decide; it is never deleted.
                         </p>
                       )}
                       {u.appealStatus === 'submitted' ? (
