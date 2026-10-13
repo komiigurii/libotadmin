@@ -146,7 +146,7 @@ function CommentRow({ comment, expanded, onToggle, onUpdated }) {
   });
 
   const banUser = () => run({
-    confirm: `Permanently ban ${userName}? Their account is archived for 30 days before deletion, and they can appeal.`,
+    confirm: `Permanently ban ${userName}? Their account is archived (never deleted), and they have 30 days to appeal.`,
     confirmText: 'Ban permanently',
     call: () => bannedAccountsAPI.ban(clerkUserId, reason.trim()),
   });

@@ -32,7 +32,7 @@ export default function InactiveUsers() {
 
   const archive = async (clerkUserId) => {
     if (!(await confirmAction(
-      'Approve archival for this traveler? Their account is permanently deleted after 30 days.',
+      'Approve archival for this traveler? Their account and records are kept, out of public view, and they can ask for it back when they return.',
       { danger: true, confirmText: 'Approve archival' }
     ))) return;
     setActing(clerkUserId);
@@ -50,7 +50,7 @@ export default function InactiveUsers() {
       <PageHeader
         title="Inactive Accounts"
         count={users.length}
-        subtitle='Travelers who haven’t opened the app in 30 days or more. Archiving keeps their record for 30 days, then deletes the account.'
+        subtitle='Travelers who haven’t opened the app in 30 days or more. Archiving keeps their record for good; it is never deleted.'
         actions={<Button icon="refresh-cw" onClick={load} disabled={loading}>Refresh</Button>}
       />
 
