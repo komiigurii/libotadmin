@@ -1444,7 +1444,8 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
     return fail('media', 'Spot image is required');
   }
   if (isNew && !form.Badge) return fail('media', 'Badge image is required');
-  if (isNew && !form.modelUrl) return fail('media', 'Display 3D model is required');
+  // Nature and Festivals spots have no 3D model (the paper's limitation).
+  if (isNew && withAR && !form.modelUrl) return fail('media', 'Display 3D model is required');
   // Typed coordinates can be blank, half-finished ("14.") or out of range, so
   // this checks for a usable number rather than just a non-empty string.
   const spotLatNum = toNum(form.coordinates_lat);
@@ -1472,7 +1473,8 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
     if (!arModels.length) return fail('ar', 'Pin at least one AR position on the AR map');
     if (!triviaLines.length) return fail('ar', 'Add at least one AR trivia fact');
   }
-  if (isNew) {
+  // A Nature or Festivals spot is visit-only: no food recommendation.
+  if (isNew && withAR) {
     const problem = foodProblem();
     if (problem) return fail('food', problem);
   }
@@ -1495,7 +1497,7 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
       .filter(model => model.lat !== null && model.lng !== null),
     // A new spot's missions are made when it's approved; this pins its food
     // mission then (an existing spot proposes it separately, below).
-    ...(isNew && {
+    ...(isNew && withAR && {
       foodMission: {
         locationName: locationName.trim(),
         image: missionImage,
@@ -1608,7 +1610,7 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
   const missingMedia = [
     !form.image && 'spot image',
     isNew && !form.Badge && 'badge image',
-    isNew && !form.modelUrl && 'display 3D model',
+    isNew && hasAR && !form.modelUrl && 'display 3D model',
   ].filter(Boolean);
   const missingAr = isNew && hasAR ? [
     !form.ARModelUrl && 'AR 3D model',
@@ -1621,7 +1623,7 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
     media:    { missing: stillNeeded(missingMedia) },
     location: { missing: spotPinned ? coordError(form.coordinates_lat, form.coordinates_lng) : 'Spot location is required' },
     ar:       { count: hasAR ? arModels.length : 0, missing: stillNeeded(missingAr) },
-    food:     { missing: isNew ? foodProblem() : '' },
+    food:     { missing: isNew && hasAR ? foodProblem() : '' },
   };
   // The red asterisk, on the fields only a new spot must fill in.
   const newSpotMark = isNew && <span style={styles.required}>*</span>;
@@ -1849,7 +1851,7 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
                 <div style={styles.uploadGrid}>
                   <FileUploadField label="Spot image" required accept="image/*" uploadType="image" previewType="image" value={form.image} onUploaded={setField('image')} />
                   <FileUploadField label="Badge image" required={isNew} hint="Reward for visiting" accept="image/*" uploadType="badge" previewType="badge" value={form.Badge} onUploaded={setField('Badge')} />
-                  <FileUploadField label="Display 3D model" required={isNew} hint=".glb — spot detail screen" accept=".glb,.gltf" uploadType="model" previewType="file" value={form.modelUrl} onUploaded={setField('modelUrl')} />
+                  <FileUploadField label="Display 3D model" required={isNew && hasAR} hint=".glb — spot detail screen" accept=".glb,.gltf" uploadType="model" previewType="file" value={form.modelUrl} onUploaded={setField('modelUrl')} />
                 </div>
               </section>
             </TabPanel>
@@ -1955,7 +1957,17 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
 
           {visited.has('food') && (
             <TabPanel id="food" active={tab === 'food'}>
-              {!initial?._id ? (
+              {!hasAR ? (
+                // Visit-only (LibotBackend utils/spotHasAR.js isVisitOnlySpot):
+                // the backend hides any mission such a spot still carries and
+                // refuses to make one or pin its food spot.
+                <section style={styles.section}>
+                  <div style={styles.emptyNote}>
+                    Nature and Festivals spots have only the visit mission: travelers complete their
+                    Bakit List by arriving. There's no food recommendation, AR or photo scan to set here.
+                  </div>
+                </section>
+              ) : !initial?._id ? (
                 renderFoodFields(true)
               ) : loadingMission ? (
                 <section style={styles.section}>
