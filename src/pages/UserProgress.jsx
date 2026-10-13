@@ -61,7 +61,7 @@ export default function UserProgress() {
       <PageHeader
         title="Traveler Progress"
         count={rows.length}
-        subtitle="The traveler leaderboard, ranked as in the app by spots visited, then points — with badges, missions and home municipality for everyone using it."
+        subtitle="The traveler leaderboard, ranked as in the app by points (visits and missions), then spots visited — with badges, missions and home municipality for everyone using it."
         actions={<Button icon="refresh-cw" onClick={load} disabled={loading}>Refresh</Button>}
       />
 
@@ -116,10 +116,10 @@ export default function UserProgress() {
             <Th width={64}>Rank</Th>
             <Th>Traveler</Th>
             <Th>Municipality</Th>
+            <Th align="right">Points</Th>
             <Th align="right">Spots visited</Th>
             <Th align="right">Badges</Th>
             <Th align="right">Missions</Th>
-            <Th align="right">Points</Th>
             <Th align="right">Last active</Th>
           </>}
         >
@@ -144,10 +144,11 @@ export default function UserProgress() {
               </Td>
               {/* Blank for accounts made before sign-up asked for it. */}
               <Td muted={!r.municipality}>{r.municipality || '—'}</Td>
-              <Td align="right" strong>{r.spotsVisited}</Td>
+              {/* Points decide the rank, so they come first and in bold. */}
+              <Td align="right" strong>{fmtNum(r.points)}</Td>
+              <Td align="right">{r.spotsVisited}</Td>
               <Td align="right">{r.badges}</Td>
               <Td align="right">{r.missionsCompleted}</Td>
-              <Td align="right">{fmtNum(r.points)}</Td>
               <Td align="right" muted>{r.lastActiveAt ? timeAgo(r.lastActiveAt) : 'Never'}</Td>
             </tr>
           ))}
