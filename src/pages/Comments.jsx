@@ -137,10 +137,10 @@ function CommentRow({ comment, expanded, onToggle, onUpdated }) {
     call: () => commentAPI.warnUser(comment._id, reason.trim()),
   });
 
-  // Suspend is 30 days, up to three times; after that the backend bans
-  // instead — it decides, not the admin.
+  // Suspend is 7 days the first time, 14 the second, and the third time the
+  // backend bans instead — it decides, not the admin.
   const suspendUser = () => run({
-    confirm: `Suspend ${userName} for 30 days? A traveler can be suspended three times; after that, this bans them permanently instead.`,
+    confirm: `Suspend ${userName}? A 1st suspension lasts 7 days and a 2nd lasts 14 days; a 3rd bans them permanently instead.`,
     confirmText: 'Suspend',
     call: () => bannedAccountsAPI.suspend(clerkUserId, reason.trim()),
   });
@@ -205,7 +205,7 @@ function CommentRow({ comment, expanded, onToggle, onUpdated }) {
           />
           <p style={s.panelNote}>
             Warnings: the 1st mutes reviews for 7 days; the 2nd mutes for 14 days and suspends the account.
-            Suspensions last 30 days, up to three times; the next one after that is a permanent ban.
+            Suspensions: the 1st lasts 7 days, the 2nd 14 days; the 3rd is a permanent ban.
             Ban skips straight to permanent.
           </p>
           <div style={s.buttonRow}>

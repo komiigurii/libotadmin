@@ -233,8 +233,8 @@ function ReportRow({ report, expanded, acting, setActing, onToggle, onUpdated })
           {isPending && (
             <p style={s.panelNote}>
               Upholding issues the next escalation step automatically: the 1st warning mutes reviews
-              for 1 week, the 2nd mutes for 2 weeks and suspends the account for 30 days. After
-              three suspensions, the next one bans the account permanently.
+              for 1 week, the 2nd mutes for 2 weeks and suspends the account. A 1st suspension
+              lasts 7 days and a 2nd lasts 14 days; the 3rd bans the account permanently.
             </p>
           )}
 
