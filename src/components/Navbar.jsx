@@ -59,8 +59,8 @@ const ADMIN_NAV = [
 ];
 
 // A moderator's job is attractions in their municipality and the requests
-// they've sent, plus a read-only look at their municipality's travelers
-// (QA 2026-10-16). Reviews, reports, the full leaderboard and account actions
+// they've sent, plus a read-only list of the travelers who visited their
+// municipality's spots (QA 2026-10-16). Reviews, reports, the full leaderboard and account actions
 // stay admin-only, in the panel and on the backend.
 const MODERATOR_NAV = [
   { group: 'Overview', items: [

@@ -74,7 +74,7 @@ export default function App() {
                       <Route path="/dashboard"          element={<Dashboard />} />
 
                       <Route path="/my-review-requests" element={<ModeratorRoute><MyReviewRequests /></ModeratorRoute>} />
-                      {/* Read-only: the travelers from the moderator's own municipality. */}
+                      {/* Read-only: the travelers who visited the moderator's municipality's spots. */}
                       <Route path="/my-travelers"       element={<ModeratorRoute><MyTravelers /></ModeratorRoute>} />
 
                       <Route path="/mod-requests"       element={<AdminRoute><ModRequests /></AdminRoute>} />
