@@ -61,7 +61,7 @@ export default function UserProgress() {
       <PageHeader
         title="Traveler Progress"
         count={rows.length}
-        subtitle="The traveler leaderboard, ranked as in the app by points (visits and missions), then spots visited — with badges, missions and home municipality for everyone using it."
+        subtitle="The traveler leaderboard, ranked as in the app by points (visits and missions); equal points share a rank — with spots visited, badges, missions and home municipality for everyone using it."
         actions={<Button icon="refresh-cw" onClick={load} disabled={loading}>Refresh</Button>}
       />
 

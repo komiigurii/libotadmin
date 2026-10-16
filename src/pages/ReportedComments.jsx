@@ -6,6 +6,7 @@ import {
   Loading, ErrorBanner, EmptyState, Avatar, ReviewPhotos, pageStyles as s,
 } from '../components/Layout';
 import { fmtDateTime } from '../utils/format';
+import { standingLabel } from '../utils/standing';
 import Icon from '../components/Icon';
 
 // A report's life: pending → resolved (upheld) or dismissed. Dismissed is
@@ -85,6 +86,8 @@ export default function ReportedComments() {
         />
       </Toolbar>
 
+      <Legend />
+
       {loading ? (
         <Loading label="Loading reported reviews…" />
       ) : error ? (
@@ -116,6 +119,45 @@ export default function ReportedComments() {
   );
 }
 
+// What each icon and pill on a report means (QA 2026-10-16: a legend for the
+// icons). Folded by default, so it doesn't push the queue down every visit.
+function Legend() {
+  const rows = [
+    [<StatusPill key="p" tone="warning" icon="clock">Pending</StatusPill>,   'Waiting for your decision.'],
+    [<StatusPill key="u" tone="success" icon="check">Upheld</StatusPill>,    'You agreed with the report; the next warning step was applied.'],
+    [<StatusPill key="d" tone="neutral" icon="x">Dismissed</StatusPill>,     'You threw the report out; nothing happened to the reviewer.'],
+    [<StatusPill key="b" tone="danger" icon="slash">Banned</StatusPill>,     'The reviewer was banned from this report.'],
+    [<Tag key="t">Spam</Tag>,                                               'The reason the reporter chose.'],
+    [<StatusPill key="w" tone="neutral" icon="alert-triangle">Warning 2 · Suspension 1</StatusPill>,
+      'The reviewer’s record so far: every warning ever given and every suspension.'],
+    [<StatusPill key="m" tone="warning" icon="clock">Muted now</StatusPill>, 'Can’t post reviews right now (a warning is in force). “Suspended now” means the account is suspended.'],
+    [<span key="s" style={s.itemFact}><Icon name="star" size={12} /> 2/5</span>, 'The star rating in the reported review.'],
+    [<span key="f" style={s.itemFact}><Icon name="flag" size={12} /> Reported by</span>, 'The traveler who sent the report.'],
+  ];
+  return (
+    <details style={legend.box}>
+      <summary style={legend.summary}><Icon name="info" size={14} /> What the icons mean</summary>
+      <dl style={legend.list}>
+        {rows.map(([icon, text], i) => (
+          <div key={i} style={legend.row}>
+            <dt style={legend.term}>{icon}</dt>
+            <dd style={legend.desc}>{text}</dd>
+          </div>
+        ))}
+      </dl>
+    </details>
+  );
+}
+
+const legend = {
+  box:     { ...s.panel, margin: '0 0 16px', padding: '10px 14px' },
+  summary: { cursor: 'pointer', fontWeight: 600, fontSize: 13.5, display: 'flex', alignItems: 'center', gap: 6 },
+  list:    { margin: '10px 0 2px', display: 'grid', gap: 8 },
+  row:     { display: 'grid', gridTemplateColumns: 'minmax(170px, auto) 1fr', gap: 12, alignItems: 'center' },
+  term:    { margin: 0 },
+  desc:    { margin: 0, fontSize: 13.5 },
+};
+
 function ReportRow({ report, expanded, acting, setActing, onToggle, onUpdated }) {
   const review = report.reviewId && typeof report.reviewId === 'object' ? report.reviewId : null;
   const [adminNote, setAdminNote] = useState(report.adminNote || '');
@@ -123,6 +165,7 @@ function ReportRow({ report, expanded, acting, setActing, onToggle, onUpdated })
   const st = REPORT_STATUS[report.status] || REPORT_STATUS.pending;
   const isPending = report.status === 'pending';
   const reviewerName = review?.userName || 'Unknown traveler';
+  const standing = report.reportedUser?.standing || null;
 
   const decide = async (decision) => {
     setActing(report._id);
@@ -191,6 +234,13 @@ function ReportRow({ report, expanded, acting, setActing, onToggle, onUpdated })
             <Tag>{REASON_LABELS[report.reason] || report.reason}</Tag>
             <StatusPill tone={st.tone} icon={st.icon}>{st.label}</StatusPill>
             {report.banApproved && <StatusPill tone="danger" icon="slash">Banned</StatusPill>}
+            {/* The reviewer's record: "Warning 1, 2, 3" (QA 2026-10-16). */}
+            {standingLabel(standing) && (
+              <StatusPill tone="neutral" icon="alert-triangle">{standingLabel(standing)}</StatusPill>
+            )}
+            {!report.banApproved && standing?.banned && <StatusPill tone="danger" icon="slash">Banned</StatusPill>}
+            {standing?.suspended && <StatusPill tone="warning" icon="pause">Suspended now</StatusPill>}
+            {!standing?.suspended && standing?.muted && <StatusPill tone="warning" icon="clock">Muted now</StatusPill>}
           </div>
 
           <p style={s.itemText}>

@@ -74,13 +74,17 @@ export default function Spots() {
     const id = deleteTarget;
     setDeleteTarget(null);
 
+    // A toast either way, like a submitted edit (QA 2026-10-16: the request
+    // used to go through with nothing said but a small label on the card).
     try {
       await spotAPI.proposeDelete(id, deleteReason);
       setError('');
+      notify('Deletion requested. The spot stays live until an admin approves it.', { tone: 'success' });
       load();
     } catch (err) {
       const msg = err.response?.data?.message || err.message || 'Unknown error';
       setError('Failed to submit request: ' + msg);
+      notify('Couldn’t request the deletion: ' + msg, { tone: 'danger' });
     }
   };
 
