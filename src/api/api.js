@@ -155,8 +155,8 @@ export const moderatorsAPI = {
   getAll: () => api.get('/api/admin/moderators').then(r => r.data.moderators || []),
 };
 
-// A moderator's travelers: those whose home municipality is the moderator's.
-// Read-only (QA 2026-10-16, decided with the team).
+// A moderator's travelers: those who visited the spots in the moderator's
+// municipality. Read-only (QA 2026-10-16, decided with the team).
 export const myTravelersAPI = {
   getAll: () => api.get('/api/moderator/travelers').then(r => r.data),
 };

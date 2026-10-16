@@ -4,13 +4,14 @@ import {
   Page, PageHeader, Toolbar, SearchInput, FilterTabs, Table, Th, Td, Button, StatusPill,
   Loading, EmptyState, ErrorBanner, Avatar, pageStyles as s,
 } from '../components/Layout';
-import { fmtNum, fmtDay, timeAgo } from '../utils/format';
+import { fmtDay, timeAgo } from '../utils/format';
 import { standingLabel } from '../utils/standing';
 
-// Travelers — for a moderator: the travelers whose home municipality is the one
-// they look after (QA 2026-10-16: user management within their municipality).
-// Read-only, as decided with the team: warnings, suspensions and bans stay with
-// the administrators. No emails.
+// Travelers — for a moderator: the travelers who have visited the spots in
+// their municipality (QA 2026-10-16: user management within their
+// municipality), whoever they are and wherever they live. Read-only, as decided
+// with the team: warnings, suspensions and bans stay with the administrators.
+// No emails.
 
 const STATUS = {
   active:    { tone: 'success', icon: 'check',  label: 'Active' },
@@ -21,12 +22,13 @@ const STATUS = {
 };
 
 export default function MyTravelers() {
-  const [rows,    setRows]    = useState([]);
-  const [town,    setTown]    = useState('');
-  const [loading, setLoading] = useState(true);
-  const [error,   setError]   = useState('');
-  const [search,  setSearch]  = useState('');
-  const [filter,  setFilter]  = useState('');
+  const [rows,      setRows]      = useState([]);
+  const [town,      setTown]      = useState('');
+  const [spotCount, setSpotCount] = useState(0);
+  const [loading,   setLoading]   = useState(true);
+  const [error,     setError]     = useState('');
+  const [search,    setSearch]    = useState('');
+  const [filter,    setFilter]    = useState('');
 
   const load = async () => {
     setLoading(true);
@@ -35,6 +37,7 @@ export default function MyTravelers() {
       const data = await myTravelersAPI.getAll();
       setRows(data?.travelers || []);
       setTown(data?.municipality || '');
+      setSpotCount(data?.spotCount || 0);
     } catch (err) {
       setError(err?.response?.data?.message || 'Couldn’t load the travelers.');
       setRows([]);
@@ -48,18 +51,22 @@ export default function MyTravelers() {
   const visible = useMemo(() => {
     const q = search.trim().toLowerCase();
     return rows.filter((r) => {
-      if (filter === 'explorers' && r.spotsVisited === 0) return false;
+      if (filter === 'locals' && r.homeMunicipality !== town) return false;
+      if (filter === 'visitors' && r.homeMunicipality === town) return false;
       if (filter === 'flagged' && !flagged(r)) return false;
-      return !q || (r.name || '').toLowerCase().includes(q);
+      return !q || [r.name, r.homeMunicipality, ...(r.spotNames || [])].some((v) => (v || '').toLowerCase().includes(q));
     });
-  }, [rows, search, filter]);
+  }, [rows, search, filter, town]);
+
+  const locals = rows.filter((r) => r.homeMunicipality === town).length;
+  const spotsWord = `${spotCount} ${spotCount === 1 ? 'spot' : 'spots'}`;
 
   return (
     <Page>
       <PageHeader
         title="Travelers"
         count={rows.length}
-        subtitle={`Travelers who live in ${town || 'your municipality'}, by points. View only: warnings, suspensions and bans are handled by the administrators.`}
+        subtitle={`Travelers who have visited the ${spotsWord} in ${town || 'your municipality'}, most recent visit first. View only: warnings, suspensions and bans are handled by the administrators.`}
         actions={<Button icon="refresh-cw" onClick={load} disabled={loading}>Refresh</Button>}
       />
 
@@ -72,12 +79,13 @@ export default function MyTravelers() {
             value={filter}
             onChange={setFilter}
             options={[
-              { value: '',          label: 'All',             count: rows.length },
-              { value: 'explorers', label: 'Visited a spot',  count: rows.filter((r) => r.spotsVisited > 0).length },
-              { value: 'flagged',   label: 'Warned or limited', count: rows.filter(flagged).length },
+              { value: '',         label: 'All',                      count: rows.length },
+              { value: 'locals',   label: `Live in ${town}`,          count: locals },
+              { value: 'visitors', label: 'From other towns',         count: rows.length - locals },
+              { value: 'flagged',  label: 'Warned or limited',        count: rows.filter(flagged).length },
             ]}
           />
-          <SearchInput value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search by name…" />
+          <SearchInput value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search by name, town or spot…" />
         </Toolbar>
       )}
 
@@ -86,20 +94,21 @@ export default function MyTravelers() {
       ) : rows.length === 0 ? (
         <EmptyState
           icon="users"
-          title="No travelers yet"
-          subtitle={`Travelers who pick ${town || 'your municipality'} as their home when they sign up appear here.`}
+          title="No visits yet"
+          subtitle={spotCount
+            ? `Travelers appear here once the app records their arrival at one of the ${spotsWord} in ${town}.`
+            : `${town || 'Your municipality'} has no spots yet. Add one in Spot Management.`}
         />
       ) : visible.length === 0 ? (
         <EmptyState icon="users" title="No travelers match" subtitle="Try a different search or filter." />
       ) : (
         <Table
-          caption={`Travelers from ${town}`}
+          caption={`Travelers who visited spots in ${town}`}
           head={<>
             <Th>Traveler</Th>
-            <Th align="right">Points</Th>
-            <Th align="right">Spots visited</Th>
+            <Th>Spots visited here</Th>
+            <Th align="right">Last visit</Th>
             <Th>Standing</Th>
-            <Th align="right">Last active</Th>
           </>}
         >
           {visible.map((r) => {
@@ -111,19 +120,23 @@ export default function MyTravelers() {
                     <Avatar src={r.profileImage} name={r.name} size={32} />
                     <div style={{ minWidth: 0 }}>
                       <div style={s.personName}>{r.name}</div>
-                      <div style={s.personSub}>Joined {r.joinedAt ? fmtDay(r.joinedAt) : '—'}</div>
+                      <div style={s.personSub}>{r.homeMunicipality ? `Lives in ${r.homeMunicipality}` : 'Home town not given'}</div>
                     </div>
                   </div>
                 </Td>
-                <Td align="right" strong>{fmtNum(r.points)}</Td>
-                <Td align="right">{r.spotsVisited}</Td>
+                <Td>
+                  <div style={s.personName}>{r.spotsVisited} of {spotCount}</div>
+                  <div style={{ ...s.personSub, whiteSpace: 'normal' }}>{(r.spotNames || []).join(', ')}</div>
+                </Td>
+                <Td align="right" muted>
+                  <span title={r.lastVisitAt ? fmtDay(r.lastVisitAt) : ''}>{r.lastVisitAt ? timeAgo(r.lastVisitAt) : '—'}</span>
+                </Td>
                 <Td>
                   <div style={s.pillStack}>
                     <StatusPill tone={st.tone} icon={st.icon}>{st.label}</StatusPill>
-                    {standingLabel(r) && <StatusPill tone="neutral" icon="flag">{standingLabel(r)}</StatusPill>}
+                    {standingLabel(r) && <StatusPill tone="neutral" icon="alert-triangle">{standingLabel(r)}</StatusPill>}
                   </div>
                 </Td>
-                <Td align="right" muted>{r.lastActiveAt ? timeAgo(r.lastActiveAt) : 'Never'}</Td>
               </tr>
             );
           })}
