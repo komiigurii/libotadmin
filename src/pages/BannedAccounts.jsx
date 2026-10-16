@@ -6,6 +6,7 @@ import {
   Loading, EmptyState, ErrorBanner, Avatar, pageStyles as s,
 } from '../components/Layout';
 import { fmtDateTime, fmtDay } from '../utils/format';
+import { standingLabel } from '../utils/standing';
 
 function remaining(expiresAt) {
   const ms = new Date(expiresAt) - Date.now();
@@ -113,7 +114,7 @@ export default function BannedAccounts() {
           head={<>
             <Th>Traveler</Th>
             <Th>Reason</Th>
-            <Th align="right">Strikes</Th>
+            <Th>Record</Th>
             <Th>Status</Th>
             <Th align="right">Action</Th>
           </>}
@@ -137,7 +138,11 @@ export default function BannedAccounts() {
                     </div>
                   </Td>
                   <Td><span style={s.clampCell} title={u.banReason}>{u.banReason || '—'}</span></Td>
-                  <Td align="right">{u.warningCount || 0}</Td>
+                  {/* "Warning 3 · Suspension 1": every warning ever given (QA
+                      2026-10-16), not warningCount, which restarts after two. */}
+                  <Td muted={!standingLabel({ warnings: u.warningsGiven ?? u.warningCount, suspensions: u.suspensionCount })}>
+                    {standingLabel({ warnings: u.warningsGiven ?? u.warningCount, suspensions: u.suspensionCount }) || 'No warnings'}
+                  </Td>
                   <Td>
                     <div style={s.pillStack}>
                       {u.isPermanent

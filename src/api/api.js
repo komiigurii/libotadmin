@@ -150,6 +150,17 @@ export const userProgressAPI = {
   getAll: () => api.get('/api/user-progress').then(r => r.data),
 };
 
+// The moderator accounts, for admins (QA 2026-10-16). Read-only.
+export const moderatorsAPI = {
+  getAll: () => api.get('/api/admin/moderators').then(r => r.data.moderators || []),
+};
+
+// A moderator's travelers: those whose home municipality is the moderator's.
+// Read-only (QA 2026-10-16, decided with the team).
+export const myTravelersAPI = {
+  getAll: () => api.get('/api/moderator/travelers').then(r => r.data),
+};
+
 // type: 'image' | 'badge' | 'model'
 export const uploadAPI = {
   spotMedia: (file, type = 'image') => {

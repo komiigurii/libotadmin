@@ -6,6 +6,7 @@ import { theme as t, radius, shadow, type } from '../theme';
 import { uploadAPI, missionAPI, categoryAPI, spotAPI } from '../api/api';
 import { notify, confirmAction } from './AppAlert';
 import Icon from './Icon';
+import VisitingHoursField from './VisitingHoursField';
 import { spotHasAR } from '../utils/spotHasAR';
 
 // Fix default marker icons breaking under Vite/webpack bundling
@@ -1820,15 +1821,16 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
                   </div>
                 </div>
 
-                <div style={styles.twoCol}>
-                  <div style={styles.field}>
-                    <label style={styles.label}>Entrance fee <span style={styles.required}>*</span></label>
-                    <input name="entranceFee" value={form.entranceFee} onChange={handleChange} style={styles.input} className="modern-input" placeholder="Free or ₱50" />
-                  </div>
-                  <div style={styles.field}>
-                    <label style={styles.label}>Visiting hours <span style={styles.required}>*</span></label>
-                    <input name="visitingHours" value={form.visitingHours} onChange={handleChange} style={styles.input} className="modern-input" placeholder="6am – 10pm" />
-                  </div>
+                <div style={styles.field}>
+                  <label style={styles.label}>Entrance fee <span style={styles.required}>*</span></label>
+                  <input name="entranceFee" value={form.entranceFee} onChange={handleChange} style={styles.input} className="modern-input" placeholder="Free or ₱50" />
+                </div>
+
+                {/* Picked, not typed: the kind (weekly / anytime / dates),
+                    then days and time dropdowns. Saves the same one line. */}
+                <div style={styles.field}>
+                  <span style={styles.label}>Visiting hours <span style={styles.required}>*</span></span>
+                  <VisitingHoursField value={form.visitingHours} onChange={setField('visitingHours')} />
                 </div>
 
                 <div style={styles.field}>

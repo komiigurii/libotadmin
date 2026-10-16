@@ -53,11 +53,15 @@ const ADMIN_NAV = [
     { label: 'Inactive Accounts',  path: '/inactive-users',    icon: 'clock' },
     { label: 'Suspensions & Bans', path: '/banned-accounts',   icon: 'slash' },
   ] },
+  { group: 'Team', items: [
+    { label: 'Moderators',         path: '/moderators',        icon: 'users' },
+  ] },
 ];
 
 // A moderator's job is attractions in their municipality and the requests
-// they've sent — per the system spec, nothing else. (Reviews, the leaderboard
-// and inactive accounts are admin-only, in the panel and on the backend.)
+// they've sent, plus a read-only look at their municipality's travelers
+// (QA 2026-10-16). Reviews, reports, the full leaderboard and account actions
+// stay admin-only, in the panel and on the backend.
 const MODERATOR_NAV = [
   { group: 'Overview', items: [
     { label: 'Dashboard',          path: '/dashboard',          icon: 'grid' },
@@ -65,6 +69,9 @@ const MODERATOR_NAV = [
   { group: 'Content', items: [
     { label: 'Spot Management',    path: '/spots',              icon: 'map-pin' },
     { label: 'My Submissions',     path: '/my-review-requests', icon: 'send' },
+  ] },
+  { group: 'Travelers', items: [
+    { label: 'Travelers',          path: '/my-travelers',       icon: 'users' },
   ] },
 ];
 
