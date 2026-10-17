@@ -153,6 +153,8 @@ export const userProgressAPI = {
 // The moderator accounts, for admins (QA 2026-10-16). Read-only.
 export const moderatorsAPI = {
   getAll: () => api.get('/api/admin/moderators').then(r => r.data.moderators || []),
+  // { name, username, email, municipality, password } → { moderator, spotCount }.
+  create: (data) => api.post('/api/admin/moderators', data).then(r => r.data),
 };
 
 // A moderator's travelers: those who visited the spots in the moderator's
