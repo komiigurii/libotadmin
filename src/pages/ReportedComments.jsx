@@ -164,7 +164,9 @@ function ReportRow({ report, expanded, acting, setActing, onToggle, onUpdated })
 
   const st = REPORT_STATUS[report.status] || REPORT_STATUS.pending;
   const isPending = report.status === 'pending';
-  const reviewerName = review?.userName || 'Unknown traveler';
+  // The account's name when the review itself is gone (deleted from here, or
+  // by its author): the report still says who wrote it.
+  const reviewerName = review?.userName || report.reportedUser?.name || 'Unknown traveler';
   const standing = report.reportedUser?.standing || null;
 
   const decide = async (decision) => {
@@ -192,7 +194,10 @@ function ReportRow({ report, expanded, acting, setActing, onToggle, onUpdated })
 
   const deleteReview = async () => {
     if (!review?._id) { notify('This review no longer exists.', { tone: 'danger' }); return; }
-    if (!(await confirmAction('Delete this review permanently?', { danger: true, confirmText: 'Delete review' }))) return;
+    if (!(await confirmAction(
+      `Delete this review permanently? The report stays open: uphold it to also warn ${reviewerName}, or dismiss it to close it.`,
+      { danger: true, confirmText: 'Delete review' }
+    ))) return;
     setActing(report._id);
     try {
       const data = await commentAPI.delete(review._id);
