@@ -40,7 +40,7 @@ const greeting = () => {
 // Mirrors how ModRequests.load() assembles the approval queue, so the count
 // here matches the one on that page.
 async function loadAdmin() {
-  const [progress, spots, proposals, pendingSpots, missions, reports, appeals] =
+  const [progress, spots, proposals, pendingSpots, missions, reports, spotReports, appeals] =
     await Promise.allSettled([
       userProgressAPI.getAll(),
       spotAPI.getAll(),
@@ -48,6 +48,7 @@ async function loadAdmin() {
       spotAPI.getPending(),
       missionAPI.getProposals(),
       reportAPI.getAll({ type: 'review', status: 'pending' }),
+      reportAPI.getAll({ type: 'spot', status: 'pending' }),
       appealAPI.getAll('pending'),
     ]);
   const ok = (r) => r.status === 'fulfilled';
@@ -67,6 +68,7 @@ async function loadAdmin() {
       approvals,
       approvalsPartial: approvalParts.some((r) => !ok(r)) && approvals != null,
       reports: ok(reports) ? listOf(val(reports), 'reports').length : null,
+      spotReports: ok(spotReports) ? listOf(val(spotReports), 'reports').length : null,
       appeals: ok(appeals) ? listOf(val(appeals), 'appeals').length : null,
     },
     failed: [
@@ -74,6 +76,7 @@ async function loadAdmin() {
       !ok(spots) && 'spots',
       approvalParts.some((r) => !ok(r)) && 'part of the approval queue',
       !ok(reports) && 'reported reviews',
+      !ok(spotReports) && 'spot reports',
       !ok(appeals) && 'appeals',
     ].filter(Boolean),
   };
@@ -148,7 +151,7 @@ export default function Dashboard() {
   const spots = data?.spots;
   // Admin only: everything waiting on a decision, or null if none of it loaded.
   const waiting = data?.attention
-    ? sumKnown(Object.values(pick(data.attention, ['approvals', 'reports', 'appeals'])))
+    ? sumKnown(Object.values(pick(data.attention, ['approvals', 'reports', 'spotReports', 'appeals'])))
     : null;
 
   // Each section fades in a beat after the one before it.
@@ -271,6 +274,8 @@ function AttentionCard({ attention, loading }) {
       detail: 'New spots, edits, deletions and food spot locations from moderators' },
     { icon: 'flag', label: 'Reported reviews', to: '/reported-comments', count: attention?.reports,
       detail: 'Reviews that travelers reported from the app' },
+    { icon: 'alert-triangle', label: 'Spot reports', to: '/spot-reports', count: attention?.spotReports,
+      detail: 'Wrong details about a spot, reported from the app' },
     { icon: 'slash', label: 'Ban appeals', to: '/banned-accounts', count: attention?.appeals,
       detail: 'Suspended or banned travelers asking to come back' },
   ];

@@ -47,6 +47,7 @@ const ADMIN_NAV = [
   { group: 'Community', items: [
     { label: 'Reviews & Feedback', path: '/comments',          icon: 'message-square' },
     { label: 'Reported Reviews',   path: '/reported-comments', icon: 'flag' },
+    { label: 'Spot Reports',       path: '/spot-reports',      icon: 'alert-triangle' },
   ] },
   { group: 'Travelers', items: [
     { label: 'Traveler Progress',  path: '/user-progress',     icon: 'award' },

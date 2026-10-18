@@ -11,6 +11,7 @@ const Dashboard        = lazy(() => import('./pages/Dashboard'));
 const Spots            = lazy(() => import('./pages/Spots'));
 const Comments         = lazy(() => import('./pages/Comments'));
 const ReportedComments = lazy(() => import('./pages/ReportedComments'));
+const SpotReports      = lazy(() => import('./pages/SpotReports'));
 const ModRequests      = lazy(() => import('./pages/ModRequests'));
 const MyReviewRequests = lazy(() => import('./pages/MyReviewRequests'));
 const InactiveUsers    = lazy(() => import('./pages/InactiveUsers'));
@@ -79,6 +80,7 @@ export default function App() {
 
                       <Route path="/mod-requests"       element={<AdminRoute><ModRequests /></AdminRoute>} />
                       <Route path="/reported-comments"  element={<AdminRoute><ReportedComments /></AdminRoute>} />
+                      <Route path="/spot-reports"       element={<AdminRoute><SpotReports /></AdminRoute>} />
                       {/* Admin-only, like the backend: moderators work only on
                           attractions and their own requests. */}
                       <Route path="/inactive-users"     element={<AdminRoute><InactiveUsers /></AdminRoute>} />
