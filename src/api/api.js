@@ -5,7 +5,7 @@ import { getToken, isExpired, endSession } from '../auth/session';
 // says "Loading…" forever. 60 s outlasts the sleeping server waking up (30–60 s).
 // Media uploads set their own, longer one.
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL,
+  baseURL: import.meta.env.VITE_API_URL || 'https://libotbackend.onrender.com',
   headers: { 'Content-Type': 'application/json' },
   timeout: 60_000,
 });
