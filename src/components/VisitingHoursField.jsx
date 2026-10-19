@@ -193,7 +193,7 @@ const st = {
   select: {
     width: '100%', padding: '9px 30px 9px 32px', borderRadius: radius.md, border: `1px solid ${t.border}`,
     fontSize: 14, color: t.textPrimary, background: t.cardBg, appearance: 'none', WebkitAppearance: 'none',
-    cursor: 'pointer', boxSizing: 'border-box', fontVariantNumeric: 'tabular-nums',
+    cursor: 'pointer', boxSizing: 'border-box',
   },
   remove: { width: 30, height: 30, borderRadius: radius.md, border: `1px solid ${t.border}`, background: t.cardBg, color: t.textSecondary, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 },
   input: { width: '100%', padding: '10px 12px', borderRadius: radius.md, border: `1px solid ${t.border}`, fontSize: 14, color: t.textPrimary, outline: 'none', background: t.cardBg, boxSizing: 'border-box' },

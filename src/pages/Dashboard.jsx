@@ -528,7 +528,7 @@ const s = {
   meterRow: { display: 'flex', flexDirection: 'column', gap: 5 },
   meterLabels: { display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 13 },
   meterLabel: { color: t.textPrimary, fontWeight: 500 },
-  meterValue: { color: t.textPrimary, fontWeight: 700, fontVariantNumeric: 'tabular-nums' },
+  meterValue: { color: t.textPrimary, fontWeight: 700 },
   meterOf: { color: t.textMuted, fontWeight: 500 },
   meterTrack: { height: 8, borderRadius: 4, background: t.data1Track, overflow: 'hidden' },
   meterFill: { height: '100%', borderRadius: 4, background: t.data1, transition: 'width 0.5s ease' },
@@ -539,10 +539,10 @@ const s = {
   barTrack: { display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 },
   // Square at the baseline, 4px round at the data end; 12px thick (≤ 24).
   barFill: { height: 12, borderRadius: '0 4px 4px 0', background: t.data1, minWidth: 2, flexShrink: 0, maxWidth: 'calc(100% - 30px)' },
-  barValue: { fontSize: 12.5, fontWeight: 700, color: t.textPrimary, fontVariantNumeric: 'tabular-nums' },
+  barValue: { fontSize: 12.5, fontWeight: 700, color: t.textPrimary },
 
   travelerRow: { display: 'flex', alignItems: 'center', gap: 12, padding: '8px 0' },
   rank: { width: 20, textAlign: 'center', fontSize: 13, fontWeight: 700, color: t.textMuted, fontVariantNumeric: 'tabular-nums', flexShrink: 0 },
-  points: { flexShrink: 0, fontSize: 13.5, fontWeight: 700, color: t.textPrimary, fontVariantNumeric: 'tabular-nums' },
+  points: { flexShrink: 0, fontSize: 13.5, fontWeight: 700, color: t.textPrimary },
   pointsUnit: { fontSize: 11.5, fontWeight: 500, color: t.textMuted },
 };

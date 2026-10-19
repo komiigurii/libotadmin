@@ -181,7 +181,6 @@ export function Td({ children, align = 'left', muted = false, strong = false, st
     <td style={{
       ...s.td,
       textAlign: align,
-      ...(align === 'right' ? { fontVariantNumeric: 'tabular-nums' } : null),
       ...(muted  ? { color: t.textMuted, fontSize: 12.5 } : null),
       ...(strong ? { color: t.textPrimary, fontWeight: 600 } : null),
       ...style,

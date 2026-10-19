@@ -2070,8 +2070,8 @@ const styles = {
   coordRow:        { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 },
   coordField:      { display: 'flex', flexDirection: 'column', gap: 5, minWidth: 0 },
   coordLabel:      { fontSize: 11.5, fontWeight: 600, color: t.textMuted, letterSpacing: '0.02em' },
-  coordInput:      { width: '100%', padding: '9px 12px', borderRadius: radius.md, border: `1px solid ${t.border}`, fontSize: 14, color: t.textPrimary, outline: 'none', background: t.cardBg, boxSizing: 'border-box', fontVariantNumeric: 'tabular-nums' },
-  coordInputSm:    { width: '100%', padding: '5px 8px', borderRadius: radius.sm, border: `1px solid ${t.border}`, fontSize: 12.5, color: t.textPrimary, outline: 'none', background: t.cardBg, boxSizing: 'border-box', fontVariantNumeric: 'tabular-nums' },
+  coordInput:      { width: '100%', padding: '9px 12px', borderRadius: radius.md, border: `1px solid ${t.border}`, fontSize: 14, color: t.textPrimary, outline: 'none', background: t.cardBg, boxSizing: 'border-box' },
+  coordInputSm:    { width: '100%', padding: '5px 8px', borderRadius: radius.sm, border: `1px solid ${t.border}`, fontSize: 12.5, color: t.textPrimary, outline: 'none', background: t.cardBg, boxSizing: 'border-box' },
   coordInputError: { borderColor: t.danger },
   coordErrorText:  { fontSize: 11.5, color: t.danger, margin: 0 },
 

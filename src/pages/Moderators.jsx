@@ -99,14 +99,15 @@ export default function Moderators() {
                   <Avatar name={m.name} size={32} />
                   <div style={{ minWidth: 0 }}>
                     <div style={s.personName}>{m.name}</div>
-                    <div style={s.personSub}>{m.email}</div>
+                    {/* The older accounts' "email" is just their username again. */}
+                    {m.email?.includes('@') && <div style={s.personSub}>{m.email}</div>}
                   </div>
                 </div>
               </Td>
               <Td>{m.username || '—'}</Td>
               <Td muted={!m.municipality}>{m.municipality || 'None assigned'}</Td>
               <Td align="right">
-                <div style={s.pillStack}>
+                <div style={{ ...s.pillStack, alignItems: 'flex-end' }}>
                   <span>{m.requests.total}</span>
                   {m.requests.pending > 0 && (
                     <StatusPill tone="warning" icon="clock">{m.requests.pending} waiting</StatusPill>
