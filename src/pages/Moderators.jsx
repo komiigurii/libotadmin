@@ -39,7 +39,7 @@ export default function Moderators() {
   const visible = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return mods;
-    return mods.filter((m) => [m.name, m.username, m.email, m.municipality].some((v) => (v || '').toLowerCase().includes(q)));
+    return mods.filter((m) => [m.name, m.username, m.municipality].some((v) => (v || '').toLowerCase().includes(q)));
   }, [mods, search]);
 
   const towns = new Set(mods.map((m) => m.municipality).filter(Boolean)).size;
@@ -97,11 +97,7 @@ export default function Moderators() {
               <Td>
                 <div style={s.person}>
                   <Avatar name={m.name} size={32} />
-                  <div style={{ minWidth: 0 }}>
-                    <div style={s.personName}>{m.name}</div>
-                    {/* The older accounts' "email" is just their username again. */}
-                    {m.email?.includes('@') && <div style={s.personSub}>{m.email}</div>}
-                  </div>
+                  <div style={{ ...s.personName, minWidth: 0 }}>{m.name}</div>
                 </div>
               </Td>
               <Td>{m.username || '—'}</Td>
@@ -131,7 +127,6 @@ function checkModerator(f) {
   if (f.name.trim().length < 2) e.name = 'Enter the office or person’s name.';
   if (!f.municipality) e.municipality = 'Choose the municipality this moderator looks after.';
   if (!/^[a-z0-9._-]{3,30}$/.test(f.username.trim().toLowerCase())) e.username = 'Use 3 to 30 lowercase letters, numbers, dots, dashes or underscores.';
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(f.email.trim())) e.email = 'Enter a valid email address.';
   if (f.password.length < PASSWORD_MIN) e.password = `At least ${PASSWORD_MIN} characters.`;
   return e;
 }
@@ -147,7 +142,7 @@ function generatePassword() {
 }
 
 function AddModerator({ onCancel, onCreated }) {
-  const [form, setForm] = useState({ name: '', municipality: '', username: '', email: '', password: '' });
+  const [form, setForm] = useState({ name: '', municipality: '', username: '', password: '' });
   const [usernameEdited, setUsernameEdited] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [tried, setTried] = useState(false);
@@ -222,7 +217,6 @@ function AddModerator({ onCancel, onCreated }) {
         {field('username', 'Username',
           <input {...inputProps('username')} maxLength={30} autoCapitalize="none" spellCheck={false} placeholder="e.g. malolosmod" />,
           'What they type to sign in.')}
-        {field('email', 'Email', <input {...inputProps('email')} type="email" maxLength={254} placeholder="tourism@example.gov.ph" />)}
         {field('password', 'Password',
           <div style={add.passwordRow}>
             <input {...inputProps('password')} type={showPassword ? 'text' : 'password'} autoComplete="new-password" maxLength={128} />
