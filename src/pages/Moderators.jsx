@@ -179,7 +179,9 @@ function AddModerator({ onCancel, onCreated }) {
       onCreated();
     } catch (err) {
       const body = err?.response?.data;
-      if (body?.field) setServerErrors({ [body.field]: body.message });
+      // A field the form doesn't have would hide the message, and the button
+      // would seem to do nothing.
+      if (body?.field && body.field in form) setServerErrors({ [body.field]: body.message });
       else notify(body?.message || 'Couldn’t reach the server. Try again.', { tone: 'danger' });
     }
     setSaving(false);
