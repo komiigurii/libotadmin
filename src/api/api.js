@@ -24,13 +24,15 @@ api.interceptors.request.use((config) => {
 });
 
 // A 401 on any call made with a token means the server no longer accepts it
-// (expired, or JWT_SECRET was rotated). Sign-in itself is excluded: a 401
-// there is just a wrong password.
+// (expired, signed out elsewhere, the account was removed, or JWT_SECRET was
+// rotated). Sign-in is excluded: a 401 there is just a wrong password. So is
+// sign-out, which clears the session itself.
 api.interceptors.response.use(
   (res) => res,
   (err) => {
     const url = err?.config?.url || '';
-    if (err?.response?.status === 401 && getToken() && !url.includes('/api/auth/admin-login')) {
+    const isSignInOrOut = url.includes('/api/auth/admin-login') || url.includes('/api/auth/admin-logout');
+    if (err?.response?.status === 401 && getToken() && !isSignInOrOut) {
       endSession('expired');
     }
     return Promise.reject(err);
@@ -135,6 +137,10 @@ export const authAPI = {
   // Sign-in is by assigned username (the backend still accepts an email).
   login: (username, password) =>
     api.post('/api/auth/admin-login', { username, password }).then(r => r.data),
+  // Ends the session on the server too, so the stored token is useless after.
+  // Takes the token because the caller clears its stored copy straight away.
+  logout: (token) =>
+    api.post('/api/auth/admin-logout', null, { headers: { Authorization: `Bearer ${token}` } }).then(r => r.data),
 };
 
 // Spot categories. The list used to be hardcoded in both this panel and the

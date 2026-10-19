@@ -3,7 +3,8 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { theme as t, radius, fonts, useThemePref } from '../theme';
 import Icon from './Icon';
 import logo from '../assets/logo.png';
-import { clearSession } from '../auth/session';
+import { clearSession, getToken } from '../auth/session';
+import { authAPI } from '../api/api';
 import { confirmAction } from './AppAlert';
 
 /*
@@ -168,6 +169,10 @@ export default function Navbar() {
       title: 'Sign out of the console?', confirmText: 'Sign out', tone: 'warning',
     });
     if (!ok) return;
+    // The server ends the session too. Not waited for, so signing out stays
+    // instant while the server wakes up, and works offline.
+    const token = getToken();
+    if (token) authAPI.logout(token).catch(() => {});
     clearSession(); // token, role and city — city used to be left behind
     navigate('/login');
   };
