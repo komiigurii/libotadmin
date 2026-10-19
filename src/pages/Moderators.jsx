@@ -60,6 +60,7 @@ export default function Moderators() {
 
       {adding && (
         <AddModerator
+          mods={mods}
           onCancel={() => setAdding(false)}
           onCreated={() => { setAdding(false); load(); }}
         />
@@ -119,41 +120,91 @@ export default function Moderators() {
   );
 }
 
-// Same rules as the server (routes/adminUsers.js), so most mistakes show
-// before sending.
+// Same rules as the server (moderatorProblem in routes/adminUsers.js), so
+// mistakes show before sending. `mods` adds what the list already knows:
+// usernames in use and towns that have their moderator.
 const PASSWORD_MIN = 8;
-function checkModerator(f) {
+const PASSWORD_MAX = 128;
+const RESERVED_USERNAMES = new Set(['admin', 'administrator', 'moderator', 'mod', 'root', 'system', 'support', 'libot', 'libotbulacan']);
+const COMMON_PASSWORDS = new Set([
+  'password1', 'password12', 'password123', 'passw0rd', 'p@ssw0rd', 'qwerty123', 'qwerty12', 'abc12345', 'abcd1234',
+  'admin123', 'admin1234', 'welcome1', 'welcome123', 'letmein1', 'iloveyou1', 'moderator1', 'moderator123',
+  'libot123', 'libot2026', 'bulacan123', 'bulacan2026',
+]);
+const cleanName = (v) => v.replace(/\s+/g, ' ').trim();
+
+function checkModerator(f, mods) {
   const e = {};
-  if (f.name.trim().length < 2) e.name = 'Enter the office or person’s name.';
+  const name = cleanName(f.name);
+  const username = f.username.trim().toLowerCase();
+
+  if (name.length < 2) e.name = 'Enter the office or person’s name.';
+  else if (!/^[\p{L}\p{M} .,'’&()-]+$/u.test(name)) e.name = 'Use letters, spaces and . , \' - & ( ) only.';
+  else if ((name.match(/\p{L}/gu) || []).length < 2) e.name = 'Enter the office or person’s name.';
+
   if (!f.municipality) e.municipality = 'Choose the municipality this moderator looks after.';
-  if (!/^[a-z0-9._-]{3,30}$/.test(f.username.trim().toLowerCase())) e.username = 'Use 3 to 30 lowercase letters, numbers, dots, dashes or underscores.';
-  if (f.password.length < PASSWORD_MIN) e.password = `At least ${PASSWORD_MIN} characters.`;
+  else {
+    const holder = mods.find((m) => m.municipality.toLowerCase() === f.municipality.toLowerCase());
+    if (holder) e.municipality = `${f.municipality} already has a moderator account (${holder.username}).`;
+  }
+
+  if (username.length < 3 || username.length > 30) e.username = 'Use 3 to 30 characters.';
+  else if (!/^[a-z0-9._-]+$/.test(username)) e.username = 'Use only lowercase letters, numbers, dots, dashes or underscores, with no spaces.';
+  else if (!/^[a-z]/.test(username)) e.username = 'Start with a letter.';
+  else if (/[._-]$/.test(username) || /[._-]{2}/.test(username)) e.username = 'End with a letter or number, and don’t put two of . _ - together.';
+  else if (RESERVED_USERNAMES.has(username)) e.username = `“${username}” is kept for the system. Choose another.`;
+  else if (mods.some((m) => m.username === username)) e.username = `The username “${username}” is taken.`;
+
+  const p = f.password;
+  if (p.length < PASSWORD_MIN || p.length > PASSWORD_MAX) e.password = `Use ${PASSWORD_MIN} to ${PASSWORD_MAX} characters.`;
+  else if (p !== p.trim()) e.password = 'Remove the spaces at the start or end.';
+  else if (!/\p{L}/u.test(p) || !/\d/.test(p)) e.password = 'Use at least one letter and one number.';
+  else if (username && p.toLowerCase().includes(username)) e.password = 'Don’t put the username in the password.';
+  else if (COMMON_PASSWORDS.has(p.toLowerCase())) e.password = 'This password is too easy to guess. Choose another.';
+
+  if (!f.confirm) e.confirm = 'Type the password again.';
+  else if (f.confirm !== p) e.confirm = 'The two passwords don’t match.';
   return e;
 }
 
 // The pattern the existing accounts use: "malolosmod", "sanjosedelmontemod".
 const suggestUsername = (town) => `${town.normalize('NFD').replace(/[^A-Za-z0-9]/g, '').toLowerCase()}mod`;
 
-// 16 characters from an alphabet without look-alikes (no 0/O, 1/l/I).
+// 16 characters from an alphabet without look-alikes (no 0/O, 1/l/I), drawn
+// again until it has a letter and a number, as the password rule asks.
 function generatePassword() {
   const abc = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';
-  const bytes = crypto.getRandomValues(new Uint8Array(16));
-  return Array.from(bytes, (b) => abc[b % abc.length]).join('');
+  for (;;) {
+    const bytes = crypto.getRandomValues(new Uint8Array(16));
+    const p = Array.from(bytes, (b) => abc[b % abc.length]).join('');
+    if (/[A-Za-z]/.test(p) && /\d/.test(p)) return p;
+  }
 }
 
-function AddModerator({ onCancel, onCreated }) {
-  const [form, setForm] = useState({ name: '', municipality: '', username: '', password: '' });
+function AddModerator({ mods, onCancel, onCreated }) {
+  const [form, setForm] = useState({ name: '', municipality: '', username: '', password: '', confirm: '' });
   const [usernameEdited, setUsernameEdited] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [tried, setTried] = useState(false);
+  // A field shows its problem once it's been left, or after Make account.
+  const [touched, setTouched] = useState({});
   const [serverErrors, setServerErrors] = useState({});
   const [saving, setSaving] = useState(false);
 
-  const errors = { ...(tried ? checkModerator(form) : {}), ...serverErrors };
+  const problems = checkModerator(form, mods);
+  const errors = { ...Object.fromEntries(Object.entries(problems).filter(([k]) => tried || touched[k])), ...serverErrors };
+  const takenTowns = new Set(mods.map((m) => m.municipality.toLowerCase()));
+  // Deletes the keys: an `undefined` left in serverErrors would overwrite the
+  // field's own problem above, hiding it while Make account still refused.
+  const dropServerErrors = (...keys) => setServerErrors((prev) => {
+    const next = { ...prev };
+    keys.forEach((k) => delete next[k]);
+    return next;
+  });
   const set = (key) => (e) => {
     const value = e.target.value;
     const refills = key === 'municipality' && !usernameEdited;
-    setServerErrors((prev) => ({ ...prev, [key]: undefined, ...(refills ? { username: undefined } : null) }));
+    dropServerErrors(key, ...(refills ? ['username'] : []));
     setForm((prev) => {
       const next = { ...prev, [key]: value };
       // Fills in the usual username for the town until it's typed over.
@@ -166,10 +217,14 @@ function AddModerator({ onCancel, onCreated }) {
   const submit = async (e) => {
     e.preventDefault();
     setTried(true);
-    if (Object.keys(checkModerator(form)).length) return;
+    if (Object.keys(problems).length) {
+      document.getElementById(`mod-${Object.keys(problems)[0]}`)?.focus();
+      return;
+    }
     setSaving(true);
     try {
-      const data = await moderatorsAPI.create({ ...form, username: form.username.trim().toLowerCase() });
+      const { confirm: _confirm, ...fields } = form;
+      const data = await moderatorsAPI.create({ ...fields, name: cleanName(form.name), username: form.username.trim().toLowerCase() });
       const m = data.moderator;
       notify(
         `Account made for ${m.municipality}: username “${m.username}”. Give them the password privately; it isn’t shown again.`
@@ -198,6 +253,7 @@ function AddModerator({ onCancel, onCreated }) {
   );
   const inputProps = (key) => ({
     id: `mod-${key}`, value: form[key], onChange: set(key), className: 'modern-input',
+    onBlur: () => setTouched((prev) => (prev[key] ? prev : { ...prev, [key]: true })),
     style: { ...s.select, cursor: 'text', ...(errors[key] ? add.invalid : null) },
     'aria-invalid': !!errors[key], 'aria-describedby': errors[key] ? `mod-${key}-err` : undefined,
   });
@@ -214,21 +270,32 @@ function AddModerator({ onCancel, onCreated }) {
         {field('municipality', 'Municipality',
           <select {...inputProps('municipality')} style={{ ...s.select, ...(errors.municipality ? add.invalid : null) }}>
             <option value="">Choose…</option>
-            {BULACAN_MUNICIPALITIES.map((m) => <option key={m} value={m}>{m}</option>)}
-          </select>)}
+            {BULACAN_MUNICIPALITIES.map((m) => {
+              const has = takenTowns.has(m.toLowerCase());
+              return <option key={m} value={m} disabled={has}>{has ? `${m} (has a moderator)` : m}</option>;
+            })}
+          </select>,
+          'One moderator account per municipality.')}
         {field('username', 'Username',
           <input {...inputProps('username')} maxLength={30} autoCapitalize="none" spellCheck={false} placeholder="e.g. malolosmod" />,
-          'What they type to sign in.')}
+          'What they type to sign in. Starts with a letter.')}
         {field('password', 'Password',
           <div style={add.passwordRow}>
-            <input {...inputProps('password')} type={showPassword ? 'text' : 'password'} autoComplete="new-password" maxLength={128} />
+            <input {...inputProps('password')} type={showPassword ? 'text' : 'password'} autoComplete="new-password" maxLength={PASSWORD_MAX} />
             <Button size="sm" icon={showPassword ? 'eye-off' : 'eye'} onClick={() => setShowPassword((v) => !v)}
               aria-label={showPassword ? 'Hide password' : 'Show password'} />
-            <Button size="sm" icon="lock" onClick={() => { setForm((p) => ({ ...p, password: generatePassword() })); setShowPassword(true); setServerErrors((p) => ({ ...p, password: undefined })); }}>
+            <Button size="sm" icon="lock" onClick={() => {
+              const password = generatePassword();
+              setForm((p) => ({ ...p, password, confirm: password }));
+              setShowPassword(true);
+              dropServerErrors('password', 'confirm');
+            }}>
               Generate
             </Button>
           </div>,
-          `At least ${PASSWORD_MIN} characters. Give it to the moderator privately.`)}
+          `At least ${PASSWORD_MIN} characters, with a letter and a number. Give it to the moderator privately.`)}
+        {field('confirm', 'Confirm password',
+          <input {...inputProps('confirm')} type={showPassword ? 'text' : 'password'} autoComplete="new-password" maxLength={PASSWORD_MAX} />)}
       </div>
       <div style={{ ...s.buttonRow, justifyContent: 'flex-end' }}>
         <Button onClick={onCancel} disabled={saving}>Cancel</Button>
