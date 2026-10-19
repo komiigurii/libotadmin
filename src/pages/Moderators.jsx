@@ -121,7 +121,7 @@ export default function Moderators() {
 
 // Same rules as the server (routes/adminUsers.js), so most mistakes show
 // before sending.
-const PASSWORD_MIN = 12;
+const PASSWORD_MIN = 8;
 function checkModerator(f) {
   const e = {};
   if (f.name.trim().length < 2) e.name = 'Enter the office or person’s name.';
