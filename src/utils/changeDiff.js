@@ -10,8 +10,12 @@ export const FIELD_LABELS = {
   name: 'Name', category: 'Category', description: 'Description', visitingHours: 'Visiting hours',
   entranceFee: 'Entrance fee', image: 'Image', modelUrl: '3D display model', AR3DModelURL: 'AR model',
   Badge: 'Badge', city: 'City', coordinates: 'Coordinates', modelsCoordinates: 'AR positions',
-  trivia: 'AR trivia',
+  trivia: 'AR trivia', arrivalRadiusMeters: 'Arrival radius', nearbyRadiusMeters: 'Nearby alert radius',
 };
+
+// A spot that never set its radii uses these (components/SpotForm.jsx,
+// LibotBackend utils/spotRadii.js), so "not set" reads as the real number.
+const RADIUS_DEFAULTS = { arrivalRadiusMeters: 50, nearbyRadiusMeters: 500 };
 
 export const MISSION_FIELD_LABELS = {
   locationName: 'Restaurant name',
@@ -34,6 +38,9 @@ function fmtCoord(c) {
 }
 
 export function fmtVal(key, v) {
+  if (key in RADIUS_DEFAULTS) {
+    return v === null || v === undefined || v === '' ? `${RADIUS_DEFAULTS[key]} m (default)` : `${v} m`;
+  }
   if (v === null || v === undefined || v === '') return '—';
   if (key === 'coordinates') return fmtCoord(v);
   if (key === 'modelsCoordinates') {
