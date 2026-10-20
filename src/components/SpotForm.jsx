@@ -90,17 +90,19 @@ function coordError(lat, lng) {
 // so a moderator can see when two of them sit on the same ground.
 
 // Each spot sets its own two radii on the Location tab; a spot that never did
-// uses the defaults. The limits are the backend's (LibotBackend
-// utils/spotRadii.js, which refuses anything outside them), and the app falls
-// back to the same defaults (LibotBulacan utils/spotRadii.js).
+// uses the defaults. No upper or lower limit (the user's call, 2026-10-20) —
+// any number above 0, checked the same way by the backend (LibotBackend
+// utils/spotRadii.js), and the app falls back to the same defaults
+// (LibotBulacan utils/spotRadii.js).
 //
 // Arrival: how close a traveler must be for the app to count a visit. Two
 // spots whose arrival rings overlap share ground: someone standing in both
 // arrives at both at once.
-const ARRIVAL_RADIUS = { default: 50, min: 30, max: 200, step: 5 };
+const ARRIVAL_RADIUS = { default: 50 };
 // Nearby: how far out the app tells a traveler about a spot they haven't
-// visited yet. Drawn as a dotted ring; it has to reach past the arrival ring.
-const NEARBY_RADIUS = { default: 500, min: 100, max: 2000, step: 50 };
+// visited yet. Drawn as a dotted ring; it has to reach past the arrival ring
+// (inside it is an arrival, so the alert would never come).
+const NEARBY_RADIUS = { default: 500 };
 
 const radiusSet = (v) => v !== null && v !== undefined && v !== '' && Number(v) > 0;
 const arrivalRadiusOf = (spot) => (radiusSet(spot?.arrivalRadiusMeters) ? Number(spot.arrivalRadiusMeters) : ARRIVAL_RADIUS.default);
@@ -110,23 +112,22 @@ const nearbyRadiusOf = (spot) => (radiusSet(spot?.nearbyRadiusMeters) ? Number(s
 // backend's radiusProblem.
 function radiusProblem(arrival, nearby) {
   const fields = [
-    [arrival, ARRIVAL_RADIUS, 'Arrival radius'],
-    [nearby, NEARBY_RADIUS, 'Nearby alert radius'],
+    [arrival, 'Arrival radius'],
+    [nearby, 'Nearby alert radius'],
   ];
-  for (const [v, { min, max }, label] of fields) {
+  for (const [v, label] of fields) {
     const n = toNum(v);
-    if (n === null || n < min || n > max) return `${label} must be from ${min} to ${max} meters.`;
+    if (n === null || n <= 0) return `${label} must be a number of meters above 0.`;
   }
   if (toNum(nearby) <= toNum(arrival)) return 'The nearby alert radius must be larger than the arrival radius.';
   return '';
 }
 
 // What the rings draw while a radius is being typed: the number if it's one,
-// else the default — so a half-typed "1" doesn't shrink a ring to a speck
-// and back on every keystroke.
-const ringRadius = (v, { default: fallback, max }) => {
+// else the default.
+const ringRadius = (v, { default: fallback }) => {
   const n = toNum(v);
-  return n !== null && n > 0 ? Math.min(n, max * 2) : fallback;
+  return n !== null && n > 0 ? n : fallback;
 };
 
 // An AR model's trigger radius (BASE_MODEL_RADIUS_METERS in the app's
@@ -2031,7 +2032,7 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
                 </div>
 
                 {/* The two rings on the map, set per spot. They follow as
-                    you type; the backend holds the same limits. */}
+                    you type; the backend checks them the same way. */}
                 <div style={styles.coordBlock}>
                   <p style={styles.coordBlockTitle}>Radius</p>
                   <div style={styles.coordRow}>
@@ -2042,9 +2043,6 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
                         name="arrivalRadius"
                         type="number"
                         inputMode="numeric"
-                        min={ARRIVAL_RADIUS.min}
-                        max={ARRIVAL_RADIUS.max}
-                        step={ARRIVAL_RADIUS.step}
                         value={form.arrivalRadius}
                         onChange={handleChange}
                         disabled={busy}
@@ -2053,7 +2051,7 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
                         className="modern-input"
                       />
                       <p id="spot-arrival-radius-hint" style={styles.radiusHint}>
-                        The visit counts within this. {ARRIVAL_RADIUS.min}–{ARRIVAL_RADIUS.max} m, usually {ARRIVAL_RADIUS.default} m.
+                        The visit counts within this. Usually {ARRIVAL_RADIUS.default} m.
                       </p>
                     </div>
                     <div style={styles.coordField}>
@@ -2063,9 +2061,6 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
                         name="nearbyRadius"
                         type="number"
                         inputMode="numeric"
-                        min={NEARBY_RADIUS.min}
-                        max={NEARBY_RADIUS.max}
-                        step={NEARBY_RADIUS.step}
                         value={form.nearbyRadius}
                         onChange={handleChange}
                         disabled={busy}
@@ -2074,7 +2069,7 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
                         className="modern-input"
                       />
                       <p id="spot-nearby-radius-hint" style={styles.radiusHint}>
-                        The “nearby” alert comes from this far. {NEARBY_RADIUS.min}–{NEARBY_RADIUS.max.toLocaleString('en-PH')} m, usually {NEARBY_RADIUS.default} m.
+                        The “nearby” alert comes from this far. Usually {NEARBY_RADIUS.default} m.
                       </p>
                     </div>
                   </div>
