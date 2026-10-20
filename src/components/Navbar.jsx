@@ -51,6 +51,7 @@ const ADMIN_NAV = [
   ] },
   { group: 'Travelers', items: [
     { label: 'Traveler Progress',  path: '/user-progress',     icon: 'award' },
+    { label: 'Town Badges',        path: '/town-badges',       icon: 'star' },
     { label: 'Inactive Accounts',  path: '/inactive-users',    icon: 'clock' },
     { label: 'Suspensions & Bans', path: '/banned-accounts',   icon: 'slash' },
   ] },

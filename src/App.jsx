@@ -18,6 +18,7 @@ const BannedAccounts   = lazy(() => import('./pages/BannedAccounts'));
 const UserProgress     = lazy(() => import('./pages/UserProgress'));
 const Moderators       = lazy(() => import('./pages/Moderators'));
 const MyTravelers      = lazy(() => import('./pages/MyTravelers'));
+const TownBadges       = lazy(() => import('./pages/TownBadges'));
 import { AppAlertProvider } from './components/AppAlert';
 import { theme as t } from './theme';
 import { hasValidSession, getToken, clearSession } from './auth/session';
@@ -86,6 +87,7 @@ export default function App() {
                       <Route path="/comments"           element={<AdminRoute><Comments /></AdminRoute>} />
                       <Route path="/user-progress"      element={<AdminRoute><UserProgress /></AdminRoute>} />
                       <Route path="/moderators"         element={<AdminRoute><Moderators /></AdminRoute>} />
+                      <Route path="/town-badges"        element={<AdminRoute><TownBadges /></AdminRoute>} />
 
                       {/* Both roles: moderators manage their municipality's
                           attractions; admins see every one, read-only. */}

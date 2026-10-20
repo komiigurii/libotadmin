@@ -156,6 +156,14 @@ export const userProgressAPI = {
   getAll: () => api.get('/api/user-progress').then(r => r.data),
 };
 
+// Town badges: earned by finishing every spot in a town. Admins set each
+// town's image, name and description; '' puts a field back to its default.
+export const townBadgeAPI = {
+  getAdmin: () => api.get('/api/municipality-badges/admin').then(r => r.data.towns || []),
+  save: (municipality, data) =>
+    api.put(`/api/municipality-badges/${encodeURIComponent(municipality)}`, data).then(r => r.data.badge),
+};
+
 // The moderator accounts, for admins (QA 2026-10-16). Read-only.
 export const moderatorsAPI = {
   getAll: () => api.get('/api/admin/moderators').then(r => r.data.moderators || []),

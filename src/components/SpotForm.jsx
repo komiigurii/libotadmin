@@ -143,6 +143,19 @@ const AR_MIN_RADIUS_M = 3;
 // sends everyone there before they can find the rest.
 const AR_SPOT_RANGE_M = 120;
 
+// An AR position's "What's here?" and "Fact shown here" (PIN_LABEL_MAX and
+// PIN_TRIVIA_MAX in LibotBackend utils/pinTrivia.js; one AR card in the app).
+const AR_LABEL_MAX = 40;
+const AR_FACT_MAX = 150;
+
+// The fact the app shows at AR position `index` of a spot whose positions
+// don't carry their own yet: fact n of the trivia list, wrapping round (the
+// app's utils/arTrail.js triviaForModel). '' when the spot has none.
+function factShownAt(trivia, index) {
+  const facts = (Array.isArray(trivia) ? trivia : []).filter((f) => typeof f === 'string' && f.trim());
+  return facts.length ? facts[index % facts.length].trim() : '';
+}
+
 const MISSION_RADIUS_DEFAULT_M = 60;
 // The backend refuses a new spot's food mission below this
 // (MIN_FOOD_RADIUS_M in LibotBackend utils/newSpotProposal.js).
@@ -798,6 +811,7 @@ function SpotMapPicker({
       const ln  = toNum(model.lng);
       if (la === null || ln === null) return;
       const num = index + 1;
+      const tip = model.label?.trim() ? `AR ${num} · ${model.label.trim()}` : `AR ${num}`;
 
       let marker = arMarkersRef.current[model.id];
       if (marker) {
@@ -806,11 +820,11 @@ function SpotMapPicker({
           marker.setLatLng([la, ln]);
         }
         marker.setIcon(makeArIcon(num));
-        marker.setTooltipContent(`AR ${num}`);
+        marker.setTooltipContent(tip);
       } else {
         marker = L.marker([la, ln], { icon: makeArIcon(num), draggable: stateRef.current.mode === 'ar' })
           .addTo(mapRef.current)
-          .bindTooltip(`AR ${num}`, { permanent: false });
+          .bindTooltip(tip, { permanent: false });
 
         const thisId = model.id;
         marker.on('drag', () => {
@@ -1218,23 +1232,27 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
     Badge:           initial?.Badge            || '',
     coordinates_lat: initial?.coordinates?.lat || '',
     coordinates_lng: initial?.coordinates?.lng || '',
-    // Edited as one fact per line; stored as an array — each entry is one card
-    // in the app's AR trivia popup.
-    trivia:          Array.isArray(initial?.trivia) ? initial.trivia.join('\n') : '',
     // What the spot uses now — its own, or the default for one that never
     // set them — so the field always shows the real number.
     arrivalRadius:   String(arrivalRadiusOf(initial)),
     nearbyRadius:    String(nearbyRadiusOf(initial)),
   });
 
+  // Each AR position says what stands there and carries the fact its model
+  // shows (LibotBackend utils/pinTrivia.js). A position from before that has
+  // neither; it starts with the fact the app shows there today (see
+  // factShownAt), so saving without touching it changes nothing.
   const [arModels, setArModels] = useState(() => {
-    if (initial?.modelsCoordinates) {
-      if (Array.isArray(initial.modelsCoordinates)) {
-        return initial.modelsCoordinates.map(m => ({ id: makeId(), lat: m.lat || '', lng: m.lng || '' }));
-      }
-      return [{ id: makeId(), lat: initial.modelsCoordinates.lat || '', lng: initial.modelsCoordinates.lng || '' }];
-    }
-    return [];
+    const list = Array.isArray(initial?.modelsCoordinates)
+      ? initial.modelsCoordinates
+      : initial?.modelsCoordinates ? [initial.modelsCoordinates] : [];
+    return list.map((m, i) => ({
+      id: makeId(),
+      lat: m.lat || '',
+      lng: m.lng || '',
+      label: m.label && m.label !== 'Model' ? m.label : '',
+      trivia: m.trivia || factShownAt(initial?.trivia, i),
+    }));
   });
 
   // Categories now come from the database. Seeded with the fallback so the
@@ -1472,7 +1490,7 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
     coordinates_lng: toNum(formValue.coordinates_lng),
     arrivalRadius: toNum(formValue.arrivalRadius),
     nearbyRadius: toNum(formValue.nearbyRadius),
-    arModels: models.map((m) => ({ id: m.id, lat: toNum(m.lat), lng: toNum(m.lng) })),
+    arModels: models.map((m) => ({ id: m.id, lat: toNum(m.lat), lng: toNum(m.lng), label: m.label.trim(), trivia: m.trivia.trim() })),
   });
 
   const initialSnapshotRef = useRef(null);
@@ -1501,10 +1519,15 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
     setForm(prev => ({ ...prev, coordinates_lat: '', coordinates_lng: '' }));
 
   const handlePlaceAr = (lat, lng) =>
-    setArModels(prev => [...prev, { id: makeId(), lat, lng }]);
+    setArModels(prev => [...prev, { id: makeId(), lat, lng, label: '', trivia: '' }]);
 
   const handleArMove = (id, lat, lng) =>
     setArModels(prev => prev.map(m => (m.id === id ? { ...m, lat, lng } : m)));
+
+  const setArText = (id, key) => (e) => {
+    const { value } = e.target;
+    setArModels(prev => prev.map(m => (m.id === id ? { ...m, [key]: value } : m)));
+  };
 
   const removeArModel = (id) => setArModels(prev => prev.filter(m => m.id !== id));
 
@@ -1521,7 +1544,10 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
   // older spots predate some fields, and a typo fix shouldn't need a badge
   // and two 3D models uploaded first.
   const isNew = !initial;
-  const triviaLines = form.trivia.split('\n').map(line => line.trim()).filter(Boolean);
+  // The first AR position still missing what's there / its fact, or -1.
+  const arNoLabel = arModels.findIndex((m) => !m.label.trim());
+  const arNoFact = arModels.findIndex((m) => !m.trivia.trim());
+  const arAllFacts = arModels.length > 0 && arNoFact === -1;
 
   // What a new spot's food recommendation still needs, as one message.
   const foodProblem = () => {
@@ -1596,7 +1622,13 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
   if (isNew && withAR) {
     if (!form.ARModelUrl) return fail('ar', 'AR 3D model is required');
     if (!arModels.length) return fail('ar', 'Pin at least one AR position on the AR map');
-    if (!triviaLines.length) return fail('ar', 'Add at least one AR trivia fact');
+    if (arNoLabel !== -1) return fail('ar', `AR ${arNoLabel + 1}: say what's there, e.g. "Bell tower".`);
+    if (arNoFact !== -1) return fail('ar', `AR ${arNoFact + 1}: write the fact its model shows.`);
+  }
+  // All or none (LibotBackend utils/pinTrivia.js): with a gap, older app
+  // versions would show the next position's fact at that model.
+  if (withAR && arNoFact !== -1 && arModels.some((m) => m.trivia.trim())) {
+    return fail('ar', `AR ${arNoFact + 1} has no fact yet — every AR position needs its own once one has one.`);
   }
   // A Nature or Festivals spot is visit-only: no food recommendation.
   if (isNew && withAR) {
@@ -1611,14 +1643,21 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
     city: form.city.trim(),
     entranceFee: form.entranceFee.trim(),
     visitingHours: form.visitingHours.trim(),
-    trivia: triviaLines,
+    // With every position's own fact, the server rewrites the spot's trivia
+    // list from them; otherwise the list is kept as it was.
+    ...(!arAllFacts && { trivia: Array.isArray(initial?.trivia) ? initial.trivia : [] }),
     image: form.image,
     modelUrl: form.modelUrl || null,
     AR3DModelURL: form.ARModelUrl || null,
     Badge: form.Badge || null,
     coordinates: { lat: spotLatNum, lng: spotLngNum },
     modelsCoordinates: arModels
-      .map(model => ({ label: model.label || 'Model', lat: toNum(model.lat), lng: toNum(model.lng) }))
+      .map(model => ({
+        label: model.label.trim() || 'Model',
+        lat: toNum(model.lat),
+        lng: toNum(model.lng),
+        ...(model.trivia.trim() && { trivia: model.trivia.trim() }),
+      }))
       .filter(model => model.lat !== null && model.lng !== null),
     // Sent only when changed: a spot that never set its radii keeps following
     // the defaults, and an edit doesn't list "50 m → 50 m" for the admin.
@@ -1744,7 +1783,8 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
   const missingAr = isNew && hasAR ? [
     !form.ARModelUrl && 'AR 3D model',
     !arModels.length && 'AR positions',
-    !triviaLines.length && 'AR trivia',
+    arNoLabel !== -1 && "what's at each AR position",
+    arNoFact !== -1 && 'a fact for each AR position',
   ].filter(Boolean) : [];
   const stillNeeded = (list) => (list.length ? `Still needed: ${list.join(', ')}` : '');
   const tabStatus = {
@@ -2098,6 +2138,10 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
 
               <section style={styles.section}>
                 <p style={styles.sectionTitle}>AR positions {newSpotMark}</p>
+                <p style={styles.panelIntro}>
+                  Put each pin at the thing its fact is about — the facade, the bell tower, a marker.
+                  In the app, the model at that pin shows that fact. Travelers find them in this order.
+                </p>
                 <div style={styles.mapHintRow}>
                   <p style={styles.mapHint}>{mapHintFor('ar')}</p>
                   {arModels.length > 0 && (
@@ -2117,28 +2161,54 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
                 ) : (
                   <div style={styles.arList}>
                     {arModels.map((model, index) => (
-                      <div key={model.id} style={styles.arListRow}>
-                        <span style={styles.arBadge}>AR {index + 1}</span>
-                        <CoordFields
-                          lat={model.lat}
-                          lng={model.lng}
-                          onChange={(lat, lng) => handleArMove(model.id, lat, lng)}
-                          compact
-                          disabled={busy}
-                        />
-                        <button onClick={() => removeArModel(model.id)} style={styles.removeBtn} className="modern-btn">Remove</button>
+                      <div key={model.id} style={styles.arCard}>
+                        <div style={styles.arListRow}>
+                          <span style={styles.arBadge}>AR {index + 1}</span>
+                          <CoordFields
+                            lat={model.lat}
+                            lng={model.lng}
+                            onChange={(lat, lng) => handleArMove(model.id, lat, lng)}
+                            compact
+                            disabled={busy}
+                          />
+                          <button onClick={() => removeArModel(model.id)} style={styles.removeBtn} className="modern-btn">Remove</button>
+                        </div>
+                        <div style={styles.arTextRow}>
+                          <div style={styles.field}>
+                            <label style={styles.coordLabel} htmlFor={`ar-label-${model.id}`}>What's here? {newSpotMark}</label>
+                            <input
+                              id={`ar-label-${model.id}`}
+                              value={model.label}
+                              onChange={setArText(model.id, 'label')}
+                              maxLength={AR_LABEL_MAX}
+                              placeholder="Bell tower"
+                              disabled={busy}
+                              style={styles.input}
+                              className="modern-input"
+                            />
+                          </div>
+                          <div style={styles.field}>
+                            <label style={styles.coordLabel} htmlFor={`ar-fact-${model.id}`}>
+                              Fact shown here {newSpotMark}
+                              <span style={styles.charCount}> {model.trivia.length}/{AR_FACT_MAX}</span>
+                            </label>
+                            <textarea
+                              id={`ar-fact-${model.id}`}
+                              value={model.trivia}
+                              onChange={setArText(model.id, 'trivia')}
+                              maxLength={AR_FACT_MAX}
+                              rows={2}
+                              placeholder="The bell tower was rebuilt after the 1880 earthquake."
+                              disabled={busy}
+                              style={styles.textarea}
+                              className="modern-input"
+                            />
+                          </div>
+                        </div>
                       </div>
                     ))}
                   </div>
                 )}
-              </section>
-
-              <section style={styles.section}>
-                <div style={styles.field}>
-                  <label style={styles.sectionTitle} htmlFor="spot-trivia">AR trivia {newSpotMark}</label>
-                  <p style={styles.hint}>One fact per line — each line becomes one card in the app's AR trivia popup.</p>
-                  <textarea id="spot-trivia" name="trivia" value={form.trivia} onChange={handleChange} style={styles.textarea} className="modern-input" rows={6} placeholder={'The present church was built from 1885 to 1888.\nThe Malolos Congress opened here on September 15, 1898.'} />
-                </div>
               </section>
               </>)}
             </TabPanel>
@@ -2322,8 +2392,11 @@ const styles = {
 
   emptyNote: { background: t.sidebarBg, borderRadius: 10, padding: 16, textAlign: 'center', color: t.textSecondary, fontSize: 13, lineHeight: 1.55, border: `1px dashed ${t.border}` },
 
-  arList:       { display: 'flex', flexDirection: 'column', gap: 6 },
-  arListRow:    { display: 'flex', alignItems: 'center', gap: 10, background: t.sidebarBg, borderRadius: 8, padding: '8px 12px', border: `1px solid ${t.border}` },
+  arList:       { display: 'flex', flexDirection: 'column', gap: 10 },
+  arCard:       { display: 'flex', flexDirection: 'column', gap: 10, background: t.sidebarBg, borderRadius: 8, padding: '10px 12px', border: `1px solid ${t.border}` },
+  arListRow:    { display: 'flex', alignItems: 'center', gap: 10 },
+  arTextRow:    { display: 'grid', gridTemplateColumns: 'minmax(140px, 1fr) 2fr', gap: 10 },
+  charCount:    { fontWeight: 500, color: t.textMuted },
   arBadge:      { fontSize: 12, fontWeight: 700, color: t.info, background: t.infoBg, borderRadius: 6, padding: '3px 8px', flexShrink: 0 },
   removeBtn:    { padding: '5px 10px', background: t.dangerBg, color: t.danger, border: 'none', borderRadius: 6, fontWeight: 600, fontSize: 12, cursor: 'pointer', flexShrink: 0 },
 

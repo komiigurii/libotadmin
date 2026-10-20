@@ -28,7 +28,7 @@ export const MISSION_FIELD_LABELS = {
 // Bookkeeping keys on a pendingChange that aren't spot fields.
 export const META_KEYS = new Set(['submittedBy', 'submittedByName', 'submittedAt', 'status']);
 
-export const LONG_FIELDS = new Set(['description', 'trivia', 'locationInfo']);
+export const LONG_FIELDS = new Set(['description', 'trivia', 'locationInfo', 'modelsCoordinates']);
 export const THUMB_FIELDS = new Set(['image', 'Badge']);
 export const FILE_LINK_FIELDS = new Set(['modelUrl', 'AR3DModelURL']);
 
@@ -45,7 +45,13 @@ export function fmtVal(key, v) {
   if (key === 'coordinates') return fmtCoord(v);
   if (key === 'modelsCoordinates') {
     if (!Array.isArray(v) || !v.length) return '—';
-    return v.map((m, i) => `#${i + 1}  ${fmtCoord(m)}`).join('\n');
+    // Each position's name and fact too (since 2026-10-21), so a changed fact
+    // reads as a change.
+    return v.map((m, i) => {
+      const name = m.label && m.label !== 'Model' ? `  ${m.label}` : '';
+      const fact = m.trivia ? `\n    “${m.trivia}”` : '';
+      return `#${i + 1}${name}  ${fmtCoord(m)}${fact}`;
+    }).join('\n');
   }
   // Trivia entries are full sentences with their own commas — comma-joining
   // them would blur where one fact ends and the next begins.
