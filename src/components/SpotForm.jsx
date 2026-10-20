@@ -95,6 +95,11 @@ function coordError(lat, lng) {
 // them arrives at both at once.
 const ARRIVAL_RADIUS_M = 50;
 
+// How far out the app tells a traveler a spot they haven't visited is nearby
+// (NEARBY_RADIUS_METERS in the app's utils/nearbyAlerts.js). Drawn as a
+// dotted ring on the Location map.
+const NEARBY_RADIUS_M = 500;
+
 // An AR model's trigger radius (BASE_MODEL_RADIUS_METERS in the app's
 // Screens/ARScreen.js). For AR pins under twice this apart the app shrinks
 // both rings to half the gap, never below AR_MIN_RADIUS_M.
@@ -486,9 +491,14 @@ function MapSearch({ mapRef }) {
 // reference — AR models are placed relative to the spot, and so is the eatery.
 //
 // The pins a map edits also get a ring at the radius the app uses for them
-// (spot: arrival, AR: trigger, food: completion). The Location map adds every
-// other spot with its own arrival ring, and rings that overlap turn red — live
-// while a pin is dragged, not just once it's dropped.
+// (spot: arrival + nearby alert, AR: trigger, food: completion). The Location
+// map adds every other spot with its own arrival ring, and rings that overlap
+// turn red — live while a pin is dragged, not just once it's dropped.
+
+// Close enough that each tab's rings are bigger than its pins: a 50 m
+// arrival ring is ~45 px across at 17, a 6 m AR ring ~40 px at 20.
+const OPEN_ZOOM = { ar: 20, spot: 17, mission: 16 };
+
 function SpotMapPicker({
   spotLat, spotLng, onSpotChange,
   arModels, onPlaceAr, onArMove,
@@ -505,9 +515,12 @@ function SpotMapPicker({
   const arMarkersRef  = useRef({});
   const missionMarkerRef = useRef(null);
   const spotRingRef    = useRef(null);
+  const nearbyRingRef  = useRef(null);
   const arRingsRef     = useRef({});
   const missionRingRef = useRef(null);
   const othersRef      = useRef([]); // [{ lat, lng, ring, dot }]
+  // What the Location map shows, so its alert-area button knows which way to go.
+  const [viewBounds, setViewBounds] = useState(null);
 
   // Both read only refs, so the drag handlers (bound once, when a marker is
   // created) can call them without going stale.
@@ -585,10 +598,9 @@ function SpotMapPicker({
     if (mode === 'ar') arModels.forEach((m) => add(m.lat, m.lng));
     if (mode === 'mission') add(missionLat, missionLng);
 
-    // Close enough that each tab's rings are bigger than its pins: a 50 m
-    // arrival ring is ~45 px across at 17, a 6 m AR ring ~40 px at 20.
-    const zoom = mode === 'ar' ? 20 : mode === 'spot' ? 17 : 16;
+    const zoom = OPEN_ZOOM[mode];
     const map = L.map(containerRef.current, { zoomControl: false, maxZoom: 21 });
+    if (mode === 'spot') map.on('moveend', () => setViewBounds(map.getBounds()));
     if (pts.length > 1) map.fitBounds(pts, { padding: [48, 48], maxZoom: zoom });
     else if (pts.length === 1) map.setView(pts[0], zoom);
     else map.setView([DEFAULT_CENTER.lat, DEFAULT_CENTER.lng], 13);
@@ -623,6 +635,7 @@ function SpotMapPicker({
       arMarkersRef.current = {};
       missionMarkerRef.current = null;
       spotRingRef.current = null;
+      nearbyRingRef.current = null;
       arRingsRef.current = {};
       missionRingRef.current = null;
       othersRef.current = [];
@@ -644,6 +657,8 @@ function SpotMapPicker({
         spotMarkerRef.current = null;
         spotRingRef.current?.remove();
         spotRingRef.current = null;
+        nearbyRingRef.current?.remove();
+        nearbyRingRef.current = null;
         paintSpotClash(null, null);
       }
       return;
@@ -668,6 +683,7 @@ function SpotMapPicker({
       spotMarkerRef.current.on('drag', () => {
         const pos = spotMarkerRef.current.getLatLng();
         spotRingRef.current?.setLatLng(pos);
+        nearbyRingRef.current?.setLatLng(pos);
         paintSpotClash(pos.lat, pos.lng);
       });
       spotMarkerRef.current.on('dragend', () => {
@@ -683,8 +699,11 @@ function SpotMapPicker({
       }
     }
 
-    // The arrival ring, on the map that moves this pin.
+    // The nearby-alert and arrival rings, on the map that moves this pin. The
+    // wide one first, so the arrival ring draws over it.
     if (mode === 'spot') {
+      if (nearbyRingRef.current) nearbyRingRef.current.setLatLng([la, ln]);
+      else nearbyRingRef.current = ring([la, ln], NEARBY_RADIUS_M, 'nearby').addTo(mapRef.current);
       if (spotRingRef.current) spotRingRef.current.setLatLng([la, ln]);
       else spotRingRef.current = ring([la, ln], ARRIVAL_RADIUS_M, 'spot').addTo(mapRef.current);
       paintSpotClash(la, ln);
@@ -863,13 +882,35 @@ function SpotMapPicker({
     }
   }, [mode]);
 
+  // The nearby-alert ring is 1 km across, far wider than the map at the zoom
+  // the arrival ring needs, so a button frames the whole of it — and back.
+  const spotLa = toNum(spotLat);
+  const spotLn = toNum(spotLng);
+  const spotAt = mode === 'spot' && spotLa !== null && spotLn !== null ? L.latLng(spotLa, spotLn) : null;
+  const alertArea = spotAt && spotAt.toBounds(2 * NEARBY_RADIUS_M);
+  const alertInView = !!(alertArea && viewBounds?.contains(alertArea));
+  const toggleAlertArea = () => {
+    const map = mapRef.current;
+    if (!map || !alertArea) return;
+    if (alertInView) map.setView(spotAt, OPEN_ZOOM.spot);
+    else map.fitBounds(alertArea, { padding: [12, 12] });
+  };
+
   return (
     <div style={styles.mapWrap}>
       <MapSearch mapRef={mapRef} />
-      <div
-        ref={containerRef}
-        style={{ height, borderRadius: radius.lg, overflow: 'hidden', border: `1px solid ${t.border}`, boxShadow: shadow.sm }}
-      />
+      <div style={styles.mapFrame}>
+        <div
+          ref={containerRef}
+          style={{ height, borderRadius: radius.lg, overflow: 'hidden', border: `1px solid ${t.border}`, boxShadow: shadow.sm }}
+        />
+        {alertArea && (
+          <button type="button" onClick={toggleAlertArea} style={styles.mapOverlayBtn} className="modern-btn">
+            <Icon name={alertInView ? 'map-pin' : 'bell'} size={13} />
+            {alertInView ? 'Back to the pin' : `Show the ${NEARBY_RADIUS_M} m alert area`}
+          </button>
+        )}
+      </div>
     </div>
   );
 }
@@ -953,8 +994,8 @@ function TabPanel({ id, active, children }) {
 
 // Which pin is which, now that there's no Spot / AR / Food toggle above the
 // map carrying the coloured dots. The pins this tab edits are listed first
-// and in full colour; the rest are there for reference. The last entry says
-// what the ring around this tab's pins measures.
+// and in full colour; the rest are there for reference. The last entries say
+// what the rings around this tab's pins measure.
 function MapLegend({ mode, spotPinned, arCount, missionPinned, otherCount = 0, missionRadius }) {
   const items = [
     (spotPinned || mode === 'spot') && { key: 'spot', color: MAP_PIN.spot, label: 'Spot' },
@@ -962,10 +1003,13 @@ function MapLegend({ mode, spotPinned, arCount, missionPinned, otherCount = 0, m
     (arCount > 0 || mode === 'ar') && { key: 'ar', color: MAP_PIN.ar, label: arCount === 1 ? 'AR position' : 'AR positions' },
     (missionPinned || mode === 'mission') && { key: 'mission', color: MAP_PIN.mission, label: 'Food spot' },
   ].filter(Boolean).sort((a, b) => (b.key === mode) - (a.key === mode));
-  const ringKey =
-    mode === 'ar' ? { color: t.mapAr, label: `${AR_RADIUS_M} m AR trigger radius · red where two overlap` }
-    : mode === 'mission' ? { color: t.mapFood, label: `${missionRadiusOf(missionRadius)} m completion radius` }
-    : { color: t.mapSpot, label: `${ARRIVAL_RADIUS_M} m arrival radius · red where two spots overlap` };
+  const ringKeys =
+    mode === 'ar' ? [{ key: 'ar', color: t.mapAr, label: `${AR_RADIUS_M} m AR trigger radius · red where two overlap` }]
+    : mode === 'mission' ? [{ key: 'food', color: t.mapFood, label: `${missionRadiusOf(missionRadius)} m completion radius` }]
+    : [
+        { key: 'arrival', color: t.mapSpot, label: `${ARRIVAL_RADIUS_M} m arrival radius · red where two spots overlap` },
+        { key: 'nearby', color: t.mapSpot, dotted: true, label: `${NEARBY_RADIUS_M} m nearby alert radius` },
+      ];
   return (
     <div style={styles.legend}>
       {items.length > 1 && items.map((it) => (
@@ -974,10 +1018,12 @@ function MapLegend({ mode, spotPinned, arCount, missionPinned, otherCount = 0, m
           {it.label}{it.key === mode ? '' : ' (reference)'}
         </span>
       ))}
-      <span style={styles.legendItem}>
-        <span style={{ ...styles.ringSwatch, borderColor: ringKey.color }} />
-        {ringKey.label}
-      </span>
+      {ringKeys.map((rk) => (
+        <span key={rk.key} style={styles.legendItem}>
+          <span style={{ ...styles.ringSwatch, borderColor: rk.color, borderStyle: rk.dotted ? 'dotted' : 'solid' }} />
+          {rk.label}
+        </span>
+      ))}
     </div>
   );
 }
@@ -1023,6 +1069,30 @@ function SpotOverlapNote({ neighbours }) {
         share ground: someone standing between them arrives at both at once.
       </p>
     </div>
+  );
+}
+
+// Also under the Location map: what the dotted ring means, and which spots
+// sit inside it. That's not a problem the way an arrival overlap is — someone
+// in range of several gets one alert naming them all — but worth knowing.
+function NearbyAlertNote({ neighbours }) {
+  // SpotOverlapNote already says when the other spots are loading or failed.
+  if (!Array.isArray(neighbours)) return null;
+  const inside = neighbours.filter((n) => n.distance <= NEARBY_RADIUS_M);
+  const names = inside.slice(0, 4).map((n) => `${n.name || 'Unnamed spot'} (${fmtDistance(n.distance)})`);
+  if (inside.length > names.length) names.push(`${inside.length - names.length} more`);
+  const list = names.length > 1 ? `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}` : names[0];
+  return (
+    <p style={styles.nearbyNote}>
+      <Icon name="bell" size={13} />
+      <span>
+        Travelers who haven’t visited this spot get a “nearby” alert when they come within
+        {' '}{NEARBY_RADIUS_M} m of the pin (the dotted ring), at most once a day.
+        {inside.length
+          ? ` Also within ${NEARBY_RADIUS_M} m: ${list}. Someone in range of ${inside.length === 1 ? 'both' : 'several'} gets one alert naming them ${inside.length === 1 ? 'together' : 'all'}.`
+          : ` No other spot is within ${NEARBY_RADIUS_M} m.`}
+      </span>
+    </p>
   );
 }
 
@@ -1874,6 +1944,7 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
                 <SpotMapPicker {...mapProps} mode="spot" active={tab === 'location'} />
                 <MapLegend mode="spot" {...legendProps} />
                 {spotPinned && <SpotOverlapNote neighbours={spotNeighbours} />}
+                {spotPinned && <NearbyAlertNote neighbours={spotNeighbours} />}
 
                 <div style={styles.coordBlock}>
                   <p style={styles.coordBlockTitle}>Spot coordinates <span style={styles.required}>*</span></p>
@@ -2105,6 +2176,7 @@ const styles = {
   overlapTitle: { display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 700, color: t.danger, margin: 0 },
   overlapList:  { margin: 0, paddingLeft: 18, fontSize: 12.5, color: t.textPrimary, lineHeight: 1.55 },
   overlapText:  { fontSize: 12, color: t.textSecondary, margin: 0, lineHeight: 1.5 },
+  nearbyNote:   { display: 'flex', alignItems: 'flex-start', gap: 6, fontSize: 12.5, color: t.textSecondary, margin: 0, lineHeight: 1.45 },
 
   mapHintRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 },
   mapHint: { fontSize: 12, color: t.textSecondary, margin: 0 },
@@ -2117,6 +2189,10 @@ const styles = {
   saveMissionBtn: { alignSelf: 'flex-start', padding: '9px 16px', borderRadius: radius.md, border: 'none', background: t.brandSolid, color: t.onBrandSolid, fontWeight: 600, fontSize: 13, cursor: 'pointer', boxShadow: shadow.sm },
 
   mapWrap: { display: 'flex', flexDirection: 'column', gap: 8, position: 'relative' },
+  // zIndex 0 = its own stacking context, so Leaflet's layers and the button
+  // over them stay under the search dropdown that opens down across the map.
+  mapFrame: { position: 'relative', zIndex: 0 },
+  mapOverlayBtn: { position: 'absolute', top: 10, right: 10, zIndex: 1000, display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 11px', borderRadius: radius.pill, border: `1px solid ${t.border}`, background: t.cardBg, color: t.textPrimary, fontWeight: 600, fontSize: 12, cursor: 'pointer', boxShadow: shadow.sm },
   searchWrap: { position: 'relative', zIndex: 1000 },
   searchInputRow: { display: 'flex', alignItems: 'center', gap: 6, background: t.sidebarBg, border: `1px solid ${t.border}`, borderRadius: 8, padding: '2px 8px' },
   searchInput: { flex: 1, padding: '8px 4px', border: 'none', background: 'transparent', fontSize: 13, color: t.textPrimary, outline: 'none' },

@@ -17,6 +17,17 @@
   fill-opacity: 0.14;
 }
 
+/* This spot's nearby-alert circle: ten times the arrival one, so outline
+ * only (a fill would tint the whole map at the zoom the arrival ring needs),
+ * and dotted so it doesn't read as another spot's dashed ring. */
+.map-ring--nearby {
+  stroke: var(--map-spot);
+  fill: none;
+  stroke-width: 3;
+  stroke-dasharray: 0.1 8;
+  stroke-linecap: round;
+}
+
 /* Other spots' arrival circles: dashed and grey, so they read as reference. */
 .map-ring--other {
   stroke: var(--map-other);
