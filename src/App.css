@@ -87,10 +87,9 @@ tbody tr:hover td {
 }
 
 /* ── Nav ──
-   :not([aria-current]) — the hover tint must never wash out the filled pill
-   of the page you're on. */
+   A neutral hover, so it never reads like the teal-tinted page you're on. */
 .nav-link-btn:hover:not([aria-current="page"]) {
-  background: var(--brand-soft) !important;
+  background: var(--card-bg-hover) !important;
   color: var(--text-primary) !important;
 }
 
@@ -121,14 +120,12 @@ tbody tr:hover td {
   background: var(--brand-soft) !important;
 }
 
-/* Sign out and the theme switch sit on the teal frame, so they lighten on
-   hover rather than tinting towards a page colour. */
 .logout-btn:hover {
-  background: var(--on-brand-solid-soft) !important;
-  border-color: rgba(255, 255, 255, 0.5) !important;
+  background: var(--card-bg-hover) !important;
+  border-color: var(--text-muted) !important;
 }
 .theme-btn:hover:not([aria-checked="true"]) {
-  background: rgba(255, 255, 255, 0.14) !important;
+  background: var(--card-bg-hover) !important;
 }
 
 /* ── Modern interactive utilities ── */
@@ -137,26 +134,24 @@ tbody tr:hover td {
   to   { opacity: 1; transform: translateY(0); }
 }
 
+/* Cards and buttons answer a hover with a colour change only: no lift, no
+   glow (2026-10-21, "quieter"). In a tool the pointer crosses all day, things
+   jumping under it is noise. */
 .modern-card {
-  animation: fadeInUp 0.25s ease both;
-  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+  transition: border-color 0.15s ease;
 }
 .modern-card:hover {
-  transform: translateY(-3px);
-  box-shadow: var(--shadow-md);
-  border-color: var(--brand);
+  border-color: var(--text-muted);
 }
 
 .modern-btn {
-  transition: filter 0.15s ease, transform 0.1s ease, box-shadow 0.15s ease;
+  transition: filter 0.15s ease;
 }
 .modern-btn:hover:not(:disabled) {
-  filter: brightness(1.08);
-  transform: translateY(-1px);
+  filter: brightness(0.97);
 }
 .modern-btn:active:not(:disabled) {
-  transform: translateY(0);
-  filter: brightness(0.94);
+  filter: brightness(0.92);
 }
 
 .modern-input {
@@ -211,30 +206,21 @@ tbody tr:hover td {
     padding-left: 0 !important;
     padding-right: 0 !important;
   }
-  /* Just the emblem, smaller. Title, console name and scope are hidden with
-     the other .sidebar-text; the block's accessible name still says which
-     console this is. */
-  .admin-sidebar .sidebar-brand { padding: 14px 0 !important; }
-  .admin-sidebar .sidebar-emblem { width: 44px !important; height: 44px !important; border-radius: 14px !important; }
-  .admin-sidebar .sidebar-emblem img { width: 32px !important; height: 32px !important; border-radius: 9px !important; }
-  .admin-sidebar .sidebar-panel { border-radius: 18px 0 0 0 !important; }
-  .admin-sidebar .sidebar-section { padding: 14px 6px 6px !important; }
-  /* No room for the drawing in a 58px panel. */
-  .admin-sidebar .sidebar-art { display: none; }
+  /* Just the emblem. Title, console name and scope are hidden with the other
+     .sidebar-text; the block's accessible name still says which console this is. */
+  .admin-sidebar .sidebar-brand { padding: 16px 0 12px !important; justify-content: center; }
+  .admin-sidebar .sidebar-emblem img { width: 34px !important; height: 34px !important; border-radius: 9px !important; }
+  .admin-sidebar .sidebar-section { padding: 8px 6px 6px !important; }
   /* Three theme buttons side by side overflow the rail — stack everything. */
   .admin-sidebar .sidebar-footer { flex-direction: column; padding: 10px 0 14px !important; }
   .admin-sidebar .theme-row { flex-direction: column; }
   .admin-sidebar .logout-btn { flex: none !important; width: 40px; padding: 8px 0 !important; }
 }
 
-/* Short laptop screens (1366×768 leaves ~650px): a tighter header and links,
-   so all eight admin links fit without scrolling. The church drawing already
-   scrolls away below them on its own. */
+/* Short laptop screens (1366×768 leaves ~650px): tighter links, so every
+   admin link fits without scrolling. */
 @media (max-height: 760px) and (min-width: 1101px) {
-  .admin-sidebar .sidebar-brand { padding: 14px 0 12px !important; gap: 8px !important; }
-  .admin-sidebar .sidebar-emblem { width: 54px !important; height: 54px !important; border-radius: 18px !important; }
-  .admin-sidebar .sidebar-emblem img { width: 38px !important; height: 38px !important; border-radius: 11px !important; }
-  .admin-sidebar .sidebar-section { padding-top: 12px !important; }
+  .admin-sidebar .sidebar-brand { padding-top: 14px !important; padding-bottom: 10px !important; }
   .admin-sidebar .nav-link-btn { min-height: 38px !important; padding-top: 8px !important; padding-bottom: 8px !important; }
 }
 
@@ -254,7 +240,7 @@ tbody tr:hover td {
     transform: translateX(-100%);
     visibility: hidden;
     transition: transform 0.24s ease, visibility 0s linear 0.24s;
-    box-shadow: 0 0 40px rgba(0, 0, 0, 0.35);
+    box-shadow: 8px 0 28px rgba(0, 0, 0, 0.18);
   }
   .admin-sidebar.open {
     transform: none;
@@ -282,7 +268,5 @@ tbody tr:hover td {
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
-  .modern-card:hover { transform: none; }
-  .modern-btn:hover:not(:disabled) { transform: none; }
   .dash-link:hover .dash-chevron { transform: none; }
 }

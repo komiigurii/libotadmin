@@ -960,7 +960,7 @@ function SpotMapPicker({
       <div style={styles.mapFrame}>
         <div
           ref={containerRef}
-          style={{ height, borderRadius: radius.lg, overflow: 'hidden', border: `1px solid ${t.border}`, boxShadow: shadow.sm }}
+          style={{ height, borderRadius: radius.lg, overflow: 'hidden', border: `1px solid ${t.border}` }}
         />
         {alertArea && (
           <button type="button" onClick={toggleAlertArea} style={styles.mapOverlayBtn} className="modern-btn">
@@ -2337,7 +2337,7 @@ const styles = {
 
   categoryChips:      { display: 'flex', flexWrap: 'wrap', gap: 8 },
   categoryChip:       { padding: '7px 14px', borderRadius: radius.pill, border: `1px solid ${t.border}`, background: t.sidebarBg, color: t.textSecondary, fontWeight: 600, fontSize: 13, cursor: 'pointer' },
-  categoryChipActive: { background: t.brandSolid, borderColor: t.brandSolid, color: t.onBrandSolid },
+  categoryChipActive: { background: t.brandSoft, borderColor: t.brand, color: t.brand },
 
   uploadGrid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 },
   uploadCard: { display: 'flex', gap: 12, padding: 12, borderRadius: radius.lg, border: `1px solid ${t.border}`, background: t.sidebarBg, boxShadow: shadow.sm },

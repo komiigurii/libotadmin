@@ -108,9 +108,8 @@ export default function App() {
 }
 
 const shell = {
-  wrap: {
-    display: 'flex', minHeight: '100vh',
-    background: `radial-gradient(1200px 600px at 100% 0%, ${t.brandSoft}, transparent 60%), ${t.bg}`,
-  },
+  // A flat page: the teal haze that used to sit in the top corner was one more
+  // thing in the eye line of every screen (2026-10-21, "quieter").
+  wrap: { display: 'flex', minHeight: '100vh', background: t.bg },
   main: { flex: 1, overflowY: 'auto', minWidth: 0 },
 };

@@ -160,11 +160,10 @@ export default function Dashboard() {
           larger one in a card. */}
       <div className="dash-reveal" style={reveal(0)}>
         <PageHeader
-          eyebrow={`${greeting()} · ${new Date().toLocaleDateString('en-PH', { weekday: 'long', month: 'long', day: 'numeric' })}`}
           title="Dashboard"
-          subtitle={isModerator
-            ? `The spots you look after${city ? ` in ${city}` : ''}, and where each request you’ve sent for approval stands.`
-            : 'An overview of what’s live in the app, what’s waiting on you, and how travelers are using it.'}
+          subtitle={`${greeting()}. ${isModerator
+            ? `Here are the spots you look after${city ? ` in ${city}` : ''}, and where each request you’ve sent for approval stands.`
+            : 'Here’s what’s live in the app, what’s waiting on you, and how travelers are using it.'}`}
           actions={<Button icon="refresh-cw" onClick={load} disabled={refreshing}>{refreshing ? 'Refreshing…' : 'Refresh'}</Button>}
         />
       </div>
@@ -518,7 +517,7 @@ const s = {
   },
 
   contentGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 24 },
-  miniHead: { ...type.label, color: t.textMuted, margin: '0 0 10px' },
+  miniHead: { fontSize: 12.5, fontWeight: 600, color: t.textSecondary, margin: '0 0 10px' },
   meterList: { listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 11 },
   meterRow: { display: 'flex', flexDirection: 'column', gap: 5 },
   meterLabels: { display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 13 },

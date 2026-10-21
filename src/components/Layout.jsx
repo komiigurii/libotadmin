@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { theme as t, radius, shadow, type } from '../theme';
+import { theme as t, radius, type } from '../theme';
 import Icon from './Icon';
 
 /*
@@ -53,13 +53,12 @@ export function Page({ children, wide = false }) {
    Title, one-line description, and an optional action on the right.
    EVERY page uses this — the count sits in the pill beside the title (not as
    "6 total" text on one page and "9 shown" on another), and actions sit on
-   the right. `eyebrow` is the small line above the title (the dashboard's
-   greeting). */
-export function PageHeader({ title, subtitle, count, actions, eyebrow }) {
+   the right. No small label above the title: the heading carries the page on
+   its own (the dashboard's greeting moved into its subtitle, 2026-10-21). */
+export function PageHeader({ title, subtitle, count, actions }) {
   return (
     <div style={s.header}>
       <div style={{ minWidth: 0 }}>
-        {eyebrow && <p style={s.eyebrow}>{eyebrow}</p>}
         <div style={s.titleRow}>
           <h1 style={s.title}>{title}</h1>
           {count != null && (
@@ -389,20 +388,18 @@ export function FilterTabs({ options, value, onChange, label = 'Filter' }) {
    proportional figures in the sans — tabular-nums look loose at this size. */
 // `emphasis` is the condition itself (e.g. `waiting > 0`), not a flag to
 // re-derive from `value` — values arrive formatted ("1,284"), which don't
-// parse back to numbers.
-export function Stat({ label, value, hint, icon, to, emphasis }) {
+// parse back to numbers. `icon` is still accepted from older callers and no
+// longer drawn.
+export function Stat({ label, value, hint, to, emphasis }) {
   const on = !!emphasis;
   const body = (
     <>
-      {(icon || to) && (
-        <div style={s.statTop}>
-          {icon && <span style={{ ...s.statIcon, ...(on ? s.statIconOn : null) }}><Icon name={icon} size={16} /></span>}
-          {to && <span style={s.statChevron}><Icon name="chevron-right" size={13} /></span>}
-        </div>
-      )}
-      <div style={s.statValue}>{value ?? '—'}</div>
+      <div style={s.statTop}>
+        <div style={{ ...s.statValue, ...(on ? s.statValueOn : null) }}>{value ?? '—'}</div>
+        {to && <span style={s.statChevron}><Icon name="chevron-right" size={13} /></span>}
+      </div>
       <div style={s.statLabel}>{label}</div>
-      {hint && <div style={{ ...s.statHint, ...(on ? { color: t.textSecondary } : null) }}>{hint}</div>}
+      {hint && <div style={s.statHint}>{hint}</div>}
     </>
   );
   const style = { ...s.stat, ...(on ? s.statOn : null) };
@@ -468,9 +465,10 @@ const base = {
     fontFamily: 'inherit',
   },
 
+  // Flat: the hairline does the separating; a shadow under every card on the
+  // cream page was a second edge for each one (2026-10-21, "quieter").
   card: {
-    background: t.cardBg, border: `1px solid ${t.border}`,
-    borderRadius: radius.lg, boxShadow: shadow.sm,
+    background: t.cardBg, border: `1px solid ${t.border}`, borderRadius: radius.lg,
   },
 
   state: {
@@ -526,7 +524,6 @@ const base = {
   },
   tagDanger: { background: t.dangerBg, borderColor: t.dangerBorder, color: t.danger },
 
-  eyebrow: { ...type.label, color: t.textMuted, margin: '0 0 6px' },
 
   // ── Button ──
   btn: {
@@ -539,7 +536,7 @@ const base = {
     sm: { padding: '5px 11px', fontSize: 12, minHeight: 30 },
   },
   btnVariant: {
-    primary:     { background: t.accent,    color: t.onAccent, fontWeight: 700, boxShadow: shadow.sm },
+    primary:     { background: t.accent,    color: t.onAccent, fontWeight: 700 },
     secondary:   { background: t.cardBg,    color: t.textPrimary, borderColor: t.border },
     subtle:      { background: t.brandSoft, color: t.brand },
     success:     { background: t.successBg, color: t.success },
@@ -559,25 +556,26 @@ const base = {
     border: 'none', borderRadius: radius.sm, background: 'transparent',
     color: t.textSecondary, fontFamily: 'inherit', fontSize: 13, fontWeight: 600, cursor: 'pointer',
   },
-  // Same language as the sidebar's current-page pill.
-  filterTabOn:   { background: t.brandSolid, color: t.onBrandSolid },
+  // Same language as the sidebar's current page: a teal tint, not a solid fill.
+  filterTabOn:   { background: t.brandSoft, color: t.brand },
   filterCount:   { fontSize: 11, fontWeight: 700, padding: '0 6px', borderRadius: radius.pill, background: t.sidebarBg, color: t.textSecondary, lineHeight: '17px' },
-  filterCountOn: { background: t.onBrandSolidSoft, color: t.onBrandSolid },
+  filterCountOn: { background: t.cardBg, color: t.brand },
 
   // ── Stat ──
+  // Flat figures: the number and what it counts. The icon wells above each
+  // one are gone (2026-10-21, "quieter"); the label already says what it is.
   stat: {
     display: 'flex', flexDirection: 'column', padding: '16px 18px', borderRadius: radius.lg,
-    backgroundColor: t.cardBg, borderWidth: 1, borderStyle: 'solid', borderColor: t.border, boxShadow: shadow.sm,
+    backgroundColor: t.cardBg, borderWidth: 1, borderStyle: 'solid', borderColor: t.border,
     color: 'inherit', textDecoration: 'none', minWidth: 0,
   },
   // Only a figure that asks for action ("Waiting on you") earns the accent,
-  // and only while it's above zero.
-  statOn:      { borderColor: t.accent, backgroundImage: `linear-gradient(${t.accentBg}, ${t.accentBg})` },
-  statTop:     { display: 'flex', alignItems: 'center', marginBottom: 12 },
-  statIcon:    { width: 34, height: 34, borderRadius: radius.md, display: 'flex', alignItems: 'center', justifyContent: 'center', background: t.brandSoft, color: t.brand },
-  statIconOn:  { background: t.accent, color: t.onAccent },
-  statChevron: { marginLeft: 'auto', color: t.textMuted, display: 'inline-flex' },
-  statValue:   { fontSize: 30, fontWeight: 650, letterSpacing: '-0.02em', lineHeight: 1, color: t.textPrimary },
+  // and only while it's above zero: an amber figure and edge, not a filled tile.
+  statOn:      { borderColor: t.warning },
+  statTop:     { display: 'flex', alignItems: 'baseline', gap: 8 },
+  statChevron: { marginLeft: 'auto', color: t.textMuted, display: 'inline-flex', alignSelf: 'center' },
+  statValue:   { fontSize: 28, fontWeight: 600, letterSpacing: '-0.02em', lineHeight: 1, color: t.textPrimary },
+  statValueOn: { color: t.warning },
   statLabel:   { fontSize: 13, fontWeight: 600, color: t.textPrimary, marginTop: 8 },
   statHint:    { fontSize: 12, color: t.textMuted, marginTop: 3 },
   statGrid:    { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 14 },
@@ -588,7 +586,7 @@ const base = {
   // for the form/actions. Reviews, reports, approval requests and a
   // moderator's own submissions all use it.
   list:      { display: 'flex', flexDirection: 'column', gap: 12 },
-  item:      { background: t.cardBg, border: `1px solid ${t.border}`, borderRadius: radius.lg, boxShadow: shadow.sm, overflow: 'hidden' },
+  item:      { background: t.cardBg, border: `1px solid ${t.border}`, borderRadius: radius.lg, overflow: 'hidden' },
   // Wraps: on a narrow screen the side buttons drop under the text instead of
   // squeezing it into a sliver.
   itemTop:   { display: 'flex', alignItems: 'flex-start', gap: 14, padding: '16px 18px', flexWrap: 'wrap' },

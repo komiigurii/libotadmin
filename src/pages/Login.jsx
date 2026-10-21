@@ -2,7 +2,7 @@ import { useEffect, useId, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { authAPI } from '../api/api';
 import { saveSession } from '../auth/session';
-import { theme as t, radius, fonts, type, shadow } from '../theme';
+import { theme as t, radius, fonts, type } from '../theme';
 import { Button } from '../components/Layout';
 import Icon from '../components/Icon';
 import logo from '../assets/logo.png';
@@ -27,9 +27,6 @@ import './Login.css';
  */
 
 const SLOGAN = ['Discover,', 'Explore,', 'Experience', 'Bulacan.'];
-
-// Same dark wash the sidebar uses for its emblem well and chips.
-const ON_FRAME_WELL = 'rgba(0,0,0,0.18)';
 
 const lockLabel = (s) => {
   const m = Math.floor(s / 60), r = s % 60;
@@ -136,7 +133,7 @@ export default function Login() {
           </span>
           <div className="signin-brand-text" style={s.brandText}>
             <div className="signin-wordmark" style={s.wordmark}>Libot Bulacan</div>
-            <div style={s.console}>Admin &amp; Moderator Console</div>
+            <div style={s.console}>Admin and moderator console</div>
           </div>
         </div>
 
@@ -151,9 +148,8 @@ export default function Login() {
 
       <main className="signin-panel">
         <form className="signin-card" style={s.card} onSubmit={handleSubmit} noValidate aria-labelledby="login-title">
-          <p style={s.eyebrow}>Admins and moderators</p>
           <h1 id="login-title" style={s.title}>Sign in</h1>
-          <p style={s.subtitle}>Use the username and password you were given.</p>
+          <p style={s.subtitle}>For admins and moderators. Use the username and password you were given.</p>
 
           {notice && (
             <div role="status" style={{ ...s.banner, ...s.bannerInfo }}>
@@ -258,35 +254,24 @@ const s = {
   brand: {
     display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', gap: 14,
   },
-  emblem: {
-    display: 'grid', placeItems: 'center', width: 88, height: 88, borderRadius: 28,
-    background: ON_FRAME_WELL, boxShadow: 'inset 0 0 0 1px var(--on-brand-solid-soft)', flexShrink: 0,
-  },
-  logo: { width: 62, height: 62, objectFit: 'contain', borderRadius: 17, display: 'block' },
+  emblem: { display: 'grid', placeItems: 'center', flexShrink: 0 },
+  logo: { width: 64, height: 64, objectFit: 'contain', borderRadius: 18, display: 'block' },
   brandText: { display: 'flex', flexDirection: 'column', alignItems: 'center' },
-  // Fluid, not a flat 32px: "LIBOT BULACAN" is 357px wide at 32px, more than
-  // the rail holds just above the 860px breakpoint (~286px); 2.2vw keeps it
-  // one line there and reaches 32px on wide screens.
+  // The name in plain title case, as the sidebar sets it (2026-10-21,
+  // "quieter": it was tracked capitals).
   wordmark: {
-    fontFamily: fonts.display, color: t.onBrandSolid, fontWeight: 700, fontSize: 'clamp(22px, 2.2vw, 32px)',
-    lineHeight: 1, letterSpacing: '0.18em', textTransform: 'uppercase', whiteSpace: 'nowrap',
-    // Tracking also pads the last letter; this re-centres the word.
-    paddingLeft: '0.18em',
+    fontFamily: fonts.display, color: t.onBrandSolid, fontWeight: 600, fontSize: 'clamp(24px, 2.4vw, 32px)',
+    lineHeight: 1.1, letterSpacing: '-0.01em', whiteSpace: 'nowrap',
   },
-  // Full white, not onBrandSolidMuted: at 10.5px this needs 4.5:1, and 86%
-  // white is 4.2:1 on the dark theme's teal (white: 5.1, light theme 5.9).
-  console: {
-    marginTop: 8, color: t.onBrandSolid, fontSize: 10.5, fontWeight: 700,
-    letterSpacing: '0.24em', textTransform: 'uppercase',
-  },
-  // The sidebar tagline's type, on teal instead of cream: white carries the
-  // contrast (≥ 5:1 on the rail teal in both themes); the yellow pass slips
-  // out from under it the way the print's inks are off-register.
+  // Full white, not onBrandSolidMuted: 86% white is 4.2:1 on the dark theme's
+  // teal (white: 5.1, light theme 5.9).
+  console: { marginTop: 6, color: t.onBrandSolid, fontSize: 13, fontWeight: 500 },
+  // White on teal, without the yellow off-register shadow it used to carry.
   slogan: {
     width: '100%', maxWidth: 400, margin: 0,
-    fontFamily: fonts.display, fontStyle: 'italic', fontWeight: 700,
-    fontSize: 'clamp(24px, 2.4vw, 32px)', lineHeight: 1.04, letterSpacing: '-0.01em',
-    color: t.onBrandSolid, textShadow: `2px 1.6px 0 ${t.accent}`,
+    fontFamily: fonts.display, fontStyle: 'italic', fontWeight: 500,
+    fontSize: 'clamp(22px, 2.1vw, 28px)', lineHeight: 1.12, letterSpacing: '-0.01em',
+    color: t.onBrandSolid,
   },
   sloganLine: { display: 'block' },
 
@@ -294,9 +279,8 @@ const s = {
   card: {
     width: '100%', maxWidth: 420, boxSizing: 'border-box',
     background: t.cardBg, border: `1px solid ${t.border}`, borderRadius: radius.xl,
-    boxShadow: shadow.sm, padding: 'clamp(22px, 4vw, 36px)',
+    padding: 'clamp(22px, 4vw, 36px)',
   },
-  eyebrow:  { ...type.label, color: t.textMuted, margin: '0 0 6px' },
   title:    { ...type.pageTitle, fontSize: 30, color: t.textPrimary, margin: 0 },
   subtitle: { ...type.body, fontSize: 14.5, color: t.textSecondary, marginTop: 6, marginBottom: 24 },
 
