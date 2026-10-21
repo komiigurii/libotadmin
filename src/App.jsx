@@ -22,6 +22,7 @@ const TownBadges       = lazy(() => import('./pages/TownBadges'));
 import { AppAlertProvider } from './components/AppAlert';
 import { theme as t } from './theme';
 import { hasValidSession, getToken, clearSession } from './auth/session';
+import { isAdminRole, isModeratorRole } from './auth/roles';
 import './App.css';
 
 function PageFallback() {
@@ -40,15 +41,14 @@ const PrivateRoute = ({ children }) => {
 // has. AdminRoute used to redirect to /mod-requests, which is itself
 // admin-only, so a moderator opening any admin URL bounced between the guard
 // and its own redirect target.
-const ModeratorRoute = ({ children }) => {
-  const role = localStorage.getItem('role');
-  return role === 'moderator' ? children : <Navigate to="/dashboard" replace />;
-};
+const ModeratorRoute = ({ children }) => (
+  isModeratorRole() ? children : <Navigate to="/dashboard" replace />
+);
 
-const AdminRoute = ({ children }) => {
-  const role = localStorage.getItem('role');
-  return role === 'admin' ? children : <Navigate to="/dashboard" replace />;
-};
+// The super admin passes too: it can do everything an admin can.
+const AdminRoute = ({ children }) => (
+  isAdminRole() ? children : <Navigate to="/dashboard" replace />
+);
 
 export default function App() {
   return (
