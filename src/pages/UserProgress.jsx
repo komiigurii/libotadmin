@@ -68,9 +68,9 @@ export default function UserProgress() {
       {error && <ErrorBanner onDismiss={() => setError(null)}>{error}</ErrorBanner>}
 
       {stats && (
-        // Six figures: a narrower minimum keeps them on one row on a laptop
-        // instead of five plus one orphan.
-        <div style={{ ...s.statGrid, gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))' }}>
+        // Seven figures: a narrower minimum keeps them on one row on a laptop
+        // instead of six plus one orphan.
+        <div style={{ ...s.statGrid, gridTemplateColumns: 'repeat(auto-fit, minmax(132px, 1fr))' }}>
           <Stat label="Travelers" value={fmtNum(stats.totalUsers)} />
           <Stat
             label="Explorers"
@@ -81,6 +81,7 @@ export default function UserProgress() {
           <Stat label="Active this month" value={fmtNum(stats.activeLast30)} />
           <Stat label="Spot visits" value={fmtNum(stats.totalVisits)} hint={`${stats.avgVisits} per traveler on average`} />
           <Stat label="Badges collected" value={fmtNum(stats.totalBadges)} />
+          <Stat label="Towns finished" value={fmtNum(stats.totalTownBadges ?? 0)} hint="Town badges earned" />
         </div>
       )}
 
@@ -119,6 +120,7 @@ export default function UserProgress() {
             <Th align="right">Points</Th>
             <Th align="right">Spots visited</Th>
             <Th align="right">Badges</Th>
+            <Th align="right">Towns</Th>
             <Th align="right">Missions</Th>
             <Th align="right">Last active</Th>
           </>}
@@ -136,6 +138,7 @@ export default function UserProgress() {
                   <div style={{ minWidth: 0 }}>
                     <div style={s.personName}>
                       {r.name}
+                      {r.titleName && <StatusPill tone="info" icon="star">{r.titleName}</StatusPill>}
                       {r.isBanned && <StatusPill tone="danger" icon="slash">Banned</StatusPill>}
                     </div>
                     <div style={s.personSub}>{r.email}</div>
@@ -148,6 +151,7 @@ export default function UserProgress() {
               <Td align="right" strong>{fmtNum(r.points)}</Td>
               <Td align="right">{r.spotsVisited}</Td>
               <Td align="right">{r.badges}</Td>
+              <Td align="right">{r.townsFinished ?? 0}</Td>
               <Td align="right">{r.missionsCompleted}</Td>
               <Td align="right" muted>{r.lastActiveAt ? timeAgo(r.lastActiveAt) : 'Never'}</Td>
             </tr>

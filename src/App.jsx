@@ -11,7 +11,6 @@ const Dashboard        = lazy(() => import('./pages/Dashboard'));
 const Spots            = lazy(() => import('./pages/Spots'));
 const Comments         = lazy(() => import('./pages/Comments'));
 const ReportedComments = lazy(() => import('./pages/ReportedComments'));
-const SpotReports      = lazy(() => import('./pages/SpotReports'));
 const ModRequests      = lazy(() => import('./pages/ModRequests'));
 const MyReviewRequests = lazy(() => import('./pages/MyReviewRequests'));
 const InactiveUsers    = lazy(() => import('./pages/InactiveUsers'));
@@ -21,6 +20,7 @@ const Moderators       = lazy(() => import('./pages/Moderators'));
 const MyTravelers      = lazy(() => import('./pages/MyTravelers'));
 const SuperAdmin       = lazy(() => import('./pages/Superadmin'));
 
+const TownBadges       = lazy(() => import('./pages/TownBadges'));
 import { AppAlertProvider } from './components/AppAlert';
 import { theme as t } from './theme';
 import { hasValidSession, getToken, clearSession } from './auth/session';
@@ -113,7 +113,6 @@ export default function App() {
 
                       <Route path="/mod-requests"       element={<AdminRoute><ModRequests /></AdminRoute>} />
                       <Route path="/reported-comments"  element={<AdminRoute><ReportedComments /></AdminRoute>} />
-                      <Route path="/spot-reports"       element={<AdminRoute><SpotReports /></AdminRoute>} />
                       {/* Admin-only, like the backend: moderators work only on
                           attractions and their own requests. */}
                       <Route path="/inactive-users"     element={<AdminRoute><InactiveUsers /></AdminRoute>} />
@@ -121,6 +120,7 @@ export default function App() {
                       <Route path="/comments"           element={<AdminRoute><Comments /></AdminRoute>} />
                       <Route path="/user-progress"      element={<AdminRoute><UserProgress /></AdminRoute>} />
                       <Route path="/moderators"         element={<AdminRoute><Moderators /></AdminRoute>} />
+                      <Route path="/town-badges"        element={<AdminRoute><TownBadges /></AdminRoute>} />
 
                       {/* Both roles: moderators manage their municipality's
                           attractions; admins see every one, read-only. */}
@@ -141,9 +141,8 @@ export default function App() {
 }
 
 const shell = {
-  wrap: {
-    display: 'flex', minHeight: '100vh',
-    background: `radial-gradient(1200px 600px at 100% 0%, ${t.brandSoft}, transparent 60%), ${t.bg}`,
-  },
+  // A flat page: the teal haze that used to sit in the top corner was one more
+  // thing in the eye line of every screen (2026-10-21, "quieter").
+  wrap: { display: 'flex', minHeight: '100vh', background: t.bg },
   main: { flex: 1, overflowY: 'auto', minWidth: 0 },
 };

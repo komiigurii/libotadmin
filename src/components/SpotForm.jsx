@@ -89,11 +89,46 @@ function coordError(lat, lng) {
 // Each map draws the radius the app actually uses around the pins it edits,
 // so a moderator can see when two of them sit on the same ground.
 
-// How close a traveler must be for the app to count a visit
-// (ARRIVAL_RADIUS_METERS in the app's context/ArrivalContext.js). Two spots
-// whose pins are under twice this apart overlap: someone standing between
-// them arrives at both at once.
-const ARRIVAL_RADIUS_M = 50;
+// Each spot sets its own two radii on the Location tab; a spot that never did
+// uses the defaults. No upper or lower limit (the user's call, 2026-10-20) —
+// any number above 0, checked the same way by the backend (LibotBackend
+// utils/spotRadii.js), and the app falls back to the same defaults
+// (LibotBulacan utils/spotRadii.js).
+//
+// Arrival: how close a traveler must be for the app to count a visit. Two
+// spots whose arrival rings overlap share ground: someone standing in both
+// arrives at both at once.
+const ARRIVAL_RADIUS = { default: 50 };
+// Nearby: how far out the app tells a traveler about a spot they haven't
+// visited yet. Drawn as a dotted ring; it has to reach past the arrival ring
+// (inside it is an arrival, so the alert would never come).
+const NEARBY_RADIUS = { default: 500 };
+
+const radiusSet = (v) => v !== null && v !== undefined && v !== '' && Number(v) > 0;
+const arrivalRadiusOf = (spot) => (radiusSet(spot?.arrivalRadiusMeters) ? Number(spot.arrivalRadiusMeters) : ARRIVAL_RADIUS.default);
+const nearbyRadiusOf = (spot) => (radiusSet(spot?.nearbyRadiusMeters) ? Number(spot.nearbyRadiusMeters) : NEARBY_RADIUS.default);
+
+// What's wrong with the two typed radii, or ''. Same rules and wording as the
+// backend's radiusProblem.
+function radiusProblem(arrival, nearby) {
+  const fields = [
+    [arrival, 'Arrival radius'],
+    [nearby, 'Nearby alert radius'],
+  ];
+  for (const [v, label] of fields) {
+    const n = toNum(v);
+    if (n === null || n <= 0) return `${label} must be a number of meters above 0.`;
+  }
+  if (toNum(nearby) <= toNum(arrival)) return 'The nearby alert radius must be larger than the arrival radius.';
+  return '';
+}
+
+// What the rings draw while a radius is being typed: the number if it's one,
+// else the default.
+const ringRadius = (v, { default: fallback }) => {
+  const n = toNum(v);
+  return n !== null && n > 0 ? n : fallback;
+};
 
 // An AR model's trigger radius (BASE_MODEL_RADIUS_METERS in the app's
 // Screens/ARScreen.js). For AR pins under twice this apart the app shrinks
@@ -107,6 +142,19 @@ const AR_MIN_RADIUS_M = 3;
 // left outside this — say, at the spot's old location after its pin moved —
 // sends everyone there before they can find the rest.
 const AR_SPOT_RANGE_M = 120;
+
+// An AR position's "What's here?" and "Fact shown here" (PIN_LABEL_MAX and
+// PIN_TRIVIA_MAX in LibotBackend utils/pinTrivia.js; one AR card in the app).
+const AR_LABEL_MAX = 40;
+const AR_FACT_MAX = 150;
+
+// The fact the app shows at AR position `index` of a spot whose positions
+// don't carry their own yet: fact n of the trivia list, wrapping round (the
+// app's utils/arTrail.js triviaForModel). '' when the spot has none.
+function factShownAt(trivia, index) {
+  const facts = (Array.isArray(trivia) ? trivia : []).filter((f) => typeof f === 'string' && f.trim());
+  return facts.length ? facts[index % facts.length].trim() : '';
+}
 
 const MISSION_RADIUS_DEFAULT_M = 60;
 // The backend refuses a new spot's food mission below this
@@ -486,16 +534,24 @@ function MapSearch({ mapRef }) {
 // reference — AR models are placed relative to the spot, and so is the eatery.
 //
 // The pins a map edits also get a ring at the radius the app uses for them
-// (spot: arrival, AR: trigger, food: completion). The Location map adds every
-// other spot with its own arrival ring, and rings that overlap turn red — live
-// while a pin is dragged, not just once it's dropped.
+// (spot: arrival + nearby alert, AR: trigger, food: completion). The Location
+// map adds every other spot with its own arrival ring, and rings that overlap
+// turn red — live while a pin is dragged, not just once it's dropped.
+
+// Close enough that each tab's rings are bigger than its pins: a 50 m
+// arrival ring is ~45 px across at 17, a 6 m AR ring ~40 px at 20.
+const OPEN_ZOOM = { ar: 20, spot: 17, mission: 16 };
+
 function SpotMapPicker({
   spotLat, spotLng, onSpotChange,
   arModels, onPlaceAr, onArMove,
   mode = 'spot', // 'spot' | 'ar' | 'mission'
   missionLat, missionLng, onMissionChange,
   missionRadius = MISSION_RADIUS_DEFAULT_M,
-  otherSpots = [], // [{ id, name, lat, lng }] — drawn on the Location map only
+  // This spot's two rings, Location map only (ringRadius values).
+  arrivalRadius = ARRIVAL_RADIUS.default,
+  nearbyRadius = NEARBY_RADIUS.default,
+  otherSpots = [], // [{ id, name, lat, lng, radius }] — drawn on the Location map only
   active = true, // false while this map's tab is hidden
   height = 320,
 }) {
@@ -505,16 +561,21 @@ function SpotMapPicker({
   const arMarkersRef  = useRef({});
   const missionMarkerRef = useRef(null);
   const spotRingRef    = useRef(null);
+  const nearbyRingRef  = useRef(null);
   const arRingsRef     = useRef({});
   const missionRingRef = useRef(null);
-  const othersRef      = useRef([]); // [{ lat, lng, ring, dot }]
+  const othersRef      = useRef([]); // [{ lat, lng, radius, ring, dot }]
+  // What the Location map shows, so its alert-area button knows which way to go.
+  const [viewBounds, setViewBounds] = useState(null);
 
   // Both read only refs, so the drag handlers (bound once, when a marker is
-  // created) can call them without going stale.
+  // created) can call them without going stale. Two arrival rings overlap
+  // when the pins are closer than the two radii added together.
   const paintSpotClash = (lat, lng) => {
     let any = false;
+    const mine = stateRef.current.arrivalRadius;
     othersRef.current.forEach((o) => {
-      const on = lat != null && distanceM(lat, lng, o.lat, o.lng) < 2 * ARRIVAL_RADIUS_M;
+      const on = lat != null && distanceM(lat, lng, o.lat, o.lng) < mine + o.radius;
       markClash(o.ring, on);
       markClash(o.dot, on);
       if (on) any = true;
@@ -533,9 +594,9 @@ function SpotMapPicker({
     L.circle(latlng, { radius: radiusM, className: `map-ring map-ring--${kind}`, interactive: false });
 
   // Always-fresh refs so the map's event handlers (bound once) see current props/callbacks
-  const stateRef = useRef({ mode, onSpotChange, onPlaceAr, onArMove, onMissionChange });
+  const stateRef = useRef({ mode, onSpotChange, onPlaceAr, onArMove, onMissionChange, arrivalRadius });
   useEffect(() => {
-    stateRef.current = { mode, onSpotChange, onPlaceAr, onArMove, onMissionChange };
+    stateRef.current = { mode, onSpotChange, onPlaceAr, onArMove, onMissionChange, arrivalRadius };
   });
 
   const spotIcon = useRef(
@@ -585,10 +646,9 @@ function SpotMapPicker({
     if (mode === 'ar') arModels.forEach((m) => add(m.lat, m.lng));
     if (mode === 'mission') add(missionLat, missionLng);
 
-    // Close enough that each tab's rings are bigger than its pins: a 50 m
-    // arrival ring is ~45 px across at 17, a 6 m AR ring ~40 px at 20.
-    const zoom = mode === 'ar' ? 20 : mode === 'spot' ? 17 : 16;
+    const zoom = OPEN_ZOOM[mode];
     const map = L.map(containerRef.current, { zoomControl: false, maxZoom: 21 });
+    if (mode === 'spot') map.on('moveend', () => setViewBounds(map.getBounds()));
     if (pts.length > 1) map.fitBounds(pts, { padding: [48, 48], maxZoom: zoom });
     else if (pts.length === 1) map.setView(pts[0], zoom);
     else map.setView([DEFAULT_CENTER.lat, DEFAULT_CENTER.lng], 13);
@@ -623,6 +683,7 @@ function SpotMapPicker({
       arMarkersRef.current = {};
       missionMarkerRef.current = null;
       spotRingRef.current = null;
+      nearbyRingRef.current = null;
       arRingsRef.current = {};
       missionRingRef.current = null;
       othersRef.current = [];
@@ -644,6 +705,8 @@ function SpotMapPicker({
         spotMarkerRef.current = null;
         spotRingRef.current?.remove();
         spotRingRef.current = null;
+        nearbyRingRef.current?.remove();
+        nearbyRingRef.current = null;
         paintSpotClash(null, null);
       }
       return;
@@ -668,6 +731,7 @@ function SpotMapPicker({
       spotMarkerRef.current.on('drag', () => {
         const pos = spotMarkerRef.current.getLatLng();
         spotRingRef.current?.setLatLng(pos);
+        nearbyRingRef.current?.setLatLng(pos);
         paintSpotClash(pos.lat, pos.lng);
       });
       spotMarkerRef.current.on('dragend', () => {
@@ -683,14 +747,25 @@ function SpotMapPicker({
       }
     }
 
-    // The arrival ring, on the map that moves this pin.
+    // The nearby-alert and arrival rings, on the map that moves this pin. The
+    // wide one first, so the arrival ring draws over it.
     if (mode === 'spot') {
+      if (nearbyRingRef.current) nearbyRingRef.current.setLatLng([la, ln]);
+      else nearbyRingRef.current = ring([la, ln], nearbyRadius, 'nearby').addTo(mapRef.current);
       if (spotRingRef.current) spotRingRef.current.setLatLng([la, ln]);
-      else spotRingRef.current = ring([la, ln], ARRIVAL_RADIUS_M, 'spot').addTo(mapRef.current);
+      else spotRingRef.current = ring([la, ln], arrivalRadius, 'spot').addTo(mapRef.current);
       paintSpotClash(la, ln);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [spotLat, spotLng]);
+
+  // The rings follow the radius fields as they're typed.
+  useEffect(() => {
+    nearbyRingRef.current?.setRadius(nearbyRadius);
+    spotRingRef.current?.setRadius(arrivalRadius);
+    const cur = spotMarkerRef.current?.getLatLng();
+    paintSpotClash(cur?.lat ?? null, cur?.lng ?? null);
+  }, [arrivalRadius, nearbyRadius]);
 
   // Every other spot with its arrival ring, Location map only. Added after
   // the spot's own ring, so theirs draw on top and stay readable where the
@@ -702,7 +777,8 @@ function SpotMapPicker({
     othersRef.current = otherSpots.map((o) => ({
       lat: o.lat,
       lng: o.lng,
-      ring: ring([o.lat, o.lng], ARRIVAL_RADIUS_M, 'other').addTo(layer),
+      radius: o.radius,
+      ring: ring([o.lat, o.lng], o.radius, 'other').addTo(layer),
       dot: L.circleMarker([o.lat, o.lng], { radius: 5, className: 'map-dot' })
         .bindTooltip(o.name || 'Unnamed spot')
         .addTo(layer),
@@ -735,6 +811,7 @@ function SpotMapPicker({
       const ln  = toNum(model.lng);
       if (la === null || ln === null) return;
       const num = index + 1;
+      const tip = model.label?.trim() ? `AR ${num} · ${model.label.trim()}` : `AR ${num}`;
 
       let marker = arMarkersRef.current[model.id];
       if (marker) {
@@ -743,11 +820,11 @@ function SpotMapPicker({
           marker.setLatLng([la, ln]);
         }
         marker.setIcon(makeArIcon(num));
-        marker.setTooltipContent(`AR ${num}`);
+        marker.setTooltipContent(tip);
       } else {
         marker = L.marker([la, ln], { icon: makeArIcon(num), draggable: stateRef.current.mode === 'ar' })
           .addTo(mapRef.current)
-          .bindTooltip(`AR ${num}`, { permanent: false });
+          .bindTooltip(tip, { permanent: false });
 
         const thisId = model.id;
         marker.on('drag', () => {
@@ -863,13 +940,35 @@ function SpotMapPicker({
     }
   }, [mode]);
 
+  // The nearby-alert ring (1 km across by default) is far wider than the map
+  // at the zoom the arrival ring needs, so a button frames all of it — and back.
+  const spotLa = toNum(spotLat);
+  const spotLn = toNum(spotLng);
+  const spotAt = mode === 'spot' && spotLa !== null && spotLn !== null ? L.latLng(spotLa, spotLn) : null;
+  const alertArea = spotAt && spotAt.toBounds(2 * nearbyRadius);
+  const alertInView = !!(alertArea && viewBounds?.contains(alertArea));
+  const toggleAlertArea = () => {
+    const map = mapRef.current;
+    if (!map || !alertArea) return;
+    if (alertInView) map.setView(spotAt, OPEN_ZOOM.spot);
+    else map.fitBounds(alertArea, { padding: [12, 12] });
+  };
+
   return (
     <div style={styles.mapWrap}>
       <MapSearch mapRef={mapRef} />
-      <div
-        ref={containerRef}
-        style={{ height, borderRadius: radius.lg, overflow: 'hidden', border: `1px solid ${t.border}`, boxShadow: shadow.sm }}
-      />
+      <div style={styles.mapFrame}>
+        <div
+          ref={containerRef}
+          style={{ height, borderRadius: radius.lg, overflow: 'hidden', border: `1px solid ${t.border}` }}
+        />
+        {alertArea && (
+          <button type="button" onClick={toggleAlertArea} style={styles.mapOverlayBtn} className="modern-btn">
+            <Icon name={alertInView ? 'map-pin' : 'bell'} size={13} />
+            {alertInView ? 'Back to the pin' : `Show the ${fmtDistance(nearbyRadius)} alert area`}
+          </button>
+        )}
+      </div>
     </div>
   );
 }
@@ -953,19 +1052,22 @@ function TabPanel({ id, active, children }) {
 
 // Which pin is which, now that there's no Spot / AR / Food toggle above the
 // map carrying the coloured dots. The pins this tab edits are listed first
-// and in full colour; the rest are there for reference. The last entry says
-// what the ring around this tab's pins measures.
-function MapLegend({ mode, spotPinned, arCount, missionPinned, otherCount = 0, missionRadius }) {
+// and in full colour; the rest are there for reference. The last entries say
+// what the rings around this tab's pins measure.
+function MapLegend({ mode, spotPinned, arCount, missionPinned, otherCount = 0, missionRadius, arrivalRadius, nearbyRadius }) {
   const items = [
     (spotPinned || mode === 'spot') && { key: 'spot', color: MAP_PIN.spot, label: 'Spot' },
     mode === 'spot' && otherCount > 0 && { key: 'other', color: t.mapOther, label: 'Other spots' },
     (arCount > 0 || mode === 'ar') && { key: 'ar', color: MAP_PIN.ar, label: arCount === 1 ? 'AR position' : 'AR positions' },
     (missionPinned || mode === 'mission') && { key: 'mission', color: MAP_PIN.mission, label: 'Food spot' },
   ].filter(Boolean).sort((a, b) => (b.key === mode) - (a.key === mode));
-  const ringKey =
-    mode === 'ar' ? { color: t.mapAr, label: `${AR_RADIUS_M} m AR trigger radius · red where two overlap` }
-    : mode === 'mission' ? { color: t.mapFood, label: `${missionRadiusOf(missionRadius)} m completion radius` }
-    : { color: t.mapSpot, label: `${ARRIVAL_RADIUS_M} m arrival radius · red where two spots overlap` };
+  const ringKeys =
+    mode === 'ar' ? [{ key: 'ar', color: t.mapAr, label: `${AR_RADIUS_M} m AR trigger radius · red where two overlap` }]
+    : mode === 'mission' ? [{ key: 'food', color: t.mapFood, label: `${missionRadiusOf(missionRadius)} m completion radius` }]
+    : [
+        { key: 'arrival', color: t.mapSpot, label: `${fmtDistance(arrivalRadius)} arrival radius · red where two spots overlap` },
+        { key: 'nearby', color: t.mapSpot, dotted: true, label: `${fmtDistance(nearbyRadius)} nearby alert radius` },
+      ];
   return (
     <div style={styles.legend}>
       {items.length > 1 && items.map((it) => (
@@ -974,24 +1076,26 @@ function MapLegend({ mode, spotPinned, arCount, missionPinned, otherCount = 0, m
           {it.label}{it.key === mode ? '' : ' (reference)'}
         </span>
       ))}
-      <span style={styles.legendItem}>
-        <span style={{ ...styles.ringSwatch, borderColor: ringKey.color }} />
-        {ringKey.label}
-      </span>
+      {ringKeys.map((rk) => (
+        <span key={rk.key} style={styles.legendItem}>
+          <span style={{ ...styles.ringSwatch, borderColor: rk.color, borderStyle: rk.dotted ? 'dotted' : 'solid' }} />
+          {rk.label}
+        </span>
+      ))}
     </div>
   );
 }
 
 // Under the Location map: does this spot's arrival ring overlap another
 // spot's? Spelled out, because a red ring alone doesn't say what it costs.
-// `neighbours` is every other spot with its distance, nearest first; null
-// while they load, false if they couldn't be.
-function SpotOverlapNote({ neighbours }) {
+// `neighbours` is every other spot with its distance and arrival radius,
+// nearest first; null while they load, false if they couldn't be.
+function SpotOverlapNote({ neighbours, arrivalRadius }) {
   if (neighbours === null) return <p style={styles.overlapMuted}>Checking the spots nearby…</p>;
   if (neighbours === false) {
     return <p style={styles.overlapMuted}>Couldn’t load the other spots, so overlaps can’t be checked right now.</p>;
   }
-  const clashes = neighbours.filter((n) => n.distance < 2 * ARRIVAL_RADIUS_M);
+  const clashes = neighbours.filter((n) => n.distance < arrivalRadius + n.radius);
   if (!clashes.length) {
     const nearest = neighbours[0];
     return (
@@ -1014,15 +1118,41 @@ function SpotOverlapNote({ neighbours }) {
         {clashes.map((c) => (
           <li key={c.id}>
             <strong>{c.name || 'Unnamed spot'}</strong> — {fmtDistance(c.distance)} apart
-            {c.distance < ARRIVAL_RADIUS_M ? ', so standing on either pin counts as arriving at both' : ''}
+            {c.radius !== ARRIVAL_RADIUS.default ? ` (its arrival radius is ${fmtDistance(c.radius)})` : ''}
+            {c.distance < Math.min(arrivalRadius, c.radius) ? ', so standing on either pin counts as arriving at both' : ''}
           </li>
         ))}
       </ul>
       <p style={styles.overlapText}>
-        A traveler arrives within {ARRIVAL_RADIUS_M} m of a pin, so pins closer than {2 * ARRIVAL_RADIUS_M} m
-        share ground: someone standing between them arrives at both at once.
+        A traveler arrives within {fmtDistance(arrivalRadius)} of this pin. Where two arrival rings overlap,
+        someone standing in both arrives at both at once — move the pin or make the arrival radius smaller.
       </p>
     </div>
+  );
+}
+
+// Also under the Location map: what the dotted ring means, and which spots
+// sit inside it. That's not a problem the way an arrival overlap is — someone
+// in range of several gets one alert naming them all — but worth knowing.
+function NearbyAlertNote({ neighbours, nearbyRadius }) {
+  // SpotOverlapNote already says when the other spots are loading or failed.
+  if (!Array.isArray(neighbours)) return null;
+  const within = fmtDistance(nearbyRadius);
+  const inside = neighbours.filter((n) => n.distance <= nearbyRadius);
+  const names = inside.slice(0, 4).map((n) => `${n.name || 'Unnamed spot'} (${fmtDistance(n.distance)})`);
+  if (inside.length > names.length) names.push(`${inside.length - names.length} more`);
+  const list = names.length > 1 ? `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}` : names[0];
+  return (
+    <p style={styles.nearbyNote}>
+      <Icon name="bell" size={13} />
+      <span>
+        Travelers who haven’t visited this spot get a “nearby” alert when they come within
+        {' '}{within} of the pin (the dotted ring), at most once a day.
+        {inside.length
+          ? ` Also within ${within}: ${list}. Someone in range of ${inside.length === 1 ? 'both' : 'several'} gets one alert naming them ${inside.length === 1 ? 'together' : 'all'}.`
+          : ` No other spot is within ${within}.`}
+      </span>
+    </p>
   );
 }
 
@@ -1102,19 +1232,27 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
     Badge:           initial?.Badge            || '',
     coordinates_lat: initial?.coordinates?.lat || '',
     coordinates_lng: initial?.coordinates?.lng || '',
-    // Edited as one fact per line; stored as an array — each entry is one card
-    // in the app's AR trivia popup.
-    trivia:          Array.isArray(initial?.trivia) ? initial.trivia.join('\n') : '',
+    // What the spot uses now — its own, or the default for one that never
+    // set them — so the field always shows the real number.
+    arrivalRadius:   String(arrivalRadiusOf(initial)),
+    nearbyRadius:    String(nearbyRadiusOf(initial)),
   });
 
+  // Each AR position says what stands there and carries the fact its model
+  // shows (LibotBackend utils/pinTrivia.js). A position from before that has
+  // neither; it starts with the fact the app shows there today (see
+  // factShownAt), so saving without touching it changes nothing.
   const [arModels, setArModels] = useState(() => {
-    if (initial?.modelsCoordinates) {
-      if (Array.isArray(initial.modelsCoordinates)) {
-        return initial.modelsCoordinates.map(m => ({ id: makeId(), lat: m.lat || '', lng: m.lng || '' }));
-      }
-      return [{ id: makeId(), lat: initial.modelsCoordinates.lat || '', lng: initial.modelsCoordinates.lng || '' }];
-    }
-    return [];
+    const list = Array.isArray(initial?.modelsCoordinates)
+      ? initial.modelsCoordinates
+      : initial?.modelsCoordinates ? [initial.modelsCoordinates] : [];
+    return list.map((m, i) => ({
+      id: makeId(),
+      lat: m.lat || '',
+      lng: m.lng || '',
+      label: m.label && m.label !== 'Model' ? m.label : '',
+      trivia: m.trivia || factShownAt(initial?.trivia, i),
+    }));
   });
 
   // Categories now come from the database. Seeded with the fallback so the
@@ -1150,7 +1288,7 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
       .filter((s) => s._id !== initial?._id)
       .map((s) => {
         const at = spotPosition(s);
-        return at && { id: s._id, name: s.name, ...at };
+        return at && { id: s._id, name: s.name, ...at, radius: arrivalRadiusOf(s) };
       })
       .filter(Boolean),
     [allSpots, initial?._id]
@@ -1350,7 +1488,9 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
     ...formValue,
     coordinates_lat: toNum(formValue.coordinates_lat),
     coordinates_lng: toNum(formValue.coordinates_lng),
-    arModels: models.map((m) => ({ id: m.id, lat: toNum(m.lat), lng: toNum(m.lng) })),
+    arrivalRadius: toNum(formValue.arrivalRadius),
+    nearbyRadius: toNum(formValue.nearbyRadius),
+    arModels: models.map((m) => ({ id: m.id, lat: toNum(m.lat), lng: toNum(m.lng), label: m.label.trim(), trivia: m.trivia.trim() })),
   });
 
   const initialSnapshotRef = useRef(null);
@@ -1379,10 +1519,15 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
     setForm(prev => ({ ...prev, coordinates_lat: '', coordinates_lng: '' }));
 
   const handlePlaceAr = (lat, lng) =>
-    setArModels(prev => [...prev, { id: makeId(), lat, lng }]);
+    setArModels(prev => [...prev, { id: makeId(), lat, lng, label: '', trivia: '' }]);
 
   const handleArMove = (id, lat, lng) =>
     setArModels(prev => prev.map(m => (m.id === id ? { ...m, lat, lng } : m)));
+
+  const setArText = (id, key) => (e) => {
+    const { value } = e.target;
+    setArModels(prev => prev.map(m => (m.id === id ? { ...m, [key]: value } : m)));
+  };
 
   const removeArModel = (id) => setArModels(prev => prev.filter(m => m.id !== id));
 
@@ -1399,7 +1544,10 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
   // older spots predate some fields, and a typo fix shouldn't need a badge
   // and two 3D models uploaded first.
   const isNew = !initial;
-  const triviaLines = form.trivia.split('\n').map(line => line.trim()).filter(Boolean);
+  // The first AR position still missing what's there / its fact, or -1.
+  const arNoLabel = arModels.findIndex((m) => !m.label.trim());
+  const arNoFact = arModels.findIndex((m) => !m.trivia.trim());
+  const arAllFacts = arModels.length > 0 && arNoFact === -1;
 
   // What a new spot's food recommendation still needs, as one message.
   const foodProblem = () => {
@@ -1456,6 +1604,8 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
   }
   const spotCoordErr = coordError(form.coordinates_lat, form.coordinates_lng);
   if (spotCoordErr) return fail('location', spotCoordErr);
+  const radiusErr = radiusProblem(form.arrivalRadius, form.nearbyRadius);
+  if (radiusErr) return fail('location', radiusErr);
 
   const badAr = arModels.findIndex(
     (m) => (m.lat !== '' || m.lng !== '') && (toNum(m.lat) === null || toNum(m.lng) === null)
@@ -1472,7 +1622,13 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
   if (isNew && withAR) {
     if (!form.ARModelUrl) return fail('ar', 'AR 3D model is required');
     if (!arModels.length) return fail('ar', 'Pin at least one AR position on the AR map');
-    if (!triviaLines.length) return fail('ar', 'Add at least one AR trivia fact');
+    if (arNoLabel !== -1) return fail('ar', `AR ${arNoLabel + 1}: say what's there, e.g. "Bell tower".`);
+    if (arNoFact !== -1) return fail('ar', `AR ${arNoFact + 1}: write the fact its model shows.`);
+  }
+  // All or none (LibotBackend utils/pinTrivia.js): with a gap, older app
+  // versions would show the next position's fact at that model.
+  if (withAR && arNoFact !== -1 && arModels.some((m) => m.trivia.trim())) {
+    return fail('ar', `AR ${arNoFact + 1} has no fact yet — every AR position needs its own once one has one.`);
   }
   // A Nature or Festivals spot is visit-only: no food recommendation.
   if (isNew && withAR) {
@@ -1487,15 +1643,26 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
     city: form.city.trim(),
     entranceFee: form.entranceFee.trim(),
     visitingHours: form.visitingHours.trim(),
-    trivia: triviaLines,
+    // With every position's own fact, the server rewrites the spot's trivia
+    // list from them; otherwise the list is kept as it was.
+    ...(!arAllFacts && { trivia: Array.isArray(initial?.trivia) ? initial.trivia : [] }),
     image: form.image,
     modelUrl: form.modelUrl || null,
     AR3DModelURL: form.ARModelUrl || null,
     Badge: form.Badge || null,
     coordinates: { lat: spotLatNum, lng: spotLngNum },
     modelsCoordinates: arModels
-      .map(model => ({ label: model.label || 'Model', lat: toNum(model.lat), lng: toNum(model.lng) }))
+      .map(model => ({
+        label: model.label.trim() || 'Model',
+        lat: toNum(model.lat),
+        lng: toNum(model.lng),
+        ...(model.trivia.trim() && { trivia: model.trivia.trim() }),
+      }))
       .filter(model => model.lat !== null && model.lng !== null),
+    // Sent only when changed: a spot that never set its radii keeps following
+    // the defaults, and an edit doesn't list "50 m → 50 m" for the admin.
+    ...(toNum(form.arrivalRadius) !== arrivalRadiusOf(initial) && { arrivalRadiusMeters: toNum(form.arrivalRadius) }),
+    ...(toNum(form.nearbyRadius) !== nearbyRadiusOf(initial) && { nearbyRadiusMeters: toNum(form.nearbyRadius) }),
     // A new spot's missions are made when it's approved; this pins its food
     // mission then (an existing spot proposes it separately, below).
     ...(isNew && withAR && {
@@ -1616,18 +1783,27 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
   const missingAr = isNew && hasAR ? [
     !form.ARModelUrl && 'AR 3D model',
     !arModels.length && 'AR positions',
-    !triviaLines.length && 'AR trivia',
+    arNoLabel !== -1 && "what's at each AR position",
+    arNoFact !== -1 && 'a fact for each AR position',
   ].filter(Boolean) : [];
   const stillNeeded = (list) => (list.length ? `Still needed: ${list.join(', ')}` : '');
   const tabStatus = {
     details:  { missing: stillNeeded(missingDetails) },
     media:    { missing: stillNeeded(missingMedia) },
-    location: { missing: spotPinned ? coordError(form.coordinates_lat, form.coordinates_lng) : 'Spot location is required' },
+    location: {
+      missing: (spotPinned ? coordError(form.coordinates_lat, form.coordinates_lng) : 'Spot location is required')
+        || radiusProblem(form.arrivalRadius, form.nearbyRadius),
+    },
     ar:       { count: hasAR ? arModels.length : 0, missing: stillNeeded(missingAr) },
     food:     { missing: isNew && hasAR ? foodProblem() : '' },
   };
   // The red asterisk, on the fields only a new spot must fill in.
   const newSpotMark = isNew && <span style={styles.required}>*</span>;
+
+  // The two radii as the rings and notes draw them while they're typed.
+  const arrivalRing = ringRadius(form.arrivalRadius, ARRIVAL_RADIUS);
+  const nearbyRing  = ringRadius(form.nearbyRadius, NEARBY_RADIUS);
+  const radiusErr   = radiusProblem(form.arrivalRadius, form.nearbyRadius);
 
   // Shared by the three maps; each adds its own mode.
   const mapProps = {
@@ -1641,9 +1817,14 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
     missionLng,
     onMissionChange: handleMissionChange,
     missionRadius: radiusMeters,
+    arrivalRadius: arrivalRing,
+    nearbyRadius: nearbyRing,
     otherSpots,
   };
-  const legendProps = { spotPinned, arCount: arModels.length, missionPinned, otherCount: otherSpots.length, missionRadius: radiusMeters };
+  const legendProps = {
+    spotPinned, arCount: arModels.length, missionPinned, otherCount: otherSpots.length, missionRadius: radiusMeters,
+    arrivalRadius: arrivalRing, nearbyRadius: nearbyRing,
+  };
   const busy = saving || savingMission;
 
   // The Food mission tab's fields. A new spot fills them in with the rest of
@@ -1873,7 +2054,8 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
 
                 <SpotMapPicker {...mapProps} mode="spot" active={tab === 'location'} />
                 <MapLegend mode="spot" {...legendProps} />
-                {spotPinned && <SpotOverlapNote neighbours={spotNeighbours} />}
+                {spotPinned && <SpotOverlapNote neighbours={spotNeighbours} arrivalRadius={arrivalRing} />}
+                {spotPinned && <NearbyAlertNote neighbours={spotNeighbours} nearbyRadius={nearbyRing} />}
 
                 <div style={styles.coordBlock}>
                   <p style={styles.coordBlockTitle}>Spot coordinates <span style={styles.required}>*</span></p>
@@ -1887,6 +2069,51 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
                     Type or paste them if you already have the numbers — pasting
                     "14.8433, 120.8114" into either box fills both. The pin follows.
                   </p>
+                </div>
+
+                {/* The two rings on the map, set per spot. They follow as
+                    you type; the backend checks them the same way. */}
+                <div style={styles.coordBlock}>
+                  <p style={styles.coordBlockTitle}>Radius</p>
+                  <div style={styles.coordRow}>
+                    <div style={styles.coordField}>
+                      <label htmlFor="spot-arrival-radius" style={styles.coordLabel}>Arrival radius (m)</label>
+                      <input
+                        id="spot-arrival-radius"
+                        name="arrivalRadius"
+                        type="number"
+                        inputMode="numeric"
+                        value={form.arrivalRadius}
+                        onChange={handleChange}
+                        disabled={busy}
+                        aria-describedby="spot-arrival-radius-hint"
+                        style={{ ...styles.coordInput, ...(radiusErr && /arrival/i.test(radiusErr) ? styles.coordInputError : {}) }}
+                        className="modern-input"
+                      />
+                      <p id="spot-arrival-radius-hint" style={styles.radiusHint}>
+                        The visit counts within this. Usually {ARRIVAL_RADIUS.default} m.
+                      </p>
+                    </div>
+                    <div style={styles.coordField}>
+                      <label htmlFor="spot-nearby-radius" style={styles.coordLabel}>Nearby alert radius (m)</label>
+                      <input
+                        id="spot-nearby-radius"
+                        name="nearbyRadius"
+                        type="number"
+                        inputMode="numeric"
+                        value={form.nearbyRadius}
+                        onChange={handleChange}
+                        disabled={busy}
+                        aria-describedby="spot-nearby-radius-hint"
+                        style={{ ...styles.coordInput, ...(radiusErr && /nearby/i.test(radiusErr) ? styles.coordInputError : {}) }}
+                        className="modern-input"
+                      />
+                      <p id="spot-nearby-radius-hint" style={styles.radiusHint}>
+                        The “nearby” alert comes from this far. Usually {NEARBY_RADIUS.default} m.
+                      </p>
+                    </div>
+                  </div>
+                  {radiusErr && <p style={styles.coordErrorText} role="alert">{radiusErr}</p>}
                 </div>
               </section>
             </TabPanel>
@@ -1911,6 +2138,10 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
 
               <section style={styles.section}>
                 <p style={styles.sectionTitle}>AR positions {newSpotMark}</p>
+                <p style={styles.panelIntro}>
+                  Put each pin at the thing its fact is about — the facade, the bell tower, a marker.
+                  In the app, the model at that pin shows that fact. Travelers find them in this order.
+                </p>
                 <div style={styles.mapHintRow}>
                   <p style={styles.mapHint}>{mapHintFor('ar')}</p>
                   {arModels.length > 0 && (
@@ -1930,28 +2161,54 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
                 ) : (
                   <div style={styles.arList}>
                     {arModels.map((model, index) => (
-                      <div key={model.id} style={styles.arListRow}>
-                        <span style={styles.arBadge}>AR {index + 1}</span>
-                        <CoordFields
-                          lat={model.lat}
-                          lng={model.lng}
-                          onChange={(lat, lng) => handleArMove(model.id, lat, lng)}
-                          compact
-                          disabled={busy}
-                        />
-                        <button onClick={() => removeArModel(model.id)} style={styles.removeBtn} className="modern-btn">Remove</button>
+                      <div key={model.id} style={styles.arCard}>
+                        <div style={styles.arListRow}>
+                          <span style={styles.arBadge}>AR {index + 1}</span>
+                          <CoordFields
+                            lat={model.lat}
+                            lng={model.lng}
+                            onChange={(lat, lng) => handleArMove(model.id, lat, lng)}
+                            compact
+                            disabled={busy}
+                          />
+                          <button onClick={() => removeArModel(model.id)} style={styles.removeBtn} className="modern-btn">Remove</button>
+                        </div>
+                        <div style={styles.arTextRow}>
+                          <div style={styles.field}>
+                            <label style={styles.coordLabel} htmlFor={`ar-label-${model.id}`}>What's here? {newSpotMark}</label>
+                            <input
+                              id={`ar-label-${model.id}`}
+                              value={model.label}
+                              onChange={setArText(model.id, 'label')}
+                              maxLength={AR_LABEL_MAX}
+                              placeholder="Bell tower"
+                              disabled={busy}
+                              style={styles.input}
+                              className="modern-input"
+                            />
+                          </div>
+                          <div style={styles.field}>
+                            <label style={styles.coordLabel} htmlFor={`ar-fact-${model.id}`}>
+                              Fact shown here {newSpotMark}
+                              <span style={styles.charCount}> {model.trivia.length}/{AR_FACT_MAX}</span>
+                            </label>
+                            <textarea
+                              id={`ar-fact-${model.id}`}
+                              value={model.trivia}
+                              onChange={setArText(model.id, 'trivia')}
+                              maxLength={AR_FACT_MAX}
+                              rows={2}
+                              placeholder="The bell tower was rebuilt after the 1880 earthquake."
+                              disabled={busy}
+                              style={styles.textarea}
+                              className="modern-input"
+                            />
+                          </div>
+                        </div>
                       </div>
                     ))}
                   </div>
                 )}
-              </section>
-
-              <section style={styles.section}>
-                <div style={styles.field}>
-                  <label style={styles.sectionTitle} htmlFor="spot-trivia">AR trivia {newSpotMark}</label>
-                  <p style={styles.hint}>One fact per line — each line becomes one card in the app's AR trivia popup.</p>
-                  <textarea id="spot-trivia" name="trivia" value={form.trivia} onChange={handleChange} style={styles.textarea} className="modern-input" rows={6} placeholder={'The present church was built from 1885 to 1888.\nThe Malolos Congress opened here on September 15, 1898.'} />
-                </div>
               </section>
               </>)}
             </TabPanel>
@@ -2072,12 +2329,15 @@ const styles = {
   coordLabel:      { fontSize: 11.5, fontWeight: 600, color: t.textMuted, letterSpacing: '0.02em' },
   coordInput:      { width: '100%', padding: '9px 12px', borderRadius: radius.md, border: `1px solid ${t.border}`, fontSize: 14, color: t.textPrimary, outline: 'none', background: t.cardBg, boxSizing: 'border-box' },
   coordInputSm:    { width: '100%', padding: '5px 8px', borderRadius: radius.sm, border: `1px solid ${t.border}`, fontSize: 12.5, color: t.textPrimary, outline: 'none', background: t.cardBg, boxSizing: 'border-box' },
-  coordInputError: { borderColor: t.danger },
+  // The whole shorthand, like coordInput's: overriding only borderColor makes
+  // React drop it on the render that clears the error (and it warns).
+  coordInputError: { border: `1px solid ${t.danger}` },
   coordErrorText:  { fontSize: 11.5, color: t.danger, margin: 0 },
+  radiusHint:      { fontSize: 11.5, color: t.textMuted, margin: 0, lineHeight: 1.45 },
 
   categoryChips:      { display: 'flex', flexWrap: 'wrap', gap: 8 },
   categoryChip:       { padding: '7px 14px', borderRadius: radius.pill, border: `1px solid ${t.border}`, background: t.sidebarBg, color: t.textSecondary, fontWeight: 600, fontSize: 13, cursor: 'pointer' },
-  categoryChipActive: { background: t.brandSolid, borderColor: t.brandSolid, color: t.onBrandSolid },
+  categoryChipActive: { background: t.brandSoft, borderColor: t.brand, color: t.brand },
 
   uploadGrid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 },
   uploadCard: { display: 'flex', gap: 12, padding: 12, borderRadius: radius.lg, border: `1px solid ${t.border}`, background: t.sidebarBg, boxShadow: shadow.sm },
@@ -2105,6 +2365,7 @@ const styles = {
   overlapTitle: { display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 700, color: t.danger, margin: 0 },
   overlapList:  { margin: 0, paddingLeft: 18, fontSize: 12.5, color: t.textPrimary, lineHeight: 1.55 },
   overlapText:  { fontSize: 12, color: t.textSecondary, margin: 0, lineHeight: 1.5 },
+  nearbyNote:   { display: 'flex', alignItems: 'flex-start', gap: 6, fontSize: 12.5, color: t.textSecondary, margin: 0, lineHeight: 1.45 },
 
   mapHintRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 },
   mapHint: { fontSize: 12, color: t.textSecondary, margin: 0 },
@@ -2117,6 +2378,10 @@ const styles = {
   saveMissionBtn: { alignSelf: 'flex-start', padding: '9px 16px', borderRadius: radius.md, border: 'none', background: t.brandSolid, color: t.onBrandSolid, fontWeight: 600, fontSize: 13, cursor: 'pointer', boxShadow: shadow.sm },
 
   mapWrap: { display: 'flex', flexDirection: 'column', gap: 8, position: 'relative' },
+  // zIndex 0 = its own stacking context, so Leaflet's layers and the button
+  // over them stay under the search dropdown that opens down across the map.
+  mapFrame: { position: 'relative', zIndex: 0 },
+  mapOverlayBtn: { position: 'absolute', top: 10, right: 10, zIndex: 1000, display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 11px', borderRadius: radius.pill, border: `1px solid ${t.border}`, background: t.cardBg, color: t.textPrimary, fontWeight: 600, fontSize: 12, cursor: 'pointer', boxShadow: shadow.sm },
   searchWrap: { position: 'relative', zIndex: 1000 },
   searchInputRow: { display: 'flex', alignItems: 'center', gap: 6, background: t.sidebarBg, border: `1px solid ${t.border}`, borderRadius: 8, padding: '2px 8px' },
   searchInput: { flex: 1, padding: '8px 4px', border: 'none', background: 'transparent', fontSize: 13, color: t.textPrimary, outline: 'none' },
@@ -2127,8 +2392,11 @@ const styles = {
 
   emptyNote: { background: t.sidebarBg, borderRadius: 10, padding: 16, textAlign: 'center', color: t.textSecondary, fontSize: 13, lineHeight: 1.55, border: `1px dashed ${t.border}` },
 
-  arList:       { display: 'flex', flexDirection: 'column', gap: 6 },
-  arListRow:    { display: 'flex', alignItems: 'center', gap: 10, background: t.sidebarBg, borderRadius: 8, padding: '8px 12px', border: `1px solid ${t.border}` },
+  arList:       { display: 'flex', flexDirection: 'column', gap: 10 },
+  arCard:       { display: 'flex', flexDirection: 'column', gap: 10, background: t.sidebarBg, borderRadius: 8, padding: '10px 12px', border: `1px solid ${t.border}` },
+  arListRow:    { display: 'flex', alignItems: 'center', gap: 10 },
+  arTextRow:    { display: 'grid', gridTemplateColumns: 'minmax(140px, 1fr) 2fr', gap: 10 },
+  charCount:    { fontWeight: 500, color: t.textMuted },
   arBadge:      { fontSize: 12, fontWeight: 700, color: t.info, background: t.infoBg, borderRadius: 6, padding: '3px 8px', flexShrink: 0 },
   removeBtn:    { padding: '5px 10px', background: t.dangerBg, color: t.danger, border: 'none', borderRadius: 6, fontWeight: 600, fontSize: 12, cursor: 'pointer', flexShrink: 0 },
 

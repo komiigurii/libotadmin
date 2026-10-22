@@ -8,6 +8,7 @@ import {
 import { fmtDateTime } from '../utils/format';
 import { standingLabel } from '../utils/standing';
 import Icon from '../components/Icon';
+import { theme as t } from '../theme';
 
 // A report's life: pending → resolved (upheld) or dismissed. Dismissed is
 // neutral, not red — throwing out a report isn't an error.
@@ -120,7 +121,8 @@ export default function ReportedComments() {
 }
 
 // What each icon and pill on a report means (QA 2026-10-16: a legend for the
-// icons). Folded by default, so it doesn't push the queue down every visit.
+// icons). Folded by default and kept to a quiet muted link, so it doesn't
+// compete with the queue.
 function Legend() {
   const rows = [
     [<StatusPill key="p" tone="warning" icon="clock">Pending</StatusPill>,   'Waiting for your decision.'],
@@ -136,7 +138,7 @@ function Legend() {
   ];
   return (
     <details style={legend.box}>
-      <summary style={legend.summary}><Icon name="info" size={14} /> What the icons mean</summary>
+      <summary style={legend.summary}><Icon name="info" size={13} /> What the icons mean</summary>
       <dl style={legend.list}>
         {rows.map(([icon, text], i) => (
           <div key={i} style={legend.row}>
@@ -150,12 +152,12 @@ function Legend() {
 }
 
 const legend = {
-  box:     { ...s.panel, margin: '0 0 16px', padding: '10px 14px' },
-  summary: { cursor: 'pointer', fontWeight: 600, fontSize: 13.5, display: 'flex', alignItems: 'center', gap: 6 },
-  list:    { margin: '10px 0 2px', display: 'grid', gap: 8 },
+  box:     { margin: '0 0 14px' },
+  summary: { cursor: 'pointer', width: 'fit-content', fontSize: 12.5, color: t.textMuted, display: 'flex', alignItems: 'center', gap: 5 },
+  list:    { margin: '10px 0 4px', padding: '2px 0 2px 12px', borderLeft: `2px solid ${t.divider}`, display: 'grid', gap: 8 },
   row:     { display: 'grid', gridTemplateColumns: 'minmax(170px, auto) 1fr', gap: 12, alignItems: 'center' },
   term:    { margin: 0 },
-  desc:    { margin: 0, fontSize: 13.5 },
+  desc:    { margin: 0, fontSize: 12.5, color: t.textMuted },
 };
 
 function ReportRow({ report, expanded, acting, setActing, onToggle, onUpdated }) {
@@ -288,8 +290,9 @@ function ReportRow({ report, expanded, acting, setActing, onToggle, onUpdated })
           {isPending && (
             <p style={s.panelNote}>
               Upholding issues the next escalation step automatically: the 1st warning mutes reviews
-              for 1 week, the 2nd mutes for 2 weeks and suspends the account. A 1st suspension
-              lasts 7 days and a 2nd lasts 14 days; the 3rd bans the account permanently.
+              for 1 week, the 2nd mutes for 2 weeks and suspends the account. A suspended traveler
+              can&rsquo;t use their account until it ends. A 1st suspension lasts 7 days and a 2nd
+              lasts 14 days; the 3rd bans the account permanently.
             </p>
           )}
 

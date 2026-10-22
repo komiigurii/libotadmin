@@ -140,7 +140,7 @@ function CommentRow({ comment, expanded, onToggle, onUpdated }) {
   // Suspend is 7 days the first time, 14 the second, and the third time the
   // backend bans instead — it decides, not the admin.
   const suspendUser = () => run({
-    confirm: `Suspend ${userName}? A 1st suspension lasts 7 days and a 2nd lasts 14 days; a 3rd bans them permanently instead.`,
+    confirm: `Suspend ${userName}? They can't use their account until it ends. A 1st suspension lasts 7 days and a 2nd lasts 14 days; a 3rd bans them permanently instead.`,
     confirmText: 'Suspend',
     call: () => bannedAccountsAPI.suspend(clerkUserId, reason.trim()),
   });
@@ -205,7 +205,7 @@ function CommentRow({ comment, expanded, onToggle, onUpdated }) {
           />
           <p style={s.panelNote}>
             Warnings: the 1st mutes reviews for 7 days; the 2nd mutes for 14 days and suspends the account.
-            Suspensions: the 1st lasts 7 days, the 2nd 14 days; the 3rd is a permanent ban.
+            Suspensions lock the account until they end: the 1st lasts 7 days, the 2nd 14 days; the 3rd is a permanent ban.
             Ban skips straight to permanent.
           </p>
           <div style={s.buttonRow}>
