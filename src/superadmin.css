@@ -220,7 +220,9 @@
 [data-console='superadmin'] textarea { caret-color: var(--brand); }
 
 /* ── Shell ───────────────────────────────────────────────────────────────── */
-.sa-shell { display: flex; min-height: 100dvh; background: var(--bg); }
+/* flex-shrink: 0 because #root is height: 100% (App.css): a shrinking shell
+   stays one screen tall, and the sticky rail and top bar leave with it. */
+.sa-shell { display: flex; flex-shrink: 0; min-height: 100dvh; background: var(--bg); }
 .sa-frame { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .sa-main { flex: 1; min-width: 0; outline: none; }
 
