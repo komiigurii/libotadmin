@@ -4,7 +4,6 @@ import { theme as t, radius, fonts, useThemePref } from '../theme';
 import Icon from './Icon';
 import logo from '../assets/logo.png';
 import { clearSession, getToken } from '../auth/session';
-import { roleLabel } from '../auth/roles';
 import { authAPI } from '../api/api';
 import { confirmAction } from './AppAlert';
 
@@ -100,7 +99,6 @@ export default function Navbar() {
   };
 
   const isModerator = role === 'moderator';
-  const consoleName = `${roleLabel(role)} Console`;
   const nav = isModerator ? MODERATOR_NAV : ADMIN_NAV;
   const home = '/dashboard';
   const current = nav.flatMap((g) => g.items).find((i) => i.path === location.pathname);
@@ -151,7 +149,7 @@ export default function Navbar() {
       >
         <img src={logo} alt="" style={s.mobileLogo} />
       </button>
-      <div style={s.mobileTitle}>{current?.label || consoleName}</div>
+      <div style={s.mobileTitle}>{current?.label || (isModerator ? 'Moderator Console' : 'Admin Console')}</div>
       <button
         ref={menuBtnRef}
         type="button"
@@ -184,14 +182,14 @@ export default function Navbar() {
         role="button"
         tabIndex={0}
         onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate(home); } }}
-        aria-label={`Libot Bulacan ${consoleName} — go to dashboard`}
+        aria-label={`Libot Bulacan ${isModerator ? 'Moderator' : 'Admin'} Console — go to dashboard`}
       >
         <span className="sidebar-emblem" style={s.emblem}>
           <img src={logo} alt="" style={s.logo} />
         </span>
         <div className="sidebar-text" style={s.brandText}>
           <div style={s.brandName}>Libot Bulacan</div>
-          <div style={s.brandSub}>{`${roleLabel(role)} console`}</div>
+          <div style={s.brandSub}>{isModerator ? 'Moderator console' : 'Admin console'}</div>
           <div style={s.brandScope}>
             <Icon name="map-pin" size={11} color={t.textMuted} />
             {isModerator ? (city || 'No city assigned') : 'All of Bulacan'}
