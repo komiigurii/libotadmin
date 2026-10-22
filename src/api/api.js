@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { getToken, isExpired, endSession } from '../auth/session';
+import { getToken, isExpired, endSession, SESSION_CHECK_EVENT } from '../auth/session';
 
 // A time limit, so a dead connection ends in an error instead of a page that
 // says "Loading…" forever. 60 s outlasts the sleeping server waking up (30–60 s).
@@ -24,16 +24,29 @@ api.interceptors.request.use((config) => {
 });
 
 // A 401 on any call made with a token means the server no longer accepts it
-// (expired, signed out elsewhere, the account was removed, or JWT_SECRET was
-// rotated). Sign-in and sign-out are excluded from this — a 401 on sign-in is
-// just a wrong password, and sign-out clears the session itself.
+// (expired, signed in somewhere else, password reset, deactivated, or
+// JWT_SECRET was rotated); the server's `code` says which, for the sign-in
+// page. Sign-in is excluded: a 401 there is just a wrong password. So is
+// sign-out, which clears the session itself.
+//
+// A 403 `mustChangePassword` means the account still has its temporary
+// password: everything waits until its holder chooses their own.
 api.interceptors.response.use(
   (res) => res,
   (err) => {
     const url = err?.config?.url || '';
-    const isAuthRoute = url.includes('/api/auth/admin-login') || url.includes('/api/auth/admin-logout');
-    if (err?.response?.status === 401 && getToken() && !isAuthRoute) {
-      endSession('expired');
+    const isSignInOrOut = url.includes('/api/auth/admin-login') || url.includes('/api/auth/admin-logout');
+    const status = err?.response?.status;
+    const code = err?.response?.data?.code;
+    if (status === 401 && getToken() && !isSignInOrOut) {
+      endSession(code || 'expired');
+    } else if (status === 403 && code === 'mustChangePassword' && window.location.pathname !== '/set-password') {
+      localStorage.setItem('mustChangePassword', '1');
+      window.location.assign('/set-password');
+    } else if (status === 503 && (code === 'maintenance' || code === 'restricted')) {
+      // Maintenance started, or this role was paused: the session check
+      // brings the banner up now instead of at the next heartbeat.
+      window.dispatchEvent(new Event(SESSION_CHECK_EVENT));
     }
     return Promise.reject(err);
   },
@@ -134,15 +147,45 @@ export const reportAPI = {
 };
 
 export const authAPI = {
-  // Sign-in is by assigned username (the backend still accepts an email).
-  // The same endpoint handles all three roles: admin, moderator, superadmin.
-  // The role in the response decides where the frontend routes.
+  // Sign-in is by assigned username (the backend still accepts an email), for
+  // all three roles.
   login: (username, password) =>
     api.post('/api/auth/admin-login', { username, password }).then(r => r.data),
   // Ends the session on the server too, so the stored token is useless after.
   // Takes the token because the caller clears its stored copy straight away.
   logout: (token) =>
     api.post('/api/auth/admin-logout', null, { headers: { Authorization: `Bearer ${token}` } }).then(r => r.data),
+  // Is this session still live? Brings role and town up to date too.
+  session: () => api.get('/api/auth/admin-session').then(r => r.data),
+  // → { token, role, city }: the change ends every other session, and this one
+  // carries on with the fresh token.
+  changePassword: (currentPassword, newPassword, confirmPassword) =>
+    api.post('/api/auth/change-password', { currentPassword, newPassword, confirmPassword }).then(r => r.data),
+  // From the sign-in page: a request to the super admin for a new slip. The
+  // answer is the same whether or not the username exists.
+  forgotPassword: (username, note) =>
+    api.post('/api/auth/forgot-password', { username, note }).then(r => r.data),
+};
+
+// Staff accounts (mock defense 2026-10-21). The super admin sees and manages
+// every admin and moderator; an admin, the moderators. Making an account or
+// resetting a password returns { tempPassword, tempPasswordExpiresAt } once,
+// for the credential slip.
+export const accountsAPI = {
+  getStaff:      (params = {}) => api.get('/api/admin/accounts', { params }).then(r => r.data),
+  create:        (data)        => api.post('/api/admin/accounts', data).then(r => r.data),
+  resetPassword: (id)          => api.post(`/api/admin/accounts/${id}/reset-password`).then(r => r.data),
+  setActive:     (id, active)  => api.patch(`/api/admin/accounts/${id}`, { active }).then(r => r.data.account),
+  move:          (id, municipality) => api.patch(`/api/admin/accounts/${id}`, { municipality }).then(r => r.data.account),
+  history:       (id)          => api.get(`/api/admin/accounts/${id}/history`).then(r => r.data.entries || []),
+  // Super admin only.
+  getTravelers:  (params = {}) => api.get('/api/admin/accounts/travelers', { params }).then(r => r.data),
+  getTraveler:   (id)          => api.get(`/api/admin/accounts/travelers/${encodeURIComponent(id)}`).then(r => r.data),
+};
+
+// The activity log (super admin): who did what, newest first.
+export const activityAPI = {
+  get: (params = {}) => api.get('/api/admin/activity', { params }).then(r => r.data),
 };
 
 // Spot categories. The list used to be hardcoded in both this panel and the
@@ -166,11 +209,10 @@ export const townBadgeAPI = {
     api.put(`/api/municipality-badges/${encodeURIComponent(municipality)}`, data).then(r => r.data.badge),
 };
 
-// The moderator accounts, for admins (QA 2026-10-16). Read-only.
+// The moderator accounts, for admins (QA 2026-10-16), with their request
+// counts. Making and changing them goes through accountsAPI.
 export const moderatorsAPI = {
   getAll: () => api.get('/api/admin/moderators').then(r => r.data.moderators || []),
-  // { name, username, email, municipality, password } → { moderator, spotCount }.
-  create: (data) => api.post('/api/admin/moderators', data).then(r => r.data),
 };
 
 // A moderator's travelers: those who visited the spots in the moderator's
@@ -194,45 +236,49 @@ export const uploadAPI = {
   },
 };
 
+// The bell (every role): newest first, with the unread count.
+export const notificationsAPI = {
+  get:     (params = {}) => api.get('/api/admin/notifications', { params }).then(r => r.data),
+  read:    (id) => api.post(`/api/admin/notifications/${id}/read`).then(r => r.data),
+  readAll: () => api.post('/api/admin/notifications/read-all').then(r => r.data),
+};
+
+// Staff tickets (mock defense 2026-10-21): admins and moderators report a
+// problem; the super admin answers, sets the status, and turns a forgotten
+// password into a new credential slip.
+export const ticketsAPI = {
+  list:   (params = {}) => api.get('/api/admin/tickets', { params }).then(r => r.data),
+  get:    (id) => api.get(`/api/admin/tickets/${id}`).then(r => r.data.ticket),
+  create: (data) => api.post('/api/admin/tickets', data).then(r => r.data.ticket),
+  reply:  (id, message) => api.post(`/api/admin/tickets/${id}/replies`, { message }).then(r => r.data.ticket),
+  setStatus: (id, status) => api.patch(`/api/admin/tickets/${id}`, { status }).then(r => r.data.ticket),
+  // → { ticket, account, tempPassword, tempPasswordExpiresAt } for the slip.
+  resetPassword: (id) => api.post(`/api/admin/tickets/${id}/reset-password`).then(r => r.data),
+};
+
 /*
- * System-level controls, superadmin only.
- *
- * These routes don't exist yet on the backend — add them behind
- * requireAdminRole('superadmin') when you're ready. The frontend calls are
- * already wired; the backend just needs to respond.
- *
- * Suggested backend routes (all under /api/superadmin):
- *   GET  /status                   → { maintenanceMode, disabledRoles, message }
- *   POST /maintenance              → { maintenanceMode: true }
- *   DELETE /maintenance            → { maintenanceMode: false }
- *   POST /disable-role             → body: { role: 'admin'|'moderator' }
- *   DELETE /disable-role/:role     → re-enables that role
- *   PUT  /maintenance-message      → body: { message: string }
+ * The super admin's System page (routes/system.js): maintenance, who is let
+ * in, the maintenance log, update notices and the tools. Started from the
+ * System Console screen a teammate drew (Charles, 2026-10-22); the routes
+ * are real now and live under /api/system.
  */
-export const superadminAPI = {
-  // Current system state: maintenance mode on/off, which roles are locked out,
-  // and the message shown to locked-out users on the login page.
-  getStatus: () =>
-    api.get('/api/superadmin/status').then(r => r.data),
-
-  // Flip maintenance mode. While on, the login endpoint should reject
-  // admin/moderator sign-ins with a 503 + the maintenance message.
-  enableMaintenance: () =>
-    api.post('/api/superadmin/maintenance').then(r => r.data),
-  disableMaintenance: () =>
-    api.delete('/api/superadmin/maintenance').then(r => r.data),
-
-  // Disable a specific role without full maintenance mode — useful for
-  // taking moderators offline while admins keep working (or vice versa).
-  disableRole: (role) =>
-    api.post('/api/superadmin/disable-role', { role }).then(r => r.data),
-  enableRole: (role) =>
-    api.delete(`/api/superadmin/disable-role/${role}`).then(r => r.data),
-
-  // The message admins and moderators see when they try to sign in during
-  // maintenance. Empty string removes it.
-  setMaintenanceMessage: (message) =>
-    api.put('/api/superadmin/maintenance-message', { message }).then(r => r.data),
+export const systemAPI = {
+  // Public: what the app and the sign-in page show.
+  status:       () => api.get('/api/system/status').then(r => r.data),
+  // Super admin: everything on the page.
+  get:          () => api.get('/api/system').then(r => r.data),
+  startMaintenance: (data) => api.post('/api/system/maintenance/start', data).then(r => r.data),
+  updateMaintenance: (data) => api.put('/api/system/maintenance', data).then(r => r.data),
+  endMaintenance: (summary) => api.post('/api/system/maintenance/end', { summary }).then(r => r.data),
+  logs:         (params = {}) => api.get('/api/system/maintenance/logs', { params }).then(r => r.data),
+  setRestricted: (roles) => api.put('/api/system/restrictions', { roles }).then(r => r.data),
+  notices:      (params = {}) => api.get('/api/system/notices', { params }).then(r => r.data),
+  publishNotice: (data) => api.post('/api/system/notices', data).then(r => r.data),
+  hideNotice:   (id) => api.post(`/api/system/notices/${id}/hide`).then(r => r.data),
+  clearCache:   () => api.post('/api/system/tools/clear-cache').then(r => r.data),
+  health:       () => api.get('/api/system/tools/health').then(r => r.data),
+  locked:       () => api.get('/api/system/tools/locked').then(r => r.data.accounts || []),
+  unlock:       (id) => api.post(`/api/system/tools/unlock/${id}`).then(r => r.data),
 };
 
 export default api;

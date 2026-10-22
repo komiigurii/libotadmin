@@ -4,6 +4,8 @@ import { theme as t, radius, fonts, useThemePref } from '../theme';
 import Icon from './Icon';
 import logo from '../assets/logo.png';
 import { clearSession, getToken } from '../auth/session';
+import { roleLabel, isSuperAdmin } from '../auth/roles';
+import { useHeartbeat } from '../auth/heartbeat';
 import { authAPI } from '../api/api';
 import { confirmAction } from './AppAlert';
 
@@ -59,6 +61,26 @@ const ADMIN_NAV = [
   ] },
 ];
 
+// The super admin's own pages, under everything an admin has (mock defense
+// 2026-10-21): maintenance and the tools, the staff's tickets, every account
+// in the system, and what was done in the console.
+const SYSTEM_NAV = { group: 'System', items: [
+  { label: 'System',             path: '/system',            icon: 'tool' },
+  { label: 'Tickets',            path: '/tickets',           icon: 'flag', badge: 'tickets' },
+  { label: 'Accounts',           path: '/accounts',          icon: 'shield' },
+  { label: 'Activity Log',       path: '/activity',          icon: 'history' },
+] };
+
+// Every role's bell; admins and moderators also report problems from here
+// (the super admin answers them under System → Tickets).
+const inboxNav = (superAdmin) => ({ group: 'Inbox', items: [
+  { label: 'Notifications',      path: '/notifications',     icon: 'bell', badge: 'unread' },
+  ...(superAdmin ? [] : [{ label: 'Report a Problem', path: '/tickets', icon: 'flag' }]),
+] });
+
+// A link is "here" on its own page and on the pages under it (/tickets/12).
+const isHere = (item, path) => path === item.path || path.startsWith(`${item.path}/`);
+
 // A moderator's job is attractions in their municipality and the requests
 // they've sent, plus a read-only list of the travelers who visited their
 // municipality's spots (QA 2026-10-16). Reviews, reports, the full leaderboard and account actions
@@ -99,9 +121,17 @@ export default function Navbar() {
   };
 
   const isModerator = role === 'moderator';
-  const nav = isModerator ? MODERATOR_NAV : ADMIN_NAV;
+  const superAdmin = isSuperAdmin(role);
+  const consoleName = `${roleLabel(role)} Console`;
+  const nav = [
+    ...(isModerator ? MODERATOR_NAV : ADMIN_NAV),
+    inboxNav(superAdmin),
+    ...(superAdmin ? [SYSTEM_NAV] : []),
+  ];
   const home = '/dashboard';
-  const current = nav.flatMap((g) => g.items).find((i) => i.path === location.pathname);
+  const current = nav.flatMap((g) => g.items).find((i) => isHere(i, location.pathname));
+  const beat = useHeartbeat();
+  const badges = { unread: beat?.unread || 0, tickets: beat?.openTickets || 0 };
 
   // ── Phone drawer (App.css shows it only at ≤ 720px) ──
   const [menuOpen, setMenuOpen] = useState(false);
@@ -149,7 +179,7 @@ export default function Navbar() {
       >
         <img src={logo} alt="" style={s.mobileLogo} />
       </button>
-      <div style={s.mobileTitle}>{current?.label || (isModerator ? 'Moderator Console' : 'Admin Console')}</div>
+      <div style={s.mobileTitle}>{current?.label || consoleName}</div>
       <button
         ref={menuBtnRef}
         type="button"
@@ -182,14 +212,14 @@ export default function Navbar() {
         role="button"
         tabIndex={0}
         onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate(home); } }}
-        aria-label={`Libot Bulacan ${isModerator ? 'Moderator' : 'Admin'} Console — go to dashboard`}
+        aria-label={`Libot Bulacan ${consoleName} — go to dashboard`}
       >
         <span className="sidebar-emblem" style={s.emblem}>
           <img src={logo} alt="" style={s.logo} />
         </span>
         <div className="sidebar-text" style={s.brandText}>
           <div style={s.brandName}>Libot Bulacan</div>
-          <div style={s.brandSub}>{isModerator ? 'Moderator console' : 'Admin console'}</div>
+          <div style={s.brandSub}>{`${roleLabel(role)} console`}</div>
           <div style={s.brandScope}>
             <Icon name="map-pin" size={11} color={t.textMuted} />
             {isModerator ? (city || 'No city assigned') : 'All of Bulacan'}
@@ -213,7 +243,8 @@ export default function Navbar() {
               >
                 <div className="sidebar-links" style={s.links}>
                   {section.items.map((item) => {
-                    const active = location.pathname === item.path;
+                    const active = isHere(item, location.pathname);
+                    const count = item.badge ? badges[item.badge] : 0;
                     return (
                       <button
                         key={item.path}
@@ -222,7 +253,7 @@ export default function Navbar() {
                         // aria-current is how a screen reader knows which page
                         // it's on; the filled pill only says it visually.
                         aria-current={active ? 'page' : undefined}
-                        title={item.label}
+                        title={count ? `${item.label} (${count})` : item.label}
                         style={{ ...s.link, ...(active ? s.linkActive : {}) }}
                       >
                         <Icon
@@ -231,7 +262,11 @@ export default function Navbar() {
                           color={active ? t.brand : 'currentColor'}
                           weight={active ? 'fill' : 'regular'}
                         />
-                        <span className="sidebar-text">{item.label}</span>
+                        <span className="sidebar-text">
+                          {item.label}
+                          {count > 0 && <span className="visually-hidden">, {count} new</span>}
+                        </span>
+                        {count > 0 && <span className="nav-badge" style={s.badge} aria-hidden="true">{count > 99 ? '99+' : count}</span>}
                       </button>
                     );
                   })}
@@ -265,6 +300,18 @@ export default function Navbar() {
           })}
         </div>
 
+        {/* Any role, any time (mock defense 2026-10-21). */}
+        <button
+          onClick={() => navigate('/change-password')}
+          className="logout-btn"
+          style={{ ...s.keyBtn, ...(location.pathname === '/change-password' ? s.themeBtnOn : null) }}
+          title="Change password"
+          aria-label="Change password"
+          aria-current={location.pathname === '/change-password' ? 'page' : undefined}
+        >
+          <Icon name="key" size={15} color={t.textSecondary} />
+          <span className="sidebar-text">Change password</span>
+        </button>
         <button onClick={logout} className="logout-btn" style={s.logoutBtn} title="Sign out">
           <Icon name="log-out" size={15} color={t.textSecondary} />
           <span className="sidebar-text">Sign out</span>
@@ -320,14 +367,24 @@ const s = {
     textAlign: 'left', padding: '10px 14px', borderRadius: 10, border: 'none',
     background: 'transparent', color: t.textSecondary, fontWeight: 500, fontSize: 13.5,
     cursor: 'pointer', transition: 'background 0.15s, color 0.15s',
-    width: '100%', fontFamily: 'inherit', minHeight: 42,
+    width: '100%', fontFamily: 'inherit', minHeight: 42, position: 'relative',
   },
   // A tint and the brand colour: still the one thing in the rail you find at a
   // glance, without a solid teal block and its glow competing with the page.
   linkActive: { background: t.brandSoft, color: t.brand, fontWeight: 600 },
+  // The bell's unread count: the brand colour, so it reads as "for you", not
+  // as an error.
+  badge: {
+    marginLeft: 'auto', minWidth: 20, height: 20, padding: '0 6px', boxSizing: 'border-box',
+    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+    // The card colour on the brand colour: dark on light teal in the dark
+    // theme, white on dark teal in the light one.
+    borderRadius: radius.pill, background: t.brand, color: t.cardBg,
+    fontSize: 11, fontWeight: 700, fontVariantNumeric: 'tabular-nums',
+  },
 
   footer: {
-    display: 'flex', alignItems: 'center', gap: 8, padding: '12px 14px 16px',
+    display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8, padding: '12px 14px 16px',
     borderTop: `1px solid ${t.divider}`,
   },
 
@@ -364,6 +421,14 @@ const s = {
     cursor: 'pointer', transition: 'background 0.15s',
   },
   themeBtnOn: { background: t.cardBg, boxShadow: `inset 0 0 0 1px ${t.border}` },
+  // Its own row above the theme switch and Sign out; in the icon rail, App.css
+  // shrinks it to the key like the other footer buttons.
+  keyBtn: {
+    flex: '1 1 100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+    padding: '8px 12px', minHeight: 36, borderRadius: radius.md, border: `1px solid ${t.border}`,
+    background: 'transparent', color: t.textSecondary, fontSize: 13, fontWeight: 600, fontFamily: 'inherit',
+    cursor: 'pointer', transition: 'background 0.15s, border-color 0.15s',
+  },
   logoutBtn: {
     flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
     padding: '8px 12px', borderRadius: radius.md,

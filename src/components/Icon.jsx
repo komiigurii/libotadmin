@@ -17,9 +17,10 @@
  * copy has to deep-import one module per icon.
  */
 import {
-  Aperture, Archive, ArrowClockwise, ArrowRight, Bell, CaretDown, CaretRight, CaretUp,
-  ChatCircleText, Check, CheckCircle, Clock, Desktop, Eye, EyeSlash, Flag, ForkKnife, Hand, Image, Info,
-  List, LockSimple, MapPin, Moon, Package, PaperPlaneTilt, Pause, PencilSimple, Plus, Prohibit, WarningCircle,
+  Aperture, Archive, ArrowClockwise, ArrowRight, ArrowsLeftRight, Bell, CaretDown, CaretLeft, CaretRight, CaretUp,
+  ChatCircleText, Check, CheckCircle, Clock, ClockCounterClockwise, Copy, Desktop, Eye, EyeSlash, Flag, ForkKnife,
+  Hand, Image, Info, Key, List, LockSimple, MapPin, Moon, Package, PaperPlaneTilt, Pause, PencilSimple, Plus,
+  Printer, Prohibit, ShieldCheck, UserCheck, UserMinus, WarningCircle,
   SignOut, Sparkle, SquaresFour, Star, Sun, ThumbsDown, ThumbsUp, Tray, Trash, Trophy,
   Users, Warning, Wrench, X,
 } from '@phosphor-icons/react';
@@ -36,9 +37,18 @@ const MAP = {
   'check':          Check,
   'check-circle':   CheckCircle,
   'chevron-down':   CaretDown,
+  'chevron-left':   CaretLeft,
   'chevron-right':  CaretRight,
   'chevron-up':     CaretUp,
   'clock':          Clock,
+  'copy':           Copy,
+  'history':        ClockCounterClockwise,
+  'key':            Key,
+  'move':           ArrowsLeftRight,
+  'printer':        Printer,
+  'shield':         ShieldCheck,
+  'user-check':     UserCheck,
+  'user-minus':     UserMinus,
   'eye':            Eye,
   'eye-off':        EyeSlash,
   'lock':           LockSimple,

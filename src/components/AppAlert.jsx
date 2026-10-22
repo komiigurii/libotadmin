@@ -24,6 +24,7 @@ const AlertContext = createContext(null);
 
 let _notifyHandler = null;
 let _confirmHandler = null;
+let _promptHandler = null;
 
 export function notify(message, opts = {}) {
   if (_notifyHandler) _notifyHandler(message, opts);
@@ -34,6 +35,19 @@ export function confirmAction(message, opts = {}) {
   return new Promise((resolve) => {
     if (_confirmHandler) _confirmHandler(message, opts, resolve);
     else resolve(false);
+  });
+}
+
+/*
+ * A confirm with a text box: a reject reason, approval remarks, the summary
+ * that ends maintenance. Resolves to the trimmed text, or null if cancelled.
+ *   opts: title, label, placeholder, confirmText, danger, tone,
+ *         required (default true), minLength, maxLength, initial
+ */
+export function promptAction(message, opts = {}) {
+  return new Promise((resolve) => {
+    if (_promptHandler) _promptHandler(message, opts, resolve);
+    else resolve(null);
   });
 }
 
@@ -111,9 +125,103 @@ function AlertModal({ data, onClose }) {
   );
 }
 
+function PromptModal({ data, onClose }) {
+  const titleId = useId();
+  const messageId = useId();
+  const fieldId = useId();
+  const errorId = useId();
+  const [value, setValue] = useState(data.initial || '');
+  const [tried, setTried] = useState(false);
+  const required = data.required !== false;
+  const min = data.minLength || (required ? 1 : 0);
+  const max = data.maxLength || 500;
+  const text = value.trim();
+  const problem = text.length < min
+    ? (min > 1 ? `Write at least ${min} characters.` : 'This can’t be empty.')
+    : null;
+  const tone = TONE[data.tone] || (data.danger ? TONE.danger : TONE.info);
+
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === 'Escape') onClose(null); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
+  const submit = (e) => {
+    e.preventDefault();
+    setTried(true);
+    if (problem) return;
+    onClose(text);
+  };
+
+  return (
+    <div style={s.overlay} onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(null); }}>
+      <form
+        style={{ ...s.card, maxWidth: 460, textAlign: 'left' }}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={data.title ? titleId : undefined}
+        aria-describedby={data.message ? messageId : undefined}
+        onSubmit={submit}
+        noValidate
+      >
+        <div style={{ ...s.iconWrap, margin: '0 0 14px', background: tone.bg, color: tone.color }}>
+          <Icon name={tone.icon} size={22} weight="bold" />
+        </div>
+        {data.title && <h2 id={titleId} style={s.title}>{data.title}</h2>}
+        {data.message && <p id={messageId} style={s.message}>{data.message}</p>}
+        <label htmlFor={fieldId} style={s.label}>
+          {data.label || 'Note'}{!required && <span style={s.optional}> (optional)</span>}
+        </label>
+        <textarea
+          id={fieldId}
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          placeholder={data.placeholder || ''}
+          maxLength={max}
+          rows={4}
+          autoFocus
+          aria-invalid={tried && !!problem}
+          aria-describedby={tried && problem ? errorId : undefined}
+          style={{ ...s.textarea, ...(tried && problem ? s.textareaInvalid : null) }}
+        />
+        <div style={s.fieldFoot}>
+          {tried && problem
+            ? <span id={errorId} style={s.fieldError}><Icon name="alert-circle" size={12} /> {problem}</span>
+            : <span />}
+          <span style={s.counter}>{value.length}/{max}</span>
+        </div>
+        <div style={s.actions}>
+          <button type="button" onClick={() => onClose(null)} style={s.btnCancel} className="modern-btn">
+            {data.cancelText || 'Cancel'}
+          </button>
+          <button type="submit" style={{ ...s.btnPrimary, ...(data.danger ? s.btnDanger : {}) }} className="modern-btn">
+            {data.confirmText || 'Save'}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
 export function AppAlertProvider({ children }) {
   const [active, setActive] = useState(null); // { kind, message, ...opts }
+  const [prompt, setPrompt] = useState(null);
   const resolverRef = useRef(null);
+  const promptResolverRef = useRef(null);
+
+  const promptImpl = useCallback((message, opts, resolve) => {
+    promptResolverRef.current = resolve;
+    setPrompt({ message, ...opts });
+  }, []);
+
+  const closePrompt = useCallback((text) => {
+    if (promptResolverRef.current) {
+      promptResolverRef.current(text);
+      promptResolverRef.current = null;
+    }
+    setPrompt(null);
+  }, []);
 
   const notifyImpl = useCallback((message, opts) => {
     setActive({ kind: 'notify', message, ...opts });
@@ -127,8 +235,9 @@ export function AppAlertProvider({ children }) {
   useEffect(() => {
     _notifyHandler = notifyImpl;
     _confirmHandler = confirmImpl;
-    return () => { _notifyHandler = null; _confirmHandler = null; };
-  }, [notifyImpl, confirmImpl]);
+    _promptHandler = promptImpl;
+    return () => { _notifyHandler = null; _confirmHandler = null; _promptHandler = null; };
+  }, [notifyImpl, confirmImpl, promptImpl]);
 
   const close = useCallback((confirmed) => {
     if (resolverRef.current) {
@@ -141,6 +250,7 @@ export function AppAlertProvider({ children }) {
   return (
     <AlertContext.Provider value={{ notify: notifyImpl, confirm: (msg, opts) => new Promise((r) => confirmImpl(msg, opts, r)) }}>
       {children}
+      {prompt && <PromptModal data={prompt} onClose={closePrompt} />}
       {active && <AlertModal data={active} onClose={close} />}
     </AlertContext.Provider>
   );
@@ -170,4 +280,17 @@ const s = {
   // Spread over btnPrimary, so it has to re-set `color` too — the dark
   // `onAccent` text that reads on yellow is unreadable on red.
   btnDanger:  { background: t.danger, color: t.onDanger },
+
+  // ── promptAction ──
+  label:    { display: 'block', fontSize: 13, fontWeight: 600, color: t.textPrimary, margin: '16px 0 6px' },
+  optional: { fontWeight: 500, color: t.textMuted },
+  textarea: {
+    width: '100%', boxSizing: 'border-box', padding: '10px 12px', borderRadius: radius.md,
+    borderWidth: 1, borderStyle: 'solid', borderColor: t.border, background: t.sidebarBg,
+    color: t.textPrimary, fontFamily: 'inherit', fontSize: 14, lineHeight: 1.5, resize: 'vertical', outline: 'none',
+  },
+  textareaInvalid: { borderColor: t.danger },
+  fieldFoot:  { display: 'flex', justifyContent: 'space-between', gap: 10, marginTop: 5, minHeight: 16 },
+  fieldError: { display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12, color: t.danger },
+  counter:    { fontSize: 11.5, color: t.textMuted, fontVariantNumeric: 'tabular-nums' },
 };

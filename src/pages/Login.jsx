@@ -1,7 +1,7 @@
 import { useEffect, useId, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { authAPI } from '../api/api';
-import { saveSession } from '../auth/session';
+import { Navigate, useNavigate } from 'react-router-dom';
+import { authAPI, systemAPI } from '../api/api';
+import { saveSession, hasValidSession, mustChangePassword } from '../auth/session';
 import { theme as t, radius, fonts, type } from '../theme';
 import { Button } from '../components/Layout';
 import Icon from '../components/Icon';
@@ -12,13 +12,9 @@ import loginBg from '../assets/login-bg.jpg';
 import './Login.css';
 
 /*
- * Sign-in for admins, moderators, and the superadmin.
- *
- * The same form and endpoint handle all three roles. After a successful login
- * the role from the server response decides where to go:
- *   superadmin → /superadmin  (system maintenance screen, no shared Navbar)
- *   admin      → /dashboard
- *   moderator  → /dashboard
+ * Sign-in for the super admin, admins and moderators: one form, one endpoint,
+ * and every role lands on the dashboard (the super admin's System pages are in
+ * the same sidebar).
  *
  * Built from the console's own frame, so signing in already looks like the
  * panel you land in: the teal rail with the emblem in its dark well, LIBOT BULACAN in
@@ -34,12 +30,30 @@ import './Login.css';
 
 const SLOGAN = ['Discover,', 'Explore,', 'Experience', 'Bulacan.'];
 
+// Why the last session ended, as the server reported it (one session per
+// account: signing in somewhere else ends this one).
+const ENDED = {
+  expired:           'Your session expired. Sign in again to continue.',
+  signedInElsewhere: 'Your account signed in on another window or device, so this session ended. Sign in again to continue here.',
+  signedOut:         'You signed out in another window.',
+  passwordChanged:   'Your password was changed. Sign in with the new one.',
+  passwordReset:     'Your password was reset. Sign in with the temporary password on your new slip.',
+  deactivated:       'This account has been deactivated. Ask the super admin if you need it back.',
+};
+
 const lockLabel = (s) => {
   const m = Math.floor(s / 60), r = s % 60;
   return m > 0 ? `${m}m ${String(r).padStart(2, '0')}s` : `${r}s`;
 };
 
 export default function Login() {
+  // Already signed in (this browser shares one session across its tabs): go
+  // straight in rather than signing in again, which would end that session.
+  if (hasValidSession()) return <Navigate to={mustChangePassword() ? '/set-password' : '/dashboard'} replace />;
+  return <SignInForm />;
+}
+
+function SignInForm() {
   const navigate = useNavigate();
   const ids = { user: useId(), pass: useId(), userErr: useId(), passErr: useId(), caps: useId() };
 
@@ -52,16 +66,21 @@ export default function Login() {
   const [submitted, setSubmitted] = useState(false);
   // What the server said (wrong credentials, lockout, offline).
   const [error, setError]       = useState('');
-  // Arriving from an expired or rejected session (see auth/session.js) says
-  // why. It's information, not a mistake, so it isn't styled as an error.
-  const [notice, setNotice]     = useState(() =>
-    new URLSearchParams(window.location.search).get('reason') === 'expired'
-      ? 'Your session expired. Sign in again to continue.'
-      : ''
-  );
+  // Arriving from an expired or ended session (see auth/session.js) says why.
+  // It's information, not a mistake, so it isn't styled as an error.
+  const [notice, setNotice]     = useState(() => ENDED[new URLSearchParams(window.location.search).get('reason')] || '');
   // Seconds left on a server-side account lockout (HTTP 423). Purely a UX
   // affordance — the backend enforces the lock regardless of what this says.
   const [lockedFor, setLockedFor] = useState(0);
+  // "Forgot your password?" swaps the form for the request to the super admin.
+  const [forgot, setForgot] = useState(false);
+  // Said before signing in, so nobody is surprised that saving is paused.
+  const [maintenanceOn, setMaintenanceOn] = useState(false);
+  useEffect(() => {
+    let live = true;
+    systemAPI.status().then((d) => { if (live) setMaintenanceOn(!!d.maintenance?.on); }).catch(() => {});
+    return () => { live = false; };
+  }, []);
   // A sign-in still waiting after a few seconds is almost always the API's
   // server waking up (it sleeps when idle, 30–60 s) — say so.
   const [slow, setSlow] = useState(false);
@@ -102,14 +121,10 @@ export default function Login() {
       setLoading(true);
       const data = await authAPI.login(username.trim(), password);
       if (data.success && data.token) {
-        saveSession({ token: data.token, role: data.role, city: data.city });
-        // Route by role. Superadmin goes to their own maintenance screen;
-        // admin and moderator both start on the shared dashboard.
-        if (data.role === 'superadmin') {
-          navigate('/superadmin', { replace: true });
-        } else {
-          navigate('/dashboard', { replace: true });
-        }
+        saveSession({ token: data.token, role: data.role, city: data.city, mustChangePassword: data.mustChangePassword });
+        // Every role starts on the dashboard: it shows what's waiting on them.
+        // A temporary password from a slip is replaced first.
+        navigate(data.mustChangePassword ? '/set-password' : '/dashboard', { replace: true });
       } else {
         setError(data.message || "Couldn't sign you in. Check your username and password.");
       }
@@ -158,9 +173,17 @@ export default function Login() {
       </aside>
 
       <main className="signin-panel">
+        {forgot ? <ForgotPassword initialUsername={username} onBack={() => setForgot(false)} /> : (
         <form className="signin-card" style={s.card} onSubmit={handleSubmit} noValidate aria-labelledby="login-title">
           <h1 id="login-title" style={s.title}>Sign in</h1>
           <p style={s.subtitle}>For admins and moderators. Use the username and password you were given.</p>
+
+          {maintenanceOn && (
+            <div role="status" style={{ ...s.banner, ...s.bannerWarning }}>
+              <Icon name="tool" size={15} />
+              <span>The system is under maintenance. You can sign in and look around, but changes can’t be saved until it ends.</span>
+            </div>
+          )}
 
           {notice && (
             <div role="status" style={{ ...s.banner, ...s.bannerInfo }}>
@@ -253,10 +276,90 @@ export default function Login() {
             <p style={s.help} role="status">Waking up the server. The first sign-in can take up to a minute.</p>
           )}
 
-          <p style={s.help}>Can't sign in? Ask your Libot Bulacan administrator.</p>
+          <p style={s.help}>
+            <button type="button" style={s.linkBtn} onClick={() => setForgot(true)}>Forgot your password?</button>
+          </p>
         </form>
+        )}
       </main>
     </div>
+  );
+}
+
+/*
+ * Staff have no email, so a forgotten password goes to the super admin as a
+ * ticket (POST /api/auth/forgot-password), and they hand over a new slip. The
+ * answer is the same whether or not the username exists.
+ */
+function ForgotPassword({ initialUsername, onBack }) {
+  const ids = { user: useId(), note: useId(), err: useId() };
+  const [username, setUsername] = useState(initialUsername || '');
+  const [note, setNote] = useState('');
+  const [tried, setTried] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [sent, setSent] = useState('');
+  const [error, setError] = useState('');
+  const missing = !username.trim();
+
+  const send = async (e) => {
+    e.preventDefault();
+    setTried(true);
+    if (missing) return document.getElementById(ids.user)?.focus();
+    setSending(true);
+    setError('');
+    try {
+      const data = await authAPI.forgotPassword(username.trim(), note.trim());
+      setSent(data.message);
+    } catch (err) {
+      setError(err?.response?.data?.message || "Couldn't reach the server. Check your connection and try again.");
+    }
+    setSending(false);
+  };
+
+  return (
+    <form className="signin-card" style={s.card} onSubmit={send} noValidate aria-labelledby="forgot-title">
+      <h1 id="forgot-title" style={s.title}>Forgot password</h1>
+      <p style={s.subtitle}>
+        Your account has no email, so the super admin makes you a new slip with a temporary password. Send them your username.
+      </p>
+      {sent ? (
+        <>
+          <div role="status" style={{ ...s.banner, ...s.bannerInfo }}>
+            <Icon name="check-circle" size={15} />
+            <span>{sent}</span>
+          </div>
+          <Button variant="primary" onClick={onBack} style={s.submit}>Back to sign in</Button>
+        </>
+      ) : (
+        <>
+          {error && (
+            <div role="alert" style={{ ...s.banner, ...s.bannerError }}>
+              <Icon name="alert-circle" size={15} /><span>{error}</span>
+            </div>
+          )}
+          <div style={s.field}>
+            <label htmlFor={ids.user} style={s.label}>Username</label>
+            <input id={ids.user} type="text" value={username} onChange={(e) => setUsername(e.target.value)}
+              autoComplete="username" autoCapitalize="none" spellCheck={false} autoFocus className="modern-input"
+              aria-invalid={tried && missing} aria-describedby={tried && missing ? ids.err : undefined}
+              style={{ ...s.input, ...(tried && missing ? s.inputInvalid : null) }} />
+            {tried && missing && <p id={ids.err} style={s.fieldError}><Icon name="alert-circle" size={13} /> Enter your username.</p>}
+          </div>
+          <div style={s.field}>
+            <label htmlFor={ids.note} style={s.label}>Note for the super admin <span style={s.optional}>(optional)</span></label>
+            <textarea id={ids.note} value={note} onChange={(e) => setNote(e.target.value)} maxLength={500} rows={3}
+              placeholder="e.g. I'm at the Baliwag tourism office until 5 PM."
+              style={{ ...s.input, height: 'auto', padding: '10px 14px', resize: 'vertical', fontSize: 14, lineHeight: 1.5 }} />
+          </div>
+          <Button type="submit" variant="primary" disabled={sending} style={s.submit}>
+            {sending ? 'Sending…' : 'Send request'}
+          </Button>
+          <p style={s.help}>
+            <button type="button" style={s.linkBtn} onClick={onBack}>Back to sign in</button>
+          </p>
+        </>
+      )}
+    </form>
   );
 }
 
@@ -301,6 +404,12 @@ const s = {
     marginBottom: 18, borderWidth: 1, borderStyle: 'solid',
   },
   bannerInfo:  { background: t.infoBg,   color: t.info,   borderColor: 'transparent' },
+  bannerWarning: { background: t.warningBg, color: t.textPrimary, borderColor: t.warning },
+  linkBtn: {
+    background: 'none', border: 'none', padding: 0, color: t.brand, fontFamily: 'inherit', fontSize: 'inherit',
+    fontWeight: 600, cursor: 'pointer', textDecoration: 'underline', textUnderlineOffset: 3,
+  },
+  optional: { fontWeight: 500, color: t.textMuted },
   bannerError: { background: t.dangerBg, color: t.danger, borderColor: t.dangerBorder },
 
   field: { marginBottom: 18 },
@@ -308,8 +417,11 @@ const s = {
   input: {
     width: '100%', height: 46, padding: '0 14px', boxSizing: 'border-box',
     borderRadius: radius.md, borderWidth: 1, borderStyle: 'solid', borderColor: t.border,
+    // Cream inside the white card, the same fill the spot form's inputs use.
     background: t.sidebarBg, color: t.textPrimary, fontFamily: 'inherit', fontSize: 15, outline: 'none',
   },
+  // Same longhand as `input`, so React swaps it cleanly (see the SpotForm note
+  // in the design-system docs about shorthand/longhand mixing).
   inputInvalid: { borderColor: t.danger },
   passwordWrap: { position: 'relative' },
   eyeBtn: {
