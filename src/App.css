@@ -34,9 +34,11 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* Newsreader carries the page titles. Applied by class so pages that build
-   their own heading markup opt in explicitly rather than inheriting a serif
-   into places that want the sans (buttons, table headers, pills). */
+/* Form controls don't inherit the page's face on their own. */
+input, select, textarea, button { font-family: var(--font-sans); }
+
+/* The page-title face, for headings a page builds itself. Applied by class so
+   they opt in explicitly. */
 .display-type {
   font-family: var(--font-display);
   font-weight: 600;

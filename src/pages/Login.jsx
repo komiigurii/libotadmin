@@ -158,7 +158,7 @@ function SignInForm() {
             <img src={logo} alt="" style={s.logo} />
           </span>
           <div className="signin-brand-text" style={s.brandText}>
-            <div className="signin-wordmark" style={s.wordmark}>Libot Bulacan</div>
+            <div className="signin-wordmark" style={s.wordmark}>LibotBulacan</div>
             <div style={s.console}>Admin and moderator console</div>
           </div>
         </div>
@@ -371,20 +371,20 @@ const s = {
   emblem: { display: 'grid', placeItems: 'center', flexShrink: 0 },
   logo: { width: 64, height: 64, objectFit: 'contain', borderRadius: 18, display: 'block' },
   brandText: { display: 'flex', flexDirection: 'column', alignItems: 'center' },
-  // The name in plain title case, as the sidebar sets it (2026-10-21,
-  // "quieter": it was tracked capitals).
+  // The wordmark in Knewave, as the sidebar sets it.
   wordmark: {
-    fontFamily: fonts.display, color: t.onBrandSolid, fontWeight: 600, fontSize: 'clamp(24px, 2.4vw, 32px)',
-    lineHeight: 1.1, letterSpacing: '-0.01em', whiteSpace: 'nowrap',
+    fontFamily: fonts.brand, color: t.onBrandSolid, fontWeight: 400, fontSize: 'clamp(24px, 2.4vw, 32px)',
+    lineHeight: 1.1, whiteSpace: 'nowrap',
   },
   // Full white, not onBrandSolidMuted: 86% white is 4.2:1 on the dark theme's
   // teal (white: 5.1, light theme 5.9).
   console: { marginTop: 6, color: t.onBrandSolid, fontSize: 13, fontWeight: 500 },
   // White on teal, without the yellow off-register shadow it used to carry.
+  // Upright: Dongle has no italic.
   slogan: {
     width: '100%', maxWidth: 400, margin: 0,
-    fontFamily: fonts.display, fontStyle: 'italic', fontWeight: 500,
-    fontSize: 'clamp(22px, 2.1vw, 28px)', lineHeight: 1.12, letterSpacing: '-0.01em',
+    fontFamily: fonts.display, fontWeight: 700,
+    fontSize: 'clamp(22px, 2.1vw, 28px)', lineHeight: 1.12,
     color: t.onBrandSolid,
   },
   sloganLine: { display: 'block' },

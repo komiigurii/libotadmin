@@ -463,15 +463,15 @@ const base = {
   // headers can't each pick their own (they used to range from 16 to 24).
   pageHeader:  { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, flexWrap: 'wrap' },
   titleRow:    { display: 'flex', alignItems: 'center', gap: 10 },
-  // The one serif on the page. A dashboard's headings are the only place a
-  // display face earns its keep — tables and controls stay in the sans.
+  // Bold capitals, the loudest line on the page; everything under it is
+  // sentence case.
   pageTitle:   { ...type.pageTitle, color: t.textPrimary, margin: 0 },
   countPill: {
     fontSize: 12, fontWeight: 700, color: t.textSecondary, background: t.sidebarBg,
     border: `1px solid ${t.border}`, borderRadius: radius.pill, padding: '2px 9px',
     ...type.num,
   },
-  pageSub:     { fontSize: 13.5, color: t.textSecondary, margin: '5px 0 0', maxWidth: 680, lineHeight: 1.45 },
+  pageSub:     { fontSize: 14.5, color: t.textSecondary, margin: '5px 0 0', maxWidth: 880, lineHeight: 1.45 },
   actions:     { display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 },
 
   filterRow:   { display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' },

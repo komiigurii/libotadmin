@@ -131,7 +131,7 @@ export function SetPassword() {
       <aside className="signin-rail" aria-label="Libot Bulacan">
         <div style={f.brand}>
           <img src={logo} alt="" style={f.logo} />
-          <div style={f.wordmark}>Libot Bulacan</div>
+          <div style={f.wordmark}>LibotBulacan</div>
           <div style={f.console}>Admin and moderator console</div>
         </div>
       </aside>
@@ -243,7 +243,7 @@ const f = {
   recentText: { color: t.textSecondary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   brand:   { display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', gap: 12 },
   logo:     { width: 64, height: 64, objectFit: 'contain', borderRadius: 18, display: 'block' },
-  wordmark: { fontFamily: fonts.display, color: t.onBrandSolid, fontWeight: 600, fontSize: 'clamp(24px, 2.4vw, 32px)', lineHeight: 1.1 },
+  wordmark: { fontFamily: fonts.brand, color: t.onBrandSolid, fontWeight: 400, fontSize: 'clamp(24px, 2.4vw, 32px)', lineHeight: 1.1 },
   console:  { color: t.onBrandSolid, fontSize: 13, fontWeight: 500 },
   card: {
     width: '100%', maxWidth: 440, boxSizing: 'border-box',

@@ -230,8 +230,8 @@ export default function Navbar() {
           <img src={logo} alt="" style={s.logo} />
         </span>
         <div className="sidebar-text" style={s.brandText}>
-          <div style={s.brandName}>Libot Bulacan</div>
-          <div style={s.brandSub}>{`${roleLabel(role)} console`}</div>
+          <div style={s.brandName}>LibotBulacan</div>
+          <div style={s.brandSub}>{consoleName}</div>
           <div style={s.brandScope}>
             <Icon name="map-pin" size={11} color={t.textMuted} />
             {isModerator ? (city || 'No city assigned') : 'All of Bulacan'}
@@ -352,16 +352,17 @@ const s = {
   emblem: { display: 'grid', placeItems: 'center', width: 40, height: 40, flexShrink: 0 },
   logo: { width: 40, height: 40, objectFit: 'contain', borderRadius: 11, display: 'block' },
   brandText: { minWidth: 0, display: 'flex', flexDirection: 'column' },
+  // The wordmark in Knewave, the one place these consoles use it.
   brandName: {
-    fontFamily: fonts.display, color: t.textPrimary, fontWeight: 600, fontSize: 19,
-    lineHeight: 1.1, letterSpacing: '-0.01em', whiteSpace: 'nowrap',
+    fontFamily: fonts.brand, color: t.textPrimary, fontWeight: 400, fontSize: 20,
+    lineHeight: 1.1, whiteSpace: 'nowrap',
   },
   brandSub: {
-    marginTop: 3, color: t.textSecondary, fontSize: 12, fontWeight: 500,
+    marginTop: 3, color: t.textPrimary, fontSize: 13, fontWeight: 400,
     overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
   },
   brandScope: {
-    marginTop: 2, display: 'flex', alignItems: 'center', gap: 4, color: t.textMuted, fontSize: 12,
+    marginTop: 2, display: 'flex', alignItems: 'center', gap: 4, color: t.textMuted, fontSize: 13,
     overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
   },
 
@@ -377,7 +378,7 @@ const s = {
   link: {
     display: 'flex', alignItems: 'center', gap: 12,
     textAlign: 'left', padding: '10px 14px', borderRadius: 10, border: 'none',
-    background: 'transparent', color: t.textSecondary, fontWeight: 500, fontSize: 13.5,
+    background: 'transparent', color: t.textSecondary, fontWeight: 400, fontSize: 16,
     cursor: 'pointer', transition: 'background 0.15s, color 0.15s',
     width: '100%', fontFamily: 'inherit', minHeight: 42, position: 'relative',
   },

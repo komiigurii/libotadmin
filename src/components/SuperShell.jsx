@@ -129,7 +129,7 @@ export default function SuperShell({ children }) {
         <button type="button" className="sa-brand" onClick={() => navigate('/dashboard')} aria-label="Libot Bulacan super admin console, go to the dashboard">
           <img src={logo} alt="" />
           <span className="sa-brand-text sa-hide-collapsed">
-            <span className="sa-brand-name">Libot Bulacan</span>
+            <span className="sa-brand-name">LibotBulacan</span>
             <span className="sa-brand-sub">Super admin console</span>
           </span>
         </button>

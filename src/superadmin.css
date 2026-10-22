@@ -10,63 +10,8 @@
  */
 
 /* ── Type ────────────────────────────────────────────────────────────────────
-   Knewave (Tyler Finck) for page titles, the brand and big numbers; Dongle
-   (Yanghee Ryu) for every other word. Both SIL OFL 1.1, self-hosted (the CSP
-   allows fonts from this site only), Latin subsets only.
-
-   Dongle's letters are small for their size: its x-height is 0.30 em where a
-   normal UI sans sits near 0.53. Rather than restate every font size in the
-   console, this face is scaled by size-adjust so 14px Dongle reads like 14px
-   of any other sans. The browser multiplies the metric overrides by
-   size-adjust too, so they are written divided by 1.72: an ascent of 0.96 em
-   and a descent of 0.26 em after scaling, instead of Dongle's own 1.45 em of
-   line box, which would double every row's height. Measured in Edge. */
-@font-face {
-  font-family: 'Dongle Libot';
-  src: url('./assets/fonts/dongle-latin-400-normal.woff2') format('woff2');
-  font-weight: 400; font-style: normal; font-display: swap;
-  size-adjust: 172%; ascent-override: 55.8%; descent-override: 15.1%; line-gap-override: 0%;
-  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
-}
-@font-face {
-  font-family: 'Dongle Libot';
-  src: url('./assets/fonts/dongle-latin-ext-400-normal.woff2') format('woff2');
-  font-weight: 400; font-style: normal; font-display: swap;
-  size-adjust: 172%; ascent-override: 55.8%; descent-override: 15.1%; line-gap-override: 0%;
-  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+1E00-1E9F, U+20A0-20AB, U+20AD-20C0, U+2113, U+A720-A7FF;
-}
-/* One bold file covers 500 to 900, so the 600 and 700 the console already
-   asks for both land on it. */
-@font-face {
-  font-family: 'Dongle Libot';
-  src: url('./assets/fonts/dongle-latin-700-normal.woff2') format('woff2');
-  font-weight: 500 900; font-style: normal; font-display: swap;
-  size-adjust: 172%; ascent-override: 55.8%; descent-override: 15.1%; line-gap-override: 0%;
-  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
-}
-@font-face {
-  font-family: 'Dongle Libot';
-  src: url('./assets/fonts/dongle-latin-ext-700-normal.woff2') format('woff2');
-  font-weight: 500 900; font-style: normal; font-display: swap;
-  size-adjust: 172%; ascent-override: 55.8%; descent-override: 15.1%; line-gap-override: 0%;
-  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+1E00-1E9F, U+20A0-20AB, U+20AD-20C0, U+2113, U+A720-A7FF;
-}
-/* Knewave has one weight; 400 to 900 all map to it, so a heading that asks
-   for 600 doesn't fall back. Its line box is tightened the same way. */
-@font-face {
-  font-family: 'Knewave Libot';
-  src: url('./assets/fonts/knewave-latin-400-normal.woff2') format('woff2');
-  font-weight: 400 900; font-style: normal; font-display: swap;
-  ascent-override: 98%; descent-override: 24%; line-gap-override: 0%;
-  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
-}
-@font-face {
-  font-family: 'Knewave Libot';
-  src: url('./assets/fonts/knewave-latin-ext-400-normal.woff2') format('woff2');
-  font-weight: 400 900; font-style: normal; font-display: swap;
-  ascent-override: 98%; descent-override: 24%; line-gap-override: 0%;
-  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+1E00-1E9F, U+20A0-20AB, U+20AD-20C0, U+2113, U+A720-A7FF;
-}
+   Every console sets words in Dongle and the wordmark in Knewave (both loaded
+   in index.css). This one also sets page titles and big numbers in Knewave. */
 
 /* ── LIGHT ───────────────────────────────────────────────────────────────────
    Pale sage paper under white panels; the shell, the page bands and table
@@ -80,8 +25,8 @@
    is routine sign-ins, deliberately not a hue. Text never wears these: a
    swatch beside the words carries the identity. */
 :root[data-console='superadmin'] {
-  --font-sans:    'Dongle Libot', 'Schibsted Grotesk Variable', system-ui, sans-serif;
   --font-display: 'Knewave Libot', 'Dongle Libot', system-ui, sans-serif;
+  --title-case:   none;
 
   --bg:             #EDF1EF;
   --sidebar-bg:     #F2F6F4;
@@ -210,10 +155,6 @@
 
 [data-console='superadmin'] ::selection { background: var(--sa-selection); color: var(--text-primary); }
 [data-console='superadmin'] body { font-size: 15px; }
-[data-console='superadmin'] input,
-[data-console='superadmin'] select,
-[data-console='superadmin'] textarea,
-[data-console='superadmin'] button { font-family: var(--font-sans); }
 [data-console='superadmin'] input::placeholder,
 [data-console='superadmin'] textarea::placeholder { color: var(--text-muted); opacity: 1; }
 [data-console='superadmin'] input,
@@ -243,7 +184,7 @@
 }
 .sa-brand img { width: 36px; height: 36px; border-radius: 10px; display: block; flex-shrink: 0; }
 .sa-brand-text { display: flex; flex-direction: column; min-width: 0; }
-.sa-brand-name { font-family: var(--font-display); font-size: 21px; line-height: 1.05; letter-spacing: 0.005em; white-space: nowrap; }
+.sa-brand-name { font-family: var(--font-brand); font-size: 21px; line-height: 1.05; letter-spacing: 0.005em; white-space: nowrap; }
 .sa-brand-sub { font-size: 14px; color: var(--sa-shell-muted); white-space: nowrap; margin-top: 2px; }
 
 .sa-jump {
