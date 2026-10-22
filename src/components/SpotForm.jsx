@@ -3,11 +3,13 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import './SpotMap.css';
 import { theme as t, radius, shadow, type } from '../theme';
-import { uploadAPI, missionAPI, categoryAPI, spotAPI } from '../api/api';
+import { uploadAPI, missionAPI, categoryAPI, spotAPI, municipalityAPI } from '../api/api';
 import { notify, confirmAction } from './AppAlert';
 import Icon from './Icon';
 import VisitingHoursField from './VisitingHoursField';
 import { spotHasAR } from '../utils/spotHasAR';
+import { insideBoundary } from '../utils/geo';
+import { parseEntranceFee, formatEntranceFee, entranceFeeProblem } from '../utils/entranceFee';
 
 // Fix default marker icons breaking under Vite/webpack bundling
 import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
@@ -433,8 +435,9 @@ function FileUploadField({ label, required, hint, accept, uploadType, value, onU
 
 // ── Search box that pans/zooms the map to a place, using OSM's free
 // Nominatim geocoder. Purely for navigation — it never touches the spot
-// or AR pins, it just moves the viewport.
-function MapSearch({ mapRef }) {
+// or AR pins, it just moves the viewport. On a moderator's map it searches
+// their town only (`bounds`: [[w, s], [e, n]]).
+function MapSearch({ mapRef, bounds = null }) {
   const [query, setQuery]     = useState('');
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -454,8 +457,9 @@ function MapSearch({ mapRef }) {
     setLoading(true);
     debounceRef.current = setTimeout(async () => {
       try {
+        const box = bounds ? `&viewbox=${bounds[0][0]},${bounds[1][1]},${bounds[1][0]},${bounds[0][1]}&bounded=1` : '';
         const res = await fetch(
-          `https://nominatim.openstreetmap.org/search?format=json&limit=6&countrycodes=ph&q=${encodeURIComponent(q)}`
+          `https://nominatim.openstreetmap.org/search?format=json&limit=6&countrycodes=ph${box}&q=${encodeURIComponent(q)}`
         );
         const data = await res.json();
         setResults(Array.isArray(data) ? data : []);
@@ -468,7 +472,7 @@ function MapSearch({ mapRef }) {
     }, 400);
 
     return () => clearTimeout(debounceRef.current);
-  }, [query]);
+  }, [query, bounds]);
 
   const goTo = (place) => {
     const lat = parseFloat(place.lat);
@@ -498,7 +502,7 @@ function MapSearch({ mapRef }) {
             if (e.key === 'Enter' && results.length > 0) goTo(results[0]);
             if (e.key === 'Escape') setOpen(false);
           }}
-          placeholder="Search a place to jump the map there…"
+          placeholder={bounds ? 'Search a place in your town to jump the map there…' : 'Search a place to jump the map there…'}
           style={styles.searchInput}
         />
         {loading && <span style={styles.searchSpinner}>…</span>}
@@ -554,6 +558,10 @@ function SpotMapPicker({
   otherSpots = [], // [{ id, name, lat, lng, radius }] — drawn on the Location map only
   active = true, // false while this map's tab is hidden
   height = 320,
+  // A moderator's town ({ name, outer, inner, bounds }): the rest of the map is
+  // greyed out, and pins can't be dropped or dragged outside it (mock defense
+  // 2026-10-21). The server checks the same.
+  boundary = null,
 }) {
   const containerRef  = useRef(null);
   const mapRef        = useRef(null);
@@ -594,10 +602,32 @@ function SpotMapPicker({
     L.circle(latlng, { radius: radiusM, className: `map-ring map-ring--${kind}`, interactive: false });
 
   // Always-fresh refs so the map's event handlers (bound once) see current props/callbacks
-  const stateRef = useRef({ mode, onSpotChange, onPlaceAr, onArMove, onMissionChange, arrivalRadius });
+  const stateRef = useRef({ mode, onSpotChange, onPlaceAr, onArMove, onMissionChange, arrivalRadius, boundary });
   useEffect(() => {
-    stateRef.current = { mode, onSpotChange, onPlaceAr, onArMove, onMissionChange, arrivalRadius };
+    stateRef.current = { mode, onSpotChange, onPlaceAr, onArMove, onMissionChange, arrivalRadius, boundary };
   });
+
+  // Whether a point may hold a pin, saying why not when it can't.
+  const allowedAt = (lat, lng) => {
+    const b = stateRef.current.boundary;
+    if (insideBoundary(b, lat, lng)) return true;
+    notify(`That’s outside ${b.name}. Pins have to be in your own municipality.`, { tone: 'warning', title: 'Outside your town' });
+    return false;
+  };
+  // A dragged pin dropped outside the town goes back to where the drag began.
+  const keepInside = (marker, commit) => {
+    let from = null;
+    marker.on('dragstart', () => { from = marker.getLatLng(); });
+    marker.on('dragend', () => {
+      const pos = marker.getLatLng();
+      if (!allowedAt(pos.lat, pos.lng) && from) {
+        marker.setLatLng(from);
+        marker.fire('drag');
+        return;
+      }
+      commit(pos);
+    });
+  };
 
   const spotIcon = useRef(
     L.divIcon({
@@ -668,6 +698,7 @@ function SpotMapPicker({
 
     map.on('click', (e) => {
       const { mode, onSpotChange, onPlaceAr, onMissionChange } = stateRef.current;
+      if (!allowedAt(e.latlng.lat, e.latlng.lng)) return;
       if (mode === 'mission') onMissionChange(e.latlng.lat, e.latlng.lng);
       else if (mode === 'ar') onPlaceAr(e.latlng.lat, e.latlng.lng);
       else onSpotChange(e.latlng.lat, e.latlng.lng);
@@ -690,6 +721,51 @@ function SpotMapPicker({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // The moderator's town: the rest of the map under a grey wash, its outline,
+  // and the view kept near it.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !boundary?.outer?.length) return undefined;
+    const toLatLngs = (ring) => ring.map(([lng, lat]) => [lat, lng]);
+    const world = [[-85, -180], [-85, 180], [85, 180], [85, -180]];
+    const layers = [
+      L.polygon([world, ...boundary.outer.map(toLatLngs)], { className: 'map-town-mask', interactive: false }),
+      // An enclave of another town inside this one is greyed out too.
+      ...(boundary.inner || []).map((r) => L.polygon(toLatLngs(r), { className: 'map-town-mask', interactive: false })),
+      L.polyline([...boundary.outer, ...(boundary.inner || [])].map(toLatLngs), { className: 'map-town-line', interactive: false }),
+    ];
+    layers.forEach((l) => l.addTo(map));
+    const [[w, s], [e, n]] = boundary.bounds;
+    map.options.maxBoundsViscosity = 1;
+    map.setMaxBounds(L.latLngBounds([s, w], [n, e]).pad(0.3));
+    return () => {
+      layers.forEach((l) => l.remove());
+      map.setMaxBounds(null);
+    };
+  }, [boundary]);
+
+  // With no pin yet, open on the whole town — once the map can be measured
+  // (a hidden tab's map has no size).
+  const framedTownRef = useRef(false);
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !boundary?.bounds || !active || framedTownRef.current) return;
+    const anyPin = [[spotLat, spotLng], [missionLat, missionLng], ...arModels.map((m) => [m.lat, m.lng])]
+      .some(([a, b]) => toNum(a) !== null && toNum(b) !== null);
+    if (anyPin) { framedTownRef.current = true; return undefined; }
+    const [[w, s], [e, n]] = boundary.bounds;
+    // Later, once the shown tab has its size; skipped if this map has been
+    // removed meanwhile (closing the form, or React mounting twice in dev).
+    const id = setTimeout(() => {
+      if (mapRef.current !== map) return;
+      map.invalidateSize();
+      map.fitBounds(L.latLngBounds([s, w], [n, e]), { padding: [16, 16] });
+      framedTownRef.current = true;
+    }, 160);
+    return () => clearTimeout(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [boundary, active]);
 
   // Keep the spot marker in sync with props (set, moved, dragged, or cleared)
   useEffect(() => {
@@ -734,10 +810,7 @@ function SpotMapPicker({
         nearbyRingRef.current?.setLatLng(pos);
         paintSpotClash(pos.lat, pos.lng);
       });
-      spotMarkerRef.current.on('dragend', () => {
-        const pos = spotMarkerRef.current.getLatLng();
-        stateRef.current.onSpotChange(pos.lat, pos.lng);
-      });
+      keepInside(spotMarkerRef.current, (pos) => stateRef.current.onSpotChange(pos.lat, pos.lng));
 
       // Only recentre if the new pin would otherwise be off-screen. A pin
       // created by clicking the map is already in view, so this no longer
@@ -831,10 +904,7 @@ function SpotMapPicker({
           arRingsRef.current[thisId]?.setLatLng(marker.getLatLng());
           paintArClash();
         });
-        marker.on('dragend', () => {
-          const pos = marker.getLatLng();
-          stateRef.current.onArMove(thisId, pos.lat, pos.lng);
-        });
+        keepInside(marker, (pos) => stateRef.current.onArMove(thisId, pos.lat, pos.lng));
 
         arMarkersRef.current[model.id] = marker;
       }
@@ -881,10 +951,7 @@ function SpotMapPicker({
       missionMarkerRef.current.on('drag', () => {
         missionRingRef.current?.setLatLng(missionMarkerRef.current.getLatLng());
       });
-      missionMarkerRef.current.on('dragend', () => {
-        const pos = missionMarkerRef.current.getLatLng();
-        stateRef.current.onMissionChange(pos.lat, pos.lng);
-      });
+      keepInside(missionMarkerRef.current, (pos) => stateRef.current.onMissionChange(pos.lat, pos.lng));
     }
 
     // The completion ring follows the Radius field as it's typed.
@@ -956,7 +1023,7 @@ function SpotMapPicker({
 
   return (
     <div style={styles.mapWrap}>
-      <MapSearch mapRef={mapRef} />
+      <MapSearch mapRef={mapRef} bounds={boundary?.bounds || null} />
       <div style={styles.mapFrame}>
         <div
           ref={containerRef}
@@ -1255,6 +1322,25 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
     }));
   });
 
+  // A moderator's town outline, for the maps and the checks below. null while
+  // loading or for an admin; false if it couldn't load (the server still
+  // checks, so a pin outside is refused when sent).
+  const [boundary, setBoundary] = useState(null);
+  useEffect(() => {
+    if (!isModerator || !lockedCity) return undefined;
+    let cancelled = false;
+    municipalityAPI.boundary(lockedCity)
+      .then((b) => { if (!cancelled) setBoundary(b); })
+      .catch(() => { if (!cancelled) setBoundary(false); });
+    return () => { cancelled = true; };
+  }, [isModerator, lockedCity]);
+  const outsideTown = (lat, lng) => boundary && !insideBoundary(boundary, lat, lng);
+
+  // The entrance fee as Free / Paid and an amount (mock defense 2026-10-21),
+  // saved as the same one line as before ("Free", "₱50").
+  const [fee, setFee] = useState(() => parseEntranceFee(initial?.entranceFee));
+  const feeProblem = entranceFeeProblem(fee.kind, fee.amount);
+
   // Categories now come from the database. Seeded with the fallback so the
   // chips render on first paint rather than popping in.
   const [categories, setCategories] = useState(FALLBACK_CATEGORIES);
@@ -1512,6 +1598,13 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
   const setField = (field) => (value) =>
     setForm(prev => ({ ...prev, [field]: value }));
 
+  // The fee buttons and amount write the one line the spot keeps.
+  const setFeeParts = (next) => {
+    const merged = { ...fee, ...next };
+    setFee(merged);
+    setForm(prev => ({ ...prev, entranceFee: formatEntranceFee(merged.kind, merged.amount) }));
+  };
+
   const handleSpotChange = (lat, lng) =>
     setForm(prev => ({ ...prev, coordinates_lat: lat, coordinates_lng: lng }));
 
@@ -1563,6 +1656,13 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
     return '';
   };
 
+  // Pins outside the moderator's town that are new or were moved.
+  const samePos = (a, b) => toNum(a?.lat) !== null && toNum(a?.lat) === toNum(b?.lat) && toNum(a?.lng) === toNum(b?.lng);
+  const spotMovedOut = () => outsideTown(form.coordinates_lat, form.coordinates_lng)
+    && !samePos({ lat: form.coordinates_lat, lng: form.coordinates_lng }, initial?.coordinates);
+  const arMovedOut = (m) => outsideTown(m.lat, m.lng)
+    && !(initial?.modelsCoordinates || []).some((o) => samePos(o, m));
+
   const handleSave = async () => {
   // Every problem opens the tab it lives on — with the form split into tabs,
   // "Image is required" is no help if the image field is out of sight.
@@ -1579,10 +1679,8 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
     return fail('details', 'City is required');
   }
   // The spot page in the app shows all three, so a spot without them looked
-  // unfinished. A place with no fee says "Free" rather than leaving it blank.
-  if (!form.entranceFee.trim()) {
-    return fail('details', 'Entrance fee is required — type "Free" if there is none.');
-  }
+  // unfinished. A place with no fee is "Free" rather than blank.
+  if (feeProblem) return fail('details', feeProblem);
   if (!form.visitingHours.trim()) {
     return fail('details', 'Visiting hours are required');
   }
@@ -1604,6 +1702,13 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
   }
   const spotCoordErr = coordError(form.coordinates_lat, form.coordinates_lng);
   if (spotCoordErr) return fail('location', spotCoordErr);
+  // A moderator's new or moved pins stay in their town; one an old spot
+  // already had where it is can stay (the server checks the same way).
+  const townMsg = (what) => `${what} is outside ${boundary.name}. Pins have to be in your own municipality.`;
+  if (spotMovedOut()) return fail('location', townMsg('The spot pin'));
+  const arOut = arModels.findIndex((m) => arMovedOut(m));
+  if (arOut !== -1 && spotHasAR(form.category)) return fail('ar', townMsg(`AR ${arOut + 1}`));
+  if ((isNew || missionChanged()) && outsideTown(missionLat, missionLng)) return fail('food', townMsg('The food spot pin'));
   const radiusErr = radiusProblem(form.arrivalRadius, form.nearbyRadius);
   if (radiusErr) return fail('location', radiusErr);
 
@@ -1706,12 +1811,19 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
   // Nothing reaches the admin without a second look: a submitted request
   // can't be taken back from here, and an edited spot stays locked until an
   // admin decides.
+  // An admin's own add or edit goes live at once; a moderator's waits.
   const ok = await confirmAction(
-    isNew
-      ? `"${payload.name}" goes to an admin for approval. It shows in the app once it's approved.`
-      : `Your changes to "${initial.name}" go to an admin for approval.` +
-        (spotChanged ? ' You can’t edit this spot again until they decide.' : ''),
-    { title: 'Submit for approval?', confirmText: 'Submit', cancelText: 'Keep editing' }
+    !isModerator
+      ? (isNew
+        ? `"${payload.name}" goes live in the app now, with its missions and badge.`
+        : `Your changes to "${initial.name}" go live in the app now.`)
+      : isNew
+        ? `"${payload.name}" goes to an admin for approval. It shows in the app once it's approved.`
+        : `Your changes to "${initial.name}" go to an admin for approval.` +
+          (spotChanged ? ' You can’t edit this spot again until they decide.' : ''),
+    !isModerator
+      ? { title: isNew ? 'Add this spot?' : 'Save the changes?', confirmText: isNew ? 'Add spot' : 'Save', cancelText: 'Keep editing' }
+      : { title: 'Submit for approval?', confirmText: 'Submit', cancelText: 'Keep editing' }
   );
   if (!ok) return;
 
@@ -1727,7 +1839,7 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
     return;
   }
 
-  notify('Food mission location submitted for admin review.', { tone: 'success' });
+  notify(isModerator ? 'Food mission location submitted for admin review.' : 'Food spot saved. It’s live in the app now.', { tone: 'success' });
   onCancel();
 };
 
@@ -1770,7 +1882,7 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
     !form.name.trim() && 'name',
     !form.city.trim() && 'city',
     !form.category.length && 'category',
-    !form.entranceFee.trim() && 'entrance fee',
+    !!feeProblem && 'entrance fee',
     !form.visitingHours.trim() && 'visiting hours',
     !form.description.trim() && 'description',
   ].filter(Boolean);
@@ -1792,11 +1904,17 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
     media:    { missing: stillNeeded(missingMedia) },
     location: {
       missing: (spotPinned ? coordError(form.coordinates_lat, form.coordinates_lng) : 'Spot location is required')
+        || (spotPinned && spotMovedOut() ? `The spot pin is outside ${boundary.name}` : '')
         || radiusProblem(form.arrivalRadius, form.nearbyRadius),
     },
     ar:       { count: hasAR ? arModels.length : 0, missing: stillNeeded(missingAr) },
     food:     { missing: isNew && hasAR ? foodProblem() : '' },
   };
+  // Where the footer is: Next until the last tab, then Submit.
+  const tabIndex = TABS.findIndex((x) => x.id === tab);
+  const onLastTab = tabIndex === TABS.length - 1;
+  const stillMissing = TABS.filter((x) => tabStatus[x.id]?.missing).map((x) => x.label);
+
   // The red asterisk, on the fields only a new spot must fill in.
   const newSpotMark = isNew && <span style={styles.required}>*</span>;
 
@@ -1820,6 +1938,7 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
     arrivalRadius: arrivalRing,
     nearbyRadius: nearbyRing,
     otherSpots,
+    boundary: boundary || null,
   };
   const legendProps = {
     spotPinned, arCount: arModels.length, missionPinned, otherCount: otherSpots.length, missionRadius: radiusMeters,
@@ -1844,8 +1963,9 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
             <>
               This spot's 2nd mission — the user must physically be within range of this
               pin to complete it. Changes here go out together with the spot's own edits
-              when you press {isModerator ? '"Submit for review"' : '"Save changes"'} below —
-              proposed for admin review, same as spot edits, only going live once approved.
+              when you press {isModerator
+                ? '"Submit for review" below — proposed for admin review, same as spot edits, only going live once approved.'
+                : '"Save changes" below, and go live at once.'}
             </>
           )}
         </p>
@@ -2002,9 +2122,40 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
                   </div>
                 </div>
 
+                {/* Two buttons, then the amount when it's paid. Saved as the
+                    one line the app shows: "Free" or "₱50". */}
                 <div style={styles.field}>
-                  <label style={styles.label}>Entrance fee <span style={styles.required}>*</span></label>
-                  <input name="entranceFee" value={form.entranceFee} onChange={handleChange} style={styles.input} className="modern-input" placeholder="Free or ₱50" />
+                  <span style={styles.label} id="fee-label">Entrance fee <span style={styles.required}>*</span></span>
+                  <div role="radiogroup" aria-labelledby="fee-label" style={styles.feeRow}>
+                    {[{ kind: 'free', label: 'Free' }, { kind: 'paid', label: 'Paid' }].map((o) => (
+                      <button key={o.kind} type="button" role="radio" aria-checked={fee.kind === o.kind}
+                        onClick={() => setFeeParts({ kind: o.kind })}
+                        style={{ ...styles.feeBtn, ...(fee.kind === o.kind ? styles.feeBtnOn : null) }}
+                        className="modern-btn">
+                        {fee.kind === o.kind && <Icon name="check" size={13} weight="bold" />} {o.label}
+                      </button>
+                    ))}
+                  </div>
+                  {fee.kind === 'paid' && (
+                    <div style={styles.feeAmountRow}>
+                      <span style={styles.feePeso} aria-hidden="true">₱</span>
+                      <input
+                        aria-label="How much"
+                        value={fee.amount}
+                        onChange={(e) => setFeeParts({ amount: e.target.value })}
+                        inputMode="decimal"
+                        style={{ ...styles.input, paddingLeft: 28 }}
+                        className="modern-input"
+                        placeholder="50"
+                        autoFocus
+                      />
+                    </div>
+                  )}
+                  <p style={styles.hint}>
+                    {fee.kind === 'paid'
+                      ? 'The amount in pesos. Different prices (adults, children) can be written out.'
+                      : fee.kind === 'free' ? 'Travelers see “Free”.' : 'Choose Free or Paid.'}
+                  </p>
                 </div>
 
                 {/* Picked, not typed: the kind (weekly / anytime / dates),
@@ -2054,6 +2205,16 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
 
                 <SpotMapPicker {...mapProps} mode="spot" active={tab === 'location'} />
                 <MapLegend mode="spot" {...legendProps} />
+                {boundary && (
+                  <p style={styles.mapHint}>
+                    <Icon name="map-pin" size={12} /> {boundary.name} is outlined; the rest of the map is greyed out. Pins go inside your municipality.
+                  </p>
+                )}
+                {boundary === false && (
+                  <p style={styles.warningText}>
+                    <Icon name="alert-triangle" size={12} /> Couldn’t load {lockedCity}’s outline. Keep your pins inside {lockedCity}: the server refuses ones outside it.
+                  </p>
+                )}
                 {spotPinned && <SpotOverlapNote neighbours={spotNeighbours} arrivalRadius={arrivalRing} />}
                 {spotPinned && <NearbyAlertNote neighbours={spotNeighbours} nearbyRadius={nearbyRing} />}
 
@@ -2258,18 +2419,42 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
 
         </div>
 
+        {/* Back / Next walk the tabs. A new spot is sent from the last tab,
+            once every tab is complete (mock defense 2026-10-21: "yung submit
+            for review, dapat nasa dulo siya kapag nagawa na lahat"); an edit
+            can be saved from any tab, since it may be one field. */}
         <div style={styles.footer}>
-          <span style={styles.requiredNote}>{isNew ? '* Every field is required for a new spot' : '* Required fields'}</span>
+          <span style={styles.requiredNote}>
+            {isNew
+              ? (onLastTab && stillMissing.length ? `Still needed on: ${stillMissing.join(', ')}` : '* Every field is required for a new spot')
+              : '* Required fields'}
+          </span>
           <div style={styles.footerRight}>
-            <button onClick={handleCancelClick} style={styles.cancelBtn} className="modern-btn" disabled={saving || savingMission}>Cancel</button>
-            <button onClick={handleSave} style={{ ...styles.saveBtn, opacity: (saving || savingMission) ? 0.7 : 1 }} className="modern-btn" disabled={saving || savingMission}>
-              {saving || savingMission
-                ? 'Saving…'
-                : initial && !isModerator
-                  ? 'Save changes'
-                  // New or edited, it goes to an admin first — not straight into the app.
-                  : 'Submit for review'}
-            </button>
+            <button onClick={handleCancelClick} style={styles.cancelBtn} className="modern-btn" disabled={busy}>Cancel</button>
+            {tabIndex > 0 && (
+              <button onClick={() => selectTab(TABS[tabIndex - 1].id)} style={styles.cancelBtn} className="modern-btn" disabled={busy}>
+                <Icon name="chevron-left" size={13} /> Back
+              </button>
+            )}
+            {!onLastTab && (
+              <button onClick={() => selectTab(TABS[tabIndex + 1].id)}
+                style={isNew ? styles.saveBtn : styles.cancelBtn} className="modern-btn" disabled={busy}>
+                Next <Icon name="chevron-right" size={13} />
+              </button>
+            )}
+            {(!isNew || onLastTab) && (
+              <button onClick={handleSave}
+                style={{ ...styles.saveBtn, opacity: busy || (isNew && stillMissing.length) ? 0.6 : 1 }}
+                className="modern-btn" disabled={busy || (isNew && stillMissing.length > 0)}
+                title={isNew && stillMissing.length ? `Still needed on: ${stillMissing.join(', ')}` : undefined}>
+                {busy
+                  ? 'Saving…'
+                  : !isModerator
+                    ? (isNew ? 'Add spot' : 'Save changes')
+                    // New or edited, a moderator's goes to an admin first — not straight into the app.
+                    : 'Submit for review'}
+              </button>
+            )}
           </div>
         </div>
 
@@ -2334,6 +2519,12 @@ const styles = {
   coordInputError: { border: `1px solid ${t.danger}` },
   coordErrorText:  { fontSize: 11.5, color: t.danger, margin: 0 },
   radiusHint:      { fontSize: 11.5, color: t.textMuted, margin: 0, lineHeight: 1.45 },
+
+  feeRow:      { display: 'flex', gap: 8 },
+  feeBtn:      { flex: '0 0 auto', minWidth: 96, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '9px 16px', borderRadius: radius.md, borderWidth: 1, borderStyle: 'solid', borderColor: t.border, background: t.sidebarBg, color: t.textSecondary, fontWeight: 600, fontSize: 13.5, cursor: 'pointer', fontFamily: 'inherit' },
+  feeBtnOn:    { background: t.brandSoft, borderColor: t.brand, color: t.brand },
+  feeAmountRow: { position: 'relative', maxWidth: 260 },
+  feePeso:     { position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: t.textMuted, fontSize: 14, pointerEvents: 'none' },
 
   categoryChips:      { display: 'flex', flexWrap: 'wrap', gap: 8 },
   categoryChip:       { padding: '7px 14px', borderRadius: radius.pill, border: `1px solid ${t.border}`, background: t.sidebarBg, color: t.textSecondary, fontWeight: 600, fontSize: 13, cursor: 'pointer' },

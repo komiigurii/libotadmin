@@ -86,6 +86,7 @@ export default function InactiveUsers() {
                       <div style={{ minWidth: 0 }}>
                         <div style={s.personName}>{u.name || 'Unknown'}</div>
                         <div style={s.personSub}>{u.email}</div>
+                        {u.createdAt && <div style={s.personSub}>Joined {fmtDay(u.createdAt)}</div>}
                       </div>
                     </div>
                   </Td>

@@ -65,8 +65,9 @@ export const spotAPI = {
   proposeChange: (id, data)     => api.patch(`/api/spots/${id}/propose`, data).then(r => r.data),
   proposeCreate: (data)         => api.post('/api/spots/propose', data).then(r => r.data),
   proposeDelete: (id, reason)   => api.patch(`/api/spots/${id}/propose-delete`, { reason }).then(r => r.data),
-  reviewChange:  (id, action)   => api.patch(`/api/spots/${id}/review`, { action }).then(r => r.data),
-  reviewProposal: (id, action)  => api.patch(`/api/spots/proposals/${id}/review`, { action }).then(r => r.data),
+  // A reject needs its reason in `note`; an approve may carry remarks.
+  reviewChange:  (id, action, note)   => api.patch(`/api/spots/${id}/review`, { action, note }).then(r => r.data),
+  reviewProposal: (id, action, note)  => api.patch(`/api/spots/proposals/${id}/review`, { action, note }).then(r => r.data),
   getPendingProposals: ()       => api.get('/api/spots/proposals').then(r => r.data),
   getMyProposals: () => api.get('/api/spots/proposals/mine').then(r => r.data),
   getMyDeleteRequests: () => api.get('/api/spots/delete-requests/mine').then(r => r.data),
@@ -85,8 +86,8 @@ export const missionAPI = {
   proposeLocation: (missionId, { lat, lng, locationName, image, locationInfo, radiusMeters }) =>
     api.patch(`/api/missions/${missionId}/location`, { lat, lng, locationName, image, locationInfo, radiusMeters }).then(r => r.data),
   getProposals: () => api.get('/api/missions/proposals').then(r => r.data.proposals),
-  reviewLocation: (missionId, action) =>
-    api.patch(`/api/missions/${missionId}/review`, { action }).then(r => r.data),
+  reviewLocation: (missionId, action, note) =>
+    api.patch(`/api/missions/${missionId}/review`, { action, note }).then(r => r.data),
   // Missions are now created automatically when a spot itself is created —
   // this only matters for older spots that predate that (or where it
   // failed), so an admin/mod isn't stuck with no way to add them from here.
@@ -234,6 +235,16 @@ export const uploadAPI = {
       })
       .then(r => r.data);
   },
+};
+
+// A town's outline, for the moderator's map (pins stay inside their town).
+export const municipalityAPI = {
+  boundary: (name) => api.get(`/api/municipalities/${encodeURIComponent(name)}/boundary`).then(r => r.data),
+};
+
+// Day-by-day usage for the dashboards' charts (admin and super admin).
+export const statsAPI = {
+  usage: (days = 30) => api.get('/api/admin/stats/usage', { params: { days } }).then(r => r.data),
 };
 
 // The bell (every role): newest first, with the unread count.

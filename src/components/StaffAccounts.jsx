@@ -162,7 +162,7 @@ export function AddAccountForm({ roles, accounts, onCancel, onMade }) {
  * (the Moderators page adds "Requests sent"). onChanged(account) replaces a row.
  * canManage(account): whether this person may act on that row.
  */
-export function StaffTable({ accounts, extra, onChanged, canManage, caption = 'Staff accounts' }) {
+export function StaffTable({ accounts, extra, onChanged, canManage, caption = 'Staff accounts', townInName = false }) {
   const [slip, setSlip] = useState(null);
   const [moving, setMoving] = useState(null);
   const [historyOf, setHistoryOf] = useState(null);
@@ -206,7 +206,7 @@ export function StaffTable({ accounts, extra, onChanged, canManage, caption = 'S
         caption={caption}
         head={<>
           <Th>Account</Th>
-          <Th>Municipality</Th>
+          {!townInName && <Th>Municipality</Th>}
           <Th>Status</Th>
           {extra && <Th align="right">{extra.head}</Th>}
           <Th>Last activity</Th>
@@ -222,11 +222,13 @@ export function StaffTable({ accounts, extra, onChanged, canManage, caption = 'S
                   <Avatar name={a.username} size={32} />
                   <div style={{ minWidth: 0 }}>
                     <div style={s.personName}>{a.username}</div>
-                    <div style={s.personSub}>{ROLE_NAME[a.role]}{ownName(a) ? ` · ${ownName(a)}` : ''}</div>
+                    <div style={s.personSub}>
+                      {townInName ? (a.municipality || 'No town') : ROLE_NAME[a.role]}{ownName(a) ? ` · ${ownName(a)}` : ''}
+                    </div>
                   </div>
                 </div>
               </Td>
-              <Td muted={!a.municipality}>{a.municipality || (a.role === 'moderator' ? 'None assigned' : 'All of Bulacan')}</Td>
+              {!townInName && <Td muted={!a.municipality}>{a.municipality || (a.role === 'moderator' ? 'None assigned' : 'All of Bulacan')}</Td>}
               <Td><StaffStatus status={a.status} /></Td>
               {extra && <Td align="right">{extra.cell(a)}</Td>}
               <Td>

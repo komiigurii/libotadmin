@@ -5,7 +5,7 @@ import {
   Page, PageHeader, Toolbar, SearchInput, FilterTabs, Table, Th, Td, Stat, Button, StatusPill,
   EmptyState, Loading, ErrorBanner, Avatar, pageStyles,
 } from '../components/Layout';
-import { fmtNum, timeAgo } from '../utils/format';
+import { fmtNum, timeAgo, fmtDay } from '../utils/format';
 
 // Traveler Progress — the traveler leaderboard, plus the engagement figures
 // that give the ranking some context. Read-only by design: this module is for
@@ -142,6 +142,7 @@ export default function UserProgress() {
                       {r.isBanned && <StatusPill tone="danger" icon="slash">Banned</StatusPill>}
                     </div>
                     <div style={s.personSub}>{r.email}</div>
+                    {r.createdAt && <div style={s.personSub}>Joined {fmtDay(r.createdAt)}</div>}
                   </div>
                 </div>
               </Td>

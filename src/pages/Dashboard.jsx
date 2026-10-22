@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  spotAPI, missionAPI, reportAPI, appealAPI, userProgressAPI,
+  spotAPI, missionAPI, appealAPI, userProgressAPI,
 } from '../api/api';
 import { theme as t, radius, type } from '../theme';
 import {
@@ -9,15 +9,17 @@ import {
 } from '../components/Layout';
 import { fmtNum as fmt, plural, timeAgo } from '../utils/format';
 import Icon from '../components/Icon';
+import UsageCharts from '../components/UsageCharts';
+import SuperAdminDashboard from './SuperAdminDashboard';
+import { isSuperAdmin } from '../auth/roles';
 
 /*
- * The landing page for both roles: what's live, what's waiting on you, and
- * how travelers are using the app.
+ * The landing page for admins and moderators: what's live, what's waiting on
+ * you, and how travelers are using the app.
  *
- * Every figure here is a real count from an existing endpoint. There are no
- * sparklines or "+12% this week" deltas, because no endpoint returns anything
- * over time — adding them would mean inventing a trend. If a history endpoint
- * lands on the backend, the stat tiles are where a sparkline would go.
+ * Every figure here is a real count from an existing endpoint. The day-by-day
+ * charts (components/UsageCharts.jsx) come from GET /api/admin/stats/usage;
+ * nothing else here claims a trend.
  *
  * Each source loads independently (allSettled): one failing call blanks the
  * figure it feeds and says so, instead of blanking the dashboard.
@@ -40,14 +42,13 @@ const greeting = () => {
 // Mirrors how ModRequests.load() assembles the approval queue, so the count
 // here matches the one on that page.
 async function loadAdmin() {
-  const [progress, spots, proposals, pendingSpots, missions, reports, appeals] =
+  const [progress, spots, proposals, pendingSpots, missions, appeals] =
     await Promise.allSettled([
       userProgressAPI.getAll(),
       spotAPI.getAll(),
       spotAPI.getPendingProposals(),
       spotAPI.getPending(),
       missionAPI.getProposals(),
-      reportAPI.getAll({ type: 'review', status: 'pending' }),
       appealAPI.getAll('pending'),
     ]);
   const ok = (r) => r.status === 'fulfilled';
@@ -66,14 +67,12 @@ async function loadAdmin() {
     attention: {
       approvals,
       approvalsPartial: approvalParts.some((r) => !ok(r)) && approvals != null,
-      reports: ok(reports) ? listOf(val(reports), 'reports').length : null,
       appeals: ok(appeals) ? listOf(val(appeals), 'appeals').length : null,
     },
     failed: [
       !ok(progress) && 'traveler figures',
       !ok(spots) && 'spots',
       approvalParts.some((r) => !ok(r)) && 'part of the approval queue',
-      !ok(reports) && 'reported reviews',
       !ok(appeals) && 'appeals',
     ].filter(Boolean),
   };
@@ -126,7 +125,13 @@ async function loadModerator() {
 
 // ── Page ─────────────────────────────────────────────────────────────
 
+// The super admin's console holds only the super admin's work, so their
+// dashboard is a different page (pages/SuperAdminDashboard.jsx).
 export default function Dashboard() {
+  return isSuperAdmin() ? <SuperAdminDashboard /> : <StaffDashboard />;
+}
+
+function StaffDashboard() {
   const isModerator = localStorage.getItem('role') === 'moderator';
   const city = localStorage.getItem('city') || '';
 
@@ -148,7 +153,7 @@ export default function Dashboard() {
   const spots = data?.spots;
   // Admin only: everything waiting on a decision, or null if none of it loaded.
   const waiting = data?.attention
-    ? sumKnown(Object.values(pick(data.attention, ['approvals', 'reports', 'appeals'])))
+    ? sumKnown(Object.values(pick(data.attention, ['approvals', 'appeals'])))
     : null;
 
   // Each section fades in a beat after the one before it.
@@ -196,10 +201,10 @@ export default function Dashboard() {
               hint={loading ? null : stats ? `by ${plural(stats.explorers, 'traveler')}` : null} />
             <Stat icon="image" label="Published spots" to="/spots" value={loading ? '…' : fmt(spots?.length)}
               hint={loading ? null : spots ? `across ${plural(new Set(spots.map((x) => (x.city || '').trim().toLowerCase()).filter(Boolean)).size, 'city', 'cities')}` : null} />
-            <Stat icon="inbox" label="Waiting on you" to="/mod-requests"
+            <Stat icon="inbox" label="Waiting on you" to="/spots/approvals"
               emphasis={waiting > 0}
               value={loading ? '…' : fmt(waiting)}
-              hint="approvals, reports & appeals" />
+              hint="approvals & appeals" />
           </>
         )}
       </section>
@@ -222,14 +227,19 @@ export default function Dashboard() {
           <ContentCard spots={spots} loading={loading} scope={city || 'your area'} />
         </div>
       ) : (
-        <div className="dash-split" style={s.split}>
+        <>
           <div className="dash-reveal" style={reveal(4)}>
-            <ContentCard spots={spots} loading={loading} />
+            <UsageCharts />
           </div>
-          <div className="dash-reveal" style={reveal(5)}>
-            <TopTravelers rows={leaderboard} loading={loading} failed={!loading && !data?.progress} />
+          <div className="dash-split" style={s.split}>
+            <div className="dash-reveal" style={reveal(5)}>
+              <ContentCard spots={spots} loading={loading} />
+            </div>
+            <div className="dash-reveal" style={reveal(6)}>
+              <TopTravelers rows={leaderboard} loading={loading} failed={!loading && !data?.progress} />
+            </div>
           </div>
-        </div>
+        </>
       )}
     </Page>
   );
@@ -266,10 +276,8 @@ function CountBadge({ count, loading }) {
 
 function AttentionCard({ attention, loading }) {
   const rows = [
-    { icon: 'inbox', label: 'Approval queue', to: '/mod-requests', count: attention?.approvals,
+    { icon: 'inbox', label: 'Approval queue', to: '/spots/approvals', count: attention?.approvals,
       detail: 'New spots, edits, deletions and food spot locations from moderators' },
-    { icon: 'flag', label: 'Reported reviews', to: '/reported-comments', count: attention?.reports,
-      detail: 'Reviews that travelers reported from the app' },
     { icon: 'slash', label: 'Ban appeals', to: '/banned-accounts', count: attention?.appeals,
       detail: 'Suspended or banned travelers asking to come back' },
   ];
@@ -349,9 +357,9 @@ function QuickActions({ isModerator }) {
         { icon: 'send', label: 'My submissions', to: '/my-review-requests' },
       ]
     : [
-        { icon: 'inbox', label: 'Review approvals', to: '/mod-requests' },
-        { icon: 'flag', label: 'Reported reviews', to: '/reported-comments' },
-        { icon: 'map-pin', label: 'Browse spots', to: '/spots' },
+        { icon: 'inbox', label: 'Review approvals', to: '/spots/approvals' },
+        { icon: 'plus', label: 'Add a spot', to: '/spots?new=1' },
+        { icon: 'message-square', label: 'Rate and Review', to: '/comments' },
         { icon: 'award', label: 'Leaderboard', to: '/user-progress' },
       ];
   return (

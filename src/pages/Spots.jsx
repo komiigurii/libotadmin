@@ -13,7 +13,14 @@ import Icon from '../components/Icon';
 const role = () => localStorage.getItem('role');
 const modCity = () => localStorage.getItem('city') || '';
 
-export default function Spots() {
+/*
+ * The spots. A moderator's changes go to an admin for approval; an admin's
+ * own add, edit or delete goes live at once (mock defense 2026-10-21: "lahat
+ * nagagawa ni admin"), through the same request on the server, which keeps
+ * its history. For admins this is the Spots tab of Spot Management
+ * (`embedded`: no page shell, the actions sit in the toolbar).
+ */
+export default function Spots({ embedded = false }) {
   const [spots,    setSpots]    = useState([]);
   const [loading,  setLoading]  = useState(true);
   const [editing,  setEditing]  = useState(null);
@@ -51,9 +58,10 @@ export default function Spots() {
   const [searchParams, setSearchParams] = useSearchParams();
   useEffect(() => {
     if (searchParams.get('new') !== '1') return;
-    if (isModerator) { setEditing(null); setShowForm(true); }
+    setEditing(null);
+    setShowForm(true);
     setSearchParams({}, { replace: true });
-  }, [searchParams, setSearchParams, isModerator]);
+  }, [searchParams, setSearchParams]);
 
   // Esc closes the deletion-request dialog, like every other dialog here.
   useEffect(() => {
@@ -77,9 +85,11 @@ export default function Spots() {
     // A toast either way, like a submitted edit (QA 2026-10-16: the request
     // used to go through with nothing said but a small label on the card).
     try {
-      await spotAPI.proposeDelete(id, deleteReason);
+      const data = await spotAPI.proposeDelete(id, deleteReason);
       setError('');
-      notify('Deletion requested. The spot stays live until an admin approves it.', { tone: 'success' });
+      notify(data?.direct
+        ? 'Spot deleted. It’s gone from the app.'
+        : 'Deletion requested. The spot stays live until an admin approves it.', { tone: 'success' });
       load();
     } catch (err) {
       const msg = err.response?.data?.message || err.message || 'Unknown error';
@@ -93,13 +103,13 @@ export default function Spots() {
     setError('');
 
     try {
-      if (editing) {
-        await spotAPI.proposeChange(editing._id, formData);
-        notify('Changes submitted for admin approval.', { tone: 'success' });
-      } else {
-        await spotAPI.proposeCreate(formData);
-        notify('New spot submitted for admin approval.', { tone: 'success' });
-      }
+      const data = editing
+        ? await spotAPI.proposeChange(editing._id, formData)
+        : await spotAPI.proposeCreate(formData);
+      // An admin's own change is approved in the same step.
+      notify(data?.direct
+        ? (editing ? 'Changes saved. They’re live in the app now.' : 'Spot added. It’s live in the app now.')
+        : (editing ? 'Changes submitted for admin approval.' : 'New spot submitted for admin approval.'), { tone: 'success' });
 
       setShowForm(false);
       setEditing(null);
@@ -128,32 +138,37 @@ export default function Spots() {
     return name.includes(q) || cat.includes(q);
   });
 
+  const headerActions = <>
+    <Button icon="refresh-cw" onClick={load} disabled={loading}>Refresh</Button>
+    <Button variant="primary" icon="plus" onClick={() => { setEditing(null); setShowForm(true); }}>
+      Add spot
+    </Button>
+  </>;
+  const Shell = embedded ? EmbeddedShell : Page;
+
   return (
-    <Page>
-      <PageHeader
-        title="Spot Management"
-        count={spots.length}
-        subtitle={isModerator
-          ? `The spots${lockedCity ? ` in ${lockedCity}` : ''} you look after. Add one or propose changes — an admin approves each before it goes live.`
-          : 'Every published spot. Moderators propose changes; you approve them in the Approval Queue.'}
-        actions={<>
-          <Button icon="refresh-cw" onClick={load} disabled={loading}>Refresh</Button>
-          {isModerator && (
-            <Button variant="primary" icon="plus" onClick={() => { setEditing(null); setShowForm(true); }}>
-              Add spot
-            </Button>
-          )}
-        </>}
-      />
+    <Shell>
+      {!embedded && (
+        <PageHeader
+          title="Spot Management"
+          count={spots.length}
+          subtitle={isModerator
+            ? `The spots${lockedCity ? ` in ${lockedCity}` : ''} you look after. Add one or propose changes — an admin approves each before it goes live.`
+            : 'Every spot in the app. What you add, edit or delete goes live at once.'}
+          actions={headerActions}
+        />
+      )}
 
       {error && <ErrorBanner onDismiss={() => setError('')}>{error}</ErrorBanner>}
 
       {deleteTarget && (
         <div style={s.modalOverlay}>
           <div style={s.modalBox} role="dialog" aria-modal="true" aria-labelledby="delete-title">
-            <h2 id="delete-title" style={s.modalTitle}>Request deletion</h2>
+            <h2 id="delete-title" style={s.modalTitle}>{isModerator ? 'Request deletion' : 'Delete this spot?'}</h2>
             <p style={s.modalText}>
-              An admin reviews this before the spot is removed. Reason (optional):
+              {isModerator
+                ? 'An admin reviews this before the spot is removed. Reason (optional):'
+                : 'It’s removed from the app straight away, with its missions and badge. Reason (optional, kept in the activity log):'}
             </p>
             <textarea
               value={deleteReason}
@@ -166,7 +181,7 @@ export default function Spots() {
             />
             <div style={{ ...s.buttonRow, justifyContent: 'flex-end' }}>
               <Button onClick={() => setDeleteTarget(null)}>Cancel</Button>
-              <Button variant="dangerSolid" icon="trash" onClick={confirmDelete}>Request deletion</Button>
+              <Button variant="dangerSolid" icon="trash" onClick={confirmDelete}>{isModerator ? 'Request deletion' : 'Delete spot'}</Button>
             </div>
           </div>
         </div>
@@ -191,6 +206,7 @@ export default function Spots() {
           onChange={e => setSearch(e.target.value)}
           placeholder="Search spots by name or category…"
         />
+        {embedded && headerActions}
       </Toolbar>
 
       {loading ? (
@@ -242,16 +258,15 @@ export default function Spots() {
 
                   <div style={s.cardFooter}>
                     <span style={s.cardVisits}>{plural(spot.visitCount || 0, 'visit')}</span>
-                    {isModerator && (
-                      <div style={s.cellActions}>
-                        <Button size="sm" variant="subtle" icon="edit" disabled={locked} onClick={() => { setEditing(spot); setShowForm(true); }}>
-                          Edit
-                        </Button>
-                        <Button size="sm" variant="danger" icon="trash" disabled={locked} onClick={() => openDeleteModal(spot._id)}>
-                          Delete
-                        </Button>
-                      </div>
-                    )}
+                    {/* Locked while a moderator's request on it waits for review. */}
+                    <div style={s.cellActions}>
+                      <Button size="sm" variant="subtle" icon="edit" disabled={locked} onClick={() => { setEditing(spot); setShowForm(true); }}>
+                        Edit
+                      </Button>
+                      <Button size="sm" variant="danger" icon="trash" disabled={locked} onClick={() => openDeleteModal(spot._id)}>
+                        Delete
+                      </Button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -259,9 +274,11 @@ export default function Spots() {
           })}
         </div>
       )}
-    </Page>
+    </Shell>
   );
 }
+
+const EmbeddedShell = ({ children }) => <>{children}</>;
 
 const s = {
   // Page shell, header, toolbar, states, facts and buttons come from

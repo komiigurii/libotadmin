@@ -38,17 +38,20 @@ import { confirmAction } from './AppAlert';
 // uses the same name, so the link and the page it opens always agree.
 //
 // Paths are unchanged from before the rename, so bookmarks keep working.
+//
+// Mock defense 2026-10-21: everything about spots is in Spot Management (its
+// Approval Queue is a tab there, /spots/approvals), reviews are "Rate and
+// Review" as the paper calls them, and travelers no longer report reviews —
+// the automatic filter masks bad words instead — so Reported Reviews is gone.
 const ADMIN_NAV = [
   { group: 'Overview', items: [
     { label: 'Dashboard',          path: '/dashboard',         icon: 'grid' },
   ] },
   { group: 'Content', items: [
-    { label: 'Spot Management',    path: '/spots',             icon: 'map-pin' },
-    { label: 'Approval Queue',     path: '/mod-requests',      icon: 'inbox' },
+    { label: 'Spot Management',    path: '/spots',             icon: 'map-pin', badge: 'approvals' },
   ] },
   { group: 'Community', items: [
-    { label: 'Reviews & Feedback', path: '/comments',          icon: 'message-square' },
-    { label: 'Reported Reviews',   path: '/reported-comments', icon: 'flag' },
+    { label: 'Rate and Review',    path: '/comments',          icon: 'message-square' },
   ] },
   { group: 'Travelers', items: [
     { label: 'Traveler Progress',  path: '/user-progress',     icon: 'award' },
@@ -61,18 +64,26 @@ const ADMIN_NAV = [
   ] },
 ];
 
-// The super admin's own pages, under everything an admin has (mock defense
-// 2026-10-21): maintenance and the tools, the staff's tickets, every account
-// in the system, and what was done in the console.
-const SYSTEM_NAV = { group: 'System', items: [
-  { label: 'System',             path: '/system',            icon: 'tool' },
-  { label: 'Tickets',            path: '/tickets',           icon: 'flag', badge: 'tickets' },
-  { label: 'Accounts',           path: '/accounts',          icon: 'shield' },
-  { label: 'Activity Log',       path: '/activity',          icon: 'history' },
-] };
+// The super admin's console holds only the super admin's own work (the user,
+// 2026-10-22: "superadmin panel should only contain superadmin functions"):
+// maintenance and the tools, the staff's tickets, every account, and what was
+// done in the console. Spots, reviews and travelers are the admins' job.
+const SUPER_ADMIN_NAV = [
+  { group: 'Overview', items: [
+    { label: 'Dashboard',          path: '/dashboard',         icon: 'grid' },
+  ] },
+  { group: 'System', items: [
+    { label: 'System',             path: '/system',            icon: 'tool' },
+    { label: 'Tickets',            path: '/tickets',           icon: 'flag', badge: 'tickets' },
+  ] },
+  { group: 'Accounts', items: [
+    { label: 'Accounts',           path: '/accounts',          icon: 'shield' },
+    { label: 'Activity Log',       path: '/activity',          icon: 'history' },
+  ] },
+];
 
 // Every role's bell; admins and moderators also report problems from here
-// (the super admin answers them under System → Tickets).
+// (the super admin answers them under Tickets).
 const inboxNav = (superAdmin) => ({ group: 'Inbox', items: [
   { label: 'Notifications',      path: '/notifications',     icon: 'bell', badge: 'unread' },
   ...(superAdmin ? [] : [{ label: 'Report a Problem', path: '/tickets', icon: 'flag' }]),
@@ -124,14 +135,13 @@ export default function Navbar() {
   const superAdmin = isSuperAdmin(role);
   const consoleName = `${roleLabel(role)} Console`;
   const nav = [
-    ...(isModerator ? MODERATOR_NAV : ADMIN_NAV),
+    ...(superAdmin ? SUPER_ADMIN_NAV : isModerator ? MODERATOR_NAV : ADMIN_NAV),
     inboxNav(superAdmin),
-    ...(superAdmin ? [SYSTEM_NAV] : []),
   ];
   const home = '/dashboard';
   const current = nav.flatMap((g) => g.items).find((i) => isHere(i, location.pathname));
   const beat = useHeartbeat();
-  const badges = { unread: beat?.unread || 0, tickets: beat?.openTickets || 0 };
+  const badges = { unread: beat?.unread || 0, tickets: beat?.openTickets || 0, approvals: beat?.pendingApprovals || 0 };
 
   // ── Phone drawer (App.css shows it only at ≤ 720px) ──
   const [menuOpen, setMenuOpen] = useState(false);
@@ -170,16 +180,9 @@ export default function Navbar() {
 
   return (
     <>
+    {/* The menu button sits on the left, on the side the drawer opens from
+        (mock defense 2026-10-21: "location ng burger menu kapag niliitan"). */}
     <header className="mobile-bar" style={s.mobileBar}>
-      <button
-        type="button"
-        onClick={() => navigate(home)}
-        style={s.mobileBrand}
-        aria-label="Go to dashboard"
-      >
-        <img src={logo} alt="" style={s.mobileLogo} />
-      </button>
-      <div style={s.mobileTitle}>{current?.label || consoleName}</div>
       <button
         ref={menuBtnRef}
         type="button"
@@ -190,6 +193,15 @@ export default function Navbar() {
         aria-controls="admin-nav"
       >
         <Icon name="menu" size={22} color={t.textPrimary} />
+      </button>
+      <div style={s.mobileTitle}>{current?.label || consoleName}</div>
+      <button
+        type="button"
+        onClick={() => navigate(home)}
+        style={s.mobileBrand}
+        aria-label="Go to dashboard"
+      >
+        <img src={logo} alt="" style={s.mobileLogo} />
       </button>
     </header>
     {menuOpen && <div className="nav-backdrop" onClick={() => setMenuOpen(false)} aria-hidden="true" />}
@@ -391,7 +403,7 @@ const s = {
   // ── Phone top bar + drawer close. Display comes from App.css. ──
   mobileBar: {
     position: 'sticky', top: 0, zIndex: 30, alignItems: 'center', gap: 12,
-    minHeight: 56, padding: '8px 10px 8px 12px', boxSizing: 'border-box',
+    minHeight: 56, padding: '8px 12px 8px 6px', boxSizing: 'border-box',
     background: t.sidebarBg, color: t.textPrimary, borderBottom: `1px solid ${t.border}`,
   },
   mobileBrand: {

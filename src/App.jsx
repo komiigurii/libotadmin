@@ -9,9 +9,8 @@ import Login  from './pages/Login';
 import Navbar from './components/Navbar';
 const Dashboard        = lazy(() => import('./pages/Dashboard'));
 const Spots            = lazy(() => import('./pages/Spots'));
+const SpotManagement   = lazy(() => import('./pages/SpotManagement'));
 const Comments         = lazy(() => import('./pages/Comments'));
-const ReportedComments = lazy(() => import('./pages/ReportedComments'));
-const ModRequests      = lazy(() => import('./pages/ModRequests'));
 const MyReviewRequests = lazy(() => import('./pages/MyReviewRequests'));
 const InactiveUsers    = lazy(() => import('./pages/InactiveUsers'));
 const BannedAccounts   = lazy(() => import('./pages/BannedAccounts'));
@@ -32,7 +31,7 @@ import MaintenanceBanner from './components/MaintenanceBanner';
 import { AppAlertProvider } from './components/AppAlert';
 import { theme as t } from './theme';
 import { hasValidSession, getToken, clearSession, mustChangePassword } from './auth/session';
-import { isAdminRole, isModeratorRole, isSuperAdmin } from './auth/roles';
+import { isAdminOnly, isModeratorRole, isSuperAdmin } from './auth/roles';
 import './App.css';
 
 function PageFallback() {
@@ -62,9 +61,16 @@ const ModeratorRoute = ({ children }) => (
   isModeratorRole() ? children : <Navigate to="/dashboard" replace />
 );
 
-// The super admin passes too: it can do everything an admin can.
+// Admins only. The super admin's console holds only the super admin's own
+// pages (the user, 2026-10-22), so it is turned away here too.
 const AdminRoute = ({ children }) => (
-  isAdminRole() ? children : <Navigate to="/dashboard" replace />
+  isAdminOnly() ? children : <Navigate to="/dashboard" replace />
+);
+
+// /spots: an admin's Spot Management (the spots and the Approval Queue), or a
+// moderator's own town's spots. A component, so the role is read on every visit.
+const SpotsRoute = () => (
+  isAdminOnly() ? <SpotManagement /> : isModeratorRole() ? <Spots /> : <Navigate to="/dashboard" replace />
 );
 
 // Only while there is a temporary password to replace. A component, so the
@@ -120,8 +126,11 @@ export default function App() {
                       {/* Read-only: the travelers who visited the moderator's municipality's spots. */}
                       <Route path="/my-travelers"       element={<ModeratorRoute><MyTravelers /></ModeratorRoute>} />
 
-                      <Route path="/mod-requests"       element={<AdminRoute><ModRequests /></AdminRoute>} />
-                      <Route path="/reported-comments"  element={<AdminRoute><ReportedComments /></AdminRoute>} />
+                      {/* Old addresses: the Approval Queue is a tab of Spot
+                          Management, and travelers no longer report reviews
+                          (the automatic filter masks bad words instead). */}
+                      <Route path="/mod-requests"       element={<Navigate to="/spots/approvals" replace />} />
+                      <Route path="/reported-comments"  element={<Navigate to="/comments" replace />} />
                       {/* Admin-only, like the backend: moderators work only on
                           attractions and their own requests. */}
                       <Route path="/inactive-users"     element={<AdminRoute><InactiveUsers /></AdminRoute>} />
@@ -144,9 +153,10 @@ export default function App() {
                       <Route path="/tickets"            element={<Tickets />} />
                       <Route path="/tickets/:id"        element={<TicketDetail />} />
 
-                      {/* Both roles: moderators manage their municipality's
-                          attractions; admins see every one, read-only. */}
-                      <Route path="/spots"     element={<Spots />} />
+                      {/* An admin's Spot Management (the spots, and the
+                          Approval Queue tab); a moderator's town's spots. */}
+                      <Route path="/spots"            element={<SpotsRoute />} />
+                      <Route path="/spots/approvals"  element={<AdminRoute><SpotManagement /></AdminRoute>} />
 
                       <Route path="*" element={<Navigate to="/dashboard" replace />} />
                     </Routes>

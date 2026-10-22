@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { theme as t, radius, type } from '../theme';
 import Icon from './Icon';
+import { roleLabel } from '../auth/roles';
 
 /*
  * Shared page furniture for the admin panel.
@@ -56,6 +57,11 @@ export function Page({ children, wide = false }) {
    the right. No small label above the title: the heading carries the page on
    its own (the dashboard's greeting moved into its subtitle, 2026-10-21). */
 export function PageHeader({ title, subtitle, count, actions }) {
+  // The browser tab names the page and whose console it is (mock defense
+  // 2026-10-21: "title sa tab ng mod dapat mod hindi admin").
+  useEffect(() => {
+    if (typeof title === 'string') document.title = `${title} · Libot ${roleLabel()}`;
+  }, [title]);
   return (
     <div style={s.header}>
       <div style={{ minWidth: 0 }}>

@@ -72,6 +72,7 @@ export default function MyReviewRequests() {
       image: imageOf.get(String(c.spotId)) || null,
       date: c.submittedAt,
       decidedAt: c.reviewedAt,
+      note: c.reviewNote,
       record: recordFromRequest(c),
       locationName: c.changes?.locationName,
     }));
@@ -99,6 +100,7 @@ export default function MyReviewRequests() {
       image: p.image || null,
       date: p.submittedAt || p.createdAt,
       decidedAt: p.reviewedAt,
+      note: p.reviewNote || p.rejectionReason,
       record: p,
     }));
 
@@ -109,6 +111,7 @@ export default function MyReviewRequests() {
       subtitle: d.spotName || '—',
       date: d.submittedAt,
       decidedAt: d.reviewedAt,
+      note: d.reviewNote,
       reason: d.reason,
     }));
 
@@ -210,6 +213,14 @@ export default function MyReviewRequests() {
                         </span>
                       </div>
                     )}
+                    {/* The admin's reason for a rejection, or remarks on an
+                        approval (mock defense 2026-10-21). */}
+                    {r.note && DECIDED[r.status] && (
+                      <p style={noteStyle}>
+                        <strong style={{ color: 'var(--text-primary)' }}>{r.status === 'rejected' ? 'Why it was rejected: ' : 'Admin’s remarks: '}</strong>
+                        {r.note}
+                      </p>
+                    )}
                   </div>
 
                   {hasDetails && (
@@ -231,3 +242,8 @@ export default function MyReviewRequests() {
     </Page>
   );
 }
+
+const noteStyle = {
+  fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.5, margin: '8px 0 0', padding: '8px 10px',
+  borderRadius: 8, background: 'var(--sidebar-bg)', border: '1px solid var(--divider)', overflowWrap: 'anywhere',
+};

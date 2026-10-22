@@ -88,6 +88,9 @@ export default function Moderators() {
       ) : (
         <StaffTable
           caption="Moderator accounts"
+          // Every row is a moderator, so the town sits under the username
+          // instead of in a column of its own (the table fits at 1366px).
+          townInName
           accounts={visible}
           canManage={() => true}
           onChanged={replace}
