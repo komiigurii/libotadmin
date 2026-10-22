@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { theme as t, radius, type } from '../theme';
 import Icon from './Icon';
-import { roleLabel } from '../auth/roles';
+import SuperBand from './SuperBand';
+import { roleLabel, isSuperAdmin } from '../auth/roles';
 
 /*
  * Shared page furniture for the admin panel.
@@ -56,12 +57,18 @@ export function Page({ children, wide = false }) {
    "6 total" text on one page and "9 shown" on another), and actions sit on
    the right. No small label above the title: the heading carries the page on
    its own (the dashboard's greeting moved into its subtitle, 2026-10-21). */
-export function PageHeader({ title, subtitle, count, actions }) {
+export function PageHeader({ title, subtitle, count, actions, live, stats, children }) {
   // The browser tab names the page and whose console it is (mock defense
   // 2026-10-21: "title sa tab ng mod dapat mod hindi admin").
   useEffect(() => {
     if (typeof title === 'string') document.title = `${title} · Libot ${roleLabel()}`;
   }, [title]);
+  // The super admin's console opens every page with its dark band and stat
+  // strip (components/SuperBand.jsx); `live`, `stats` and `children` are for
+  // that band only.
+  if (isSuperAdmin()) {
+    return <SuperBand title={title} subtitle={subtitle} count={count} actions={actions} live={live} stats={stats}>{children}</SuperBand>;
+  }
   return (
     <div style={s.header}>
       <div style={{ minWidth: 0 }}>
@@ -157,22 +164,23 @@ export function EmptyState({ icon = 'check', title, subtitle }) {
 /* ── Table ────────────────────────────────────────────────────────
    One cell padding and one header treatment, rather than 13px here and 10px
    there. `align="right"` for numeric columns. */
-export function Table({ head, children, caption }) {
-  return (
-    <Card pad={false} style={{ overflow: 'hidden' }}>
-      {/* A 7-column moderation table has no sensible 360px layout, so on narrow
-          viewports it scrolls sideways inside its card rather than reflowing
-          into unreadable stacks. tabIndex makes that region keyboard-scrollable,
-          which is a WCAG requirement for any scrollable container. */}
-      <div className="table-scroll" style={{ overflowX: 'auto' }} tabIndex={0} role="region" aria-label={caption || 'Data table'}>
-        <table style={s.table}>
-          {caption && <caption style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0 0 0 0)' }}>{caption}</caption>}
-          {head && <thead><tr>{head}</tr></thead>}
-          <tbody>{children}</tbody>
-        </table>
-      </div>
-    </Card>
+// `bare`: no card of its own, for a table that sits flush inside a panel
+// (a card in a card is the thing to avoid).
+export function Table({ head, children, caption, bare = false }) {
+  const table = (
+    // A 7-column moderation table has no sensible 360px layout, so on narrow
+    // viewports it scrolls sideways inside its card rather than reflowing
+    // into unreadable stacks. tabIndex makes that region keyboard-scrollable,
+    // which is a WCAG requirement for any scrollable container.
+    <div className="table-scroll" style={{ overflowX: 'auto' }} tabIndex={0} role="region" aria-label={caption || 'Data table'}>
+      <table style={s.table}>
+        {caption && <caption style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0 0 0 0)' }}>{caption}</caption>}
+        {head && <thead><tr>{head}</tr></thead>}
+        <tbody>{children}</tbody>
+      </table>
+    </div>
   );
+  return bare ? table : <Card pad={false} style={{ overflow: 'hidden' }}>{table}</Card>;
 }
 
 export function Th({ children, align = 'left', width }) {
@@ -352,6 +360,9 @@ export function Button({ variant = 'secondary', size = 'md', icon, children, sty
     <button
       type={type}
       className="modern-btn"
+      // Read by the super admin's band, which redraws outlined buttons for
+      // its dark ground (superadmin.css).
+      data-variant={variant}
       style={{ ...s.btn, ...s.btnSize[size], ...s.btnVariant[variant], ...(off ? s.btnOff : null), ...style }}
       {...rest}
     >

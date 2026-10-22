@@ -32,6 +32,17 @@ export const ACTION_LABELS = {
 
 export const actionLabel = (action) => ACTION_LABELS[action] || { label: action, icon: 'info', tone: 'neutral' };
 
+/** The kind of an action: the part before the dot ('account.create' → 'account'). */
+export const groupOf = (action = '') => String(action).split('.')[0];
+
+// Each kind's series hue in the super admin's console (superadmin.css
+// --s-*): sign-ins are routine, so slate rather than a hue; accounts blue,
+// travelers teal, tickets marigold, the system violet.
+export const GROUP_HUE = { auth: 'slate', account: 'blue', traveler: 'teal', ticket: 'marigold', system: 'violet' };
+// The order the activity-mix bar stacks them in. Blue and teal must not touch
+// (too alike side by side); this order passed the dataviz colour check.
+export const MIX_ORDER = ['auth', 'account', 'ticket', 'traveler', 'system'];
+
 // The Activity Log's filter groups (the part before the dot).
 export const ACTION_GROUPS = [
   { value: '',         label: 'Everything' },

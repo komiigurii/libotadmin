@@ -14,5 +14,13 @@
     if (p === 'light' || p === 'dark') {
       document.documentElement.setAttribute('data-theme', p);
     }
+    // The super admin's console has its own look (src/superadmin.css). Set
+    // here too so a reload doesn't flash the other consoles' look first;
+    // components/SuperShell.jsx keeps it in step after that. Not on the
+    // sign-in pages, which every role shares.
+    var path = window.location.pathname;
+    if (localStorage.getItem('role') === 'superadmin' && path !== '/login' && path !== '/set-password') {
+      document.documentElement.setAttribute('data-console', 'superadmin');
+    }
   } catch { /* private mode — fall back to the OS preference */ }
 })();

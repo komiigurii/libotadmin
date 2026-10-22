@@ -1,13 +1,15 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { accountsAPI } from '../api/api';
 import {
-  Page, PageHeader, Toolbar, SearchInput, Button, FilterTabs, StatusPill, Table, Th, Td, Avatar,
+  Page, PageHeader, Toolbar, SearchInput, Button, StatusPill, Table, Th, Td, Avatar,
   Loading, EmptyState, ErrorBanner, pageStyles as s,
 } from '../components/Layout';
 import { AddAccountForm, StaffTable, HistoryList } from '../components/StaffAccounts';
 import CredentialSlip from '../components/CredentialSlip';
 import Pagination from '../components/Pagination';
 import Drawer from '../components/Drawer';
+import Icon from '../components/Icon';
 import { theme as t, radius, type } from '../theme';
 import { fmtDay, fmtNum, timeAgo } from '../utils/format';
 import { standingLabel } from '../utils/standing';
@@ -15,33 +17,39 @@ import { standingLabel } from '../utils/standing';
 /*
  * Accounts — the super admin's view of every account in the system (mock
  * defense 2026-10-21; the paper's "Account Management Supervision" and "Admin
- * Account Creation"). Two tabs:
+ * Account Creation"):
  *   Staff     admins and moderators: make one (credential slip), reset a
  *             password, deactivate, move a moderator, see each account's history.
  *   Travelers every app account, paged and searchable, with when it joined, its
  *             standing, and an overview of one traveler.
+ *
+ * Laid out from the user's reference (2026-10-23): the band counts both kinds,
+ * a filter list on the left picks what the table shows. Links can open a view
+ * directly: ?view=travelers, ?status=firstSignIn, ?add=1 (the dashboard's).
  */
 
 const STAFF_ROLES = [
-  { value: '',          label: 'All' },
-  { value: 'admin',     label: 'Admins' },
-  { value: 'moderator', label: 'Moderators' },
-  { value: 'superadmin', label: 'Super admins' },
+  { value: '',          label: 'All staff',    icon: 'users' },
+  { value: 'superadmin', label: 'Super admins', icon: 'tool' },
+  { value: 'admin',     label: 'Admins',       icon: 'shield' },
+  { value: 'moderator', label: 'Moderators',   icon: 'map-pin' },
 ];
 const STAFF_STATUSES = [
-  { value: '',            label: 'Any status' },
-  { value: 'active',      label: 'Active' },
-  { value: 'firstSignIn', label: 'Temporary password' },
-  { value: 'deactivated', label: 'Deactivated' },
+  { value: 'active',      label: 'Active',             icon: 'check' },
+  { value: 'firstSignIn', label: 'Temporary password', icon: 'key' },
+  { value: 'locked',      label: 'Locked',             icon: 'lock' },
+  { value: 'deactivated', label: 'Deactivated',        icon: 'slash' },
 ];
 const TRAVELER_STATUSES = [
-  { value: '',          label: 'All' },
-  { value: 'active',    label: 'In good standing' },
-  { value: 'muted',     label: 'Muted' },
-  { value: 'suspended', label: 'Suspended' },
-  { value: 'banned',    label: 'Banned' },
-  { value: 'inactive',  label: 'Deactivated' },
+  { value: '',          label: 'All travelers',    icon: 'users' },
+  { value: 'active',    label: 'In good standing', icon: 'check' },
+  { value: 'muted',     label: 'Muted',            icon: 'pause' },
+  { value: 'suspended', label: 'Suspended',        icon: 'pause' },
+  { value: 'banned',    label: 'Banned',           icon: 'slash' },
+  { value: 'inactive',  label: 'Deactivated',      icon: 'clock' },
 ];
+// A temporary password whose slip ran out still counts as "Temporary password".
+const staffMatches = (a, status) => !status || a.status === status || (status === 'firstSignIn' && a.status === 'slipExpired');
 const STANDING = {
   active:    { tone: 'success', icon: 'check',  label: 'Good standing' },
   muted:     { tone: 'warning', icon: 'pause',  label: 'Muted' },
@@ -55,92 +63,168 @@ const Standing = ({ status }) => {
 };
 
 export default function Accounts() {
-  const [tab, setTab] = useState('staff');
-  return (
-    <Page wide>
-      <PageHeader
-        title="Accounts"
-        subtitle="Every account in the system. Make admin and moderator accounts, reset their passwords or turn them off, and look up any traveler. Nothing is ever deleted."
-      />
-      <FilterTabs
-        label="Kind of account"
-        value={tab}
-        onChange={setTab}
-        options={[{ value: 'staff', label: 'Admins & moderators' }, { value: 'travelers', label: 'Travelers' }]}
-      />
-      {tab === 'staff' ? <StaffTab /> : <TravelersTab />}
-    </Page>
-  );
-}
+  const [params, setParams] = useSearchParams();
+  const [view, setView] = useState(params.get('view') === 'travelers' ? 'travelers' : 'staff');
+  const [role, setRole] = useState('');
+  const [staffStatus, setStaffStatus] = useState(STAFF_STATUSES.some((o) => o.value === params.get('status')) ? params.get('status') : '');
+  const [travelerStatus, setTravelerStatus] = useState('');
+  const [adding, setAdding] = useState(params.get('add') === '1');
 
-function StaffTab() {
+  // Staff: one list, filtered here.
   const [accounts, setAccounts] = useState([]);
   const [canMake, setCanMake] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [role, setRole] = useState('');
-  const [status, setStatus] = useState('');
-  const [search, setSearch] = useState('');
-  const [adding, setAdding] = useState(false);
-  const [slip, setSlip] = useState(null);
-
-  const load = async () => {
-    setLoading(true);
-    setError('');
+  const [staffLoading, setStaffLoading] = useState(true);
+  const [staffError, setStaffError] = useState('');
+  const loadStaff = useCallback(async () => {
+    setStaffLoading(true);
+    setStaffError('');
     try {
       const data = await accountsAPI.getStaff();
       setAccounts(data.accounts || []);
       setCanMake(data.canMake || []);
     } catch {
-      setError('Couldn’t load the accounts.');
+      setStaffError('Couldn’t load the accounts.');
     }
-    setLoading(false);
-  };
-  useEffect(() => { load(); }, []);
+    setStaffLoading(false);
+  }, []);
+
+  // Travelers: paged on the server; the counts are one small ask per standing.
+  const [travelerCounts, setTravelerCounts] = useState(null);
+  const loadTravelerCounts = useCallback(async () => {
+    const total = (status) => accountsAPI.getTravelers({ limit: 1, ...(status ? { status } : {}) }).then((d) => d.total).catch(() => null);
+    const values = await Promise.all(TRAVELER_STATUSES.map((o) => total(o.value)));
+    setTravelerCounts(Object.fromEntries(TRAVELER_STATUSES.map((o, i) => [o.value, values[i]])));
+  }, []);
+
+  useEffect(() => { loadStaff(); loadTravelerCounts(); }, [loadStaff, loadTravelerCounts]);
+  // The link's choices are read once; the address goes back to /accounts.
+  useEffect(() => { if ([...params.keys()].length) setParams({}, { replace: true }); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const showStaff = (r, st = '') => { setView('staff'); setRole(r); setStaffStatus(st); };
+  const showTravelers = (st) => { setView('travelers'); setTravelerStatus(st); };
+
+  const nStaff = (fn) => (staffLoading ? null : accounts.filter(fn).length);
+  const n = (v) => (v == null ? '…' : fmtNum(v));
+  const onSlip = nStaff((a) => staffMatches(a, 'firstSignIn'));
+  const inTrouble = travelerCounts && travelerCounts.suspended != null && travelerCounts.banned != null ? travelerCounts.suspended + travelerCounts.banned : null;
+  const stats = [
+    { label: 'Admins', hue: 'blue', value: n(nStaff((a) => a.role === 'admin')), hint: 'run spots, reviews and travelers', onClick: () => showStaff('admin'), current: view === 'staff' && role === 'admin' && !staffStatus },
+    { label: 'Moderators', hue: 'blue', value: n(nStaff((a) => a.role === 'moderator')), hint: 'one per town', onClick: () => showStaff('moderator'), current: view === 'staff' && role === 'moderator' && !staffStatus },
+    { label: 'Temporary password', hue: 'blue', value: n(onSlip), tone: onSlip ? 'warn' : undefined, hint: 'waiting for a first sign-in', onClick: () => showStaff('', 'firstSignIn'), current: view === 'staff' && staffStatus === 'firstSignIn' },
+    { label: 'Deactivated staff', hue: 'blue', value: n(nStaff((a) => a.status === 'deactivated')), hint: 'kept, can’t sign in', onClick: () => showStaff('', 'deactivated'), current: view === 'staff' && staffStatus === 'deactivated' },
+    { label: 'Travelers', hue: 'teal', value: n(travelerCounts?.['']), hint: 'every app account', onClick: () => showTravelers(''), current: view === 'travelers' && !travelerStatus },
+    { label: 'Suspended or banned', hue: 'teal', value: n(inTrouble), tone: inTrouble ? 'warn' : undefined, hint: 'locked out of the app', onClick: () => showTravelers('suspended'), current: view === 'travelers' && (travelerStatus === 'suspended' || travelerStatus === 'banned') },
+  ];
+
+  return (
+    <Page>
+      <PageHeader
+        title="Accounts"
+        subtitle="Make admin and moderator accounts, reset their passwords or turn them off, and look up any traveler. Nothing is ever deleted."
+        stats={stats}
+        actions={<>
+          <Button icon="refresh-cw" onClick={() => { loadStaff(); loadTravelerCounts(); }}>Refresh</Button>
+          {canMake.length > 0 && <Button variant="primary" icon="user-plus" onClick={() => { showStaff(''); setAdding(true); }}>Add account</Button>}
+        </>}
+      />
+
+      <div className="sa-grid sa-rail-split">
+        <aside className="sa-panel sa-filters" aria-label="Choose accounts">
+          <div className="sa-filter-group" role="group" aria-label="Staff">
+            <div className="sa-filter-label">Staff</div>
+            {STAFF_ROLES.map((o) => (
+              <button key={o.value || 'all'} type="button" className="sa-filter"
+                aria-pressed={view === 'staff' && role === o.value && !staffStatus} onClick={() => showStaff(o.value)}>
+                <Icon name={o.icon} size={15} /> {o.label}
+                <span className="sa-filter-n">{n(nStaff((a) => !o.value || a.role === o.value))}</span>
+              </button>
+            ))}
+          </div>
+          <div className="sa-filter-group" role="group" aria-label="Staff by status">
+            <div className="sa-filter-label">Staff status</div>
+            {STAFF_STATUSES.map((o) => {
+              const c = nStaff((a) => staffMatches(a, o.value));
+              const flag = (o.value === 'firstSignIn' || o.value === 'locked') && c > 0;
+              return (
+                <button key={o.value} type="button" className="sa-filter"
+                  aria-pressed={view === 'staff' && staffStatus === o.value} onClick={() => showStaff('', o.value)}>
+                  <Icon name={o.icon} size={15} /> {o.label}
+                  <span className={`sa-filter-n${flag ? ' flag' : ''}`}>{n(c)}</span>
+                </button>
+              );
+            })}
+          </div>
+          <div className="sa-filter-group" role="group" aria-label="Travelers">
+            <div className="sa-filter-label">Travelers</div>
+            {TRAVELER_STATUSES.map((o) => (
+              <button key={o.value || 'all'} type="button" className="sa-filter"
+                aria-pressed={view === 'travelers' && travelerStatus === o.value} onClick={() => showTravelers(o.value)}>
+                <Icon name={o.icon} size={15} /> {o.label}
+                <span className="sa-filter-n">{travelerCounts ? n(travelerCounts[o.value]) : ''}</span>
+              </button>
+            ))}
+          </div>
+        </aside>
+
+        <div className="sa-col">
+          {view === 'staff' ? (
+            <StaffView
+              accounts={accounts.filter((a) => (!role || a.role === role) && staffMatches(a, staffStatus))}
+              all={accounts}
+              title={[STAFF_ROLES.find((o) => o.value === role)?.label, STAFF_STATUSES.find((o) => o.value === staffStatus)?.label].filter(Boolean).join(' · ')}
+              canMake={canMake}
+              loading={staffLoading}
+              error={staffError}
+              onDismissError={() => setStaffError('')}
+              adding={adding}
+              setAdding={setAdding}
+              onMade={loadStaff}
+              onChanged={(acc) => setAccounts((prev) => prev.map((a) => (a.id === acc.id ? acc : a)))}
+            />
+          ) : (
+            <TravelersView status={travelerStatus} title={TRAVELER_STATUSES.find((o) => o.value === travelerStatus)?.label} />
+          )}
+        </div>
+      </div>
+    </Page>
+  );
+}
+
+function StaffView({ accounts, all, title, canMake, loading, error, onDismissError, adding, setAdding, onMade, onChanged }) {
+  const [search, setSearch] = useState('');
+  const [slip, setSlip] = useState(null);
 
   const visible = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return accounts.filter((a) => (!role || a.role === role)
-      && (!status || a.status === status || (status === 'firstSignIn' && a.status === 'slipExpired'))
-      && (!q || [a.username, a.name, a.municipality].some((v) => (v || '').toLowerCase().includes(q))));
-  }, [accounts, role, status, search]);
-
-  const count = (r) => accounts.filter((a) => !r || a.role === r).length;
-  const replace = (acc) => setAccounts((prev) => prev.map((a) => (a.id === acc.id ? acc : a)));
+    return accounts.filter((a) => !q || [a.username, a.name, a.municipality].some((v) => (v || '').toLowerCase().includes(q)));
+  }, [accounts, search]);
 
   return (
     <>
-      <Toolbar>
-        <FilterTabs label="Role" value={role} onChange={setRole} options={STAFF_ROLES.map((o) => ({ ...o, count: count(o.value) }))} />
-        <FilterTabs label="Status" value={status} onChange={setStatus} options={STAFF_STATUSES} />
-        <div style={{ flex: 1 }} />
-        <Button icon="refresh-cw" onClick={load} disabled={loading}>Refresh</Button>
-        {!adding && canMake.length > 0 && <Button variant="primary" icon="plus" onClick={() => setAdding(true)}>Add account</Button>}
-      </Toolbar>
-
-      {error && <ErrorBanner onDismiss={() => setError('')}>{error}</ErrorBanner>}
+      {error && <ErrorBanner onDismiss={onDismissError}>{error}</ErrorBanner>}
 
       {adding && (
         <AddAccountForm
           roles={canMake}
-          accounts={accounts}
+          accounts={all}
           onCancel={() => setAdding(false)}
-          onMade={(data) => { setAdding(false); setSlip(data); load(); }}
+          onMade={(data) => { setAdding(false); setSlip(data); onMade(); }}
         />
       )}
 
-      {accounts.length > 0 && (
+      <Toolbar>
+        <span style={a.scope}>{title || 'All staff'} · {fmtNum(visible.length)}</span>
         <SearchInput value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search by username or municipality…" />
-      )}
+      </Toolbar>
 
       {loading ? <Loading label="Loading accounts…" />
-        : visible.length === 0 ? <EmptyState icon="users" title="No accounts match" subtitle="Try another filter." />
+        : visible.length === 0 ? <EmptyState icon="users" title="No accounts match" subtitle="Try another filter or search." />
           : (
             <StaffTable
-              caption="Admin and moderator accounts"
+              caption="Staff accounts"
               accounts={visible}
-              canManage={(a) => canMake.includes(a.role)}
-              onChanged={replace}
+              canManage={(acc) => canMake.includes(acc.role)}
+              onChanged={onChanged}
             />
           )}
 
@@ -154,14 +238,16 @@ function StaffTab() {
 
 const PAGE_SIZE = 25;
 
-function TravelersTab() {
+function TravelersView({ status, title }) {
   const [data, setData] = useState(null);
   const [error, setError] = useState('');
-  const [status, setStatus] = useState('');
   const [query, setQuery] = useState('');
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const [open, setOpen] = useState(null);
+
+  // A new filter from the list starts at the first page.
+  useEffect(() => { setPage(1); }, [status]);
 
   // Types settle for a moment before the list is asked again.
   useEffect(() => {
@@ -180,7 +266,7 @@ function TravelersTab() {
   return (
     <>
       <Toolbar>
-        <FilterTabs label="Standing" value={status} onChange={(v) => { setStatus(v); setPage(1); }} options={TRAVELER_STATUSES} />
+        <span style={a.scope}>{title || 'All travelers'}{data ? ` · ${fmtNum(data.total)}` : ''}</span>
         <SearchInput value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search by name, email or municipality…" />
       </Toolbar>
 
@@ -214,8 +300,8 @@ function TravelersTab() {
                       </div>
                     </Td>
                     <Td muted={!u.municipality}>{u.municipality || '—'}</Td>
-                    <Td>{fmtDay(u.createdAt)}</Td>
-                    <Td muted>{u.lastActiveAt ? timeAgo(u.lastActiveAt) : '—'}</Td>
+                    <Td style={{ whiteSpace: 'nowrap' }}><span className="sa-mono">{fmtDay(u.createdAt)}</span></Td>
+                    <Td muted style={{ whiteSpace: 'nowrap' }}>{u.lastActiveAt ? <span className="sa-mono">{timeAgo(u.lastActiveAt)}</span> : '—'}</Td>
                     <Td align="right">{fmtNum(u.points)}</Td>
                     <Td>
                       <div style={s.pillStack}>
@@ -300,6 +386,7 @@ function TravelerDrawer({ traveler, onClose }) {
 }
 
 const a = {
+  scope:  { fontSize: 15, fontWeight: 700, color: t.textPrimary, whiteSpace: 'nowrap' },
   footer: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' },
   stack:  { display: 'flex', flexDirection: 'column', gap: 18 },
   facts:  { margin: 0, display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 10 },

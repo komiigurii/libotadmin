@@ -26,7 +26,7 @@ html, body, #root {
 }
 
 body {
-  font-family: 'Schibsted Grotesk Variable', 'Schibsted Grotesk', system-ui, -apple-system, sans-serif;
+  font-family: var(--font-sans);
   background: var(--bg);
   color: var(--text-primary);
   font-size: 14px;
@@ -38,7 +38,7 @@ body {
    their own heading markup opt in explicitly rather than inheriting a serif
    into places that want the sans (buttons, table headers, pills). */
 .display-type {
-  font-family: 'Newsreader Variable', 'Newsreader', Georgia, serif;
+  font-family: var(--font-display);
   font-weight: 600;
   letter-spacing: -0.015em;
 }

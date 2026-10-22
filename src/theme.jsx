@@ -92,13 +92,14 @@ export const shadow = {
 /* ── Type ─────────────────────────────────────────────────────────────────
    Newsreader (display serif) for page titles and numerals that should carry
    weight; Schibsted Grotesk for everything else. Both self-hosted, see the
-   @import block at the top of index.css. */
+   @import block at the top of index.css. Tokens, like the colours: the super
+   admin's console swaps in Knewave and Dongle (superadmin.css). */
 export const fonts = {
-  display: "'Newsreader Variable', 'Newsreader', Georgia, serif",
-  sans:    "'Schibsted Grotesk Variable', 'Schibsted Grotesk', system-ui, -apple-system, sans-serif",
+  display: 'var(--font-display)',
+  sans:    'var(--font-sans)',
   // Tables and IDs: tabular figures so columns of numbers line up and a
   // changing count doesn't make the row jitter.
-  mono:    "ui-monospace, 'SF Mono', Menlo, Consolas, monospace",
+  mono:    'var(--font-mono)',
 };
 
 export const type = {

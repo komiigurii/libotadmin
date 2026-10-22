@@ -1,7 +1,10 @@
 import { useEffect, useId, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { authAPI } from '../api/api';
+import { Link, useNavigate } from 'react-router-dom';
+import { authAPI, accountsAPI, activityAPI } from '../api/api';
 import { saveSession, getToken, clearSession } from '../auth/session';
+import { isSuperAdmin } from '../auth/roles';
+import { actionLabel, groupOf, GROUP_HUE } from '../utils/activity';
+import { fmtDateTime, timeAgo } from '../utils/format';
 import { theme as t, radius, fonts, type } from '../theme';
 import { Page, PageHeader, Button } from '../components/Layout';
 import { notify } from '../components/AppAlert';
@@ -155,21 +158,90 @@ export function SetPassword() {
 /** /change-password — any time, from the rail. */
 export default function ChangePassword() {
   const navigate = useNavigate();
+  const form = (
+    <PasswordForm onDone={() => {
+      notify('Your password is changed.', { tone: 'success' });
+      navigate('/dashboard');
+    }} />
+  );
+  const subtitle = 'Choose a new password for your account. You stay signed in here; any other window or device is signed out.';
+  // The super admin's console fills the width: the form, and beside it what
+  // was done with this account lately, so a sign-in you don't recognise
+  // stands out before you change the password.
+  if (isSuperAdmin()) {
+    return (
+      <Page>
+        <PageHeader title="Change password" subtitle={subtitle} />
+        <div className="sa-grid sa-split-even">
+          <section className="sa-panel" style={{ padding: '18px 20px' }} aria-label="New password">{form}</section>
+          <MyRecentActivity />
+        </div>
+      </Page>
+    );
+  }
   return (
     <Page>
-      <PageHeader title="Change password" subtitle="Choose a new password for your account. You stay signed in here; any other window or device is signed out." />
-      <div style={{ ...f.card, maxWidth: 460 }}>
-        <PasswordForm onDone={() => {
-          notify('Your password is changed.', { tone: 'success' });
-          navigate('/dashboard');
-        }} />
-      </div>
+      <PageHeader title="Change password" subtitle={subtitle} />
+      <div style={{ ...f.card, maxWidth: 460 }}>{form}</div>
     </Page>
   );
 }
 
+function MyRecentActivity() {
+  const [entries, setEntries] = useState(undefined);
+  useEffect(() => {
+    let live = true;
+    (async () => {
+      try {
+        const { username } = await authAPI.session();
+        const { accounts } = await accountsAPI.getStaff({ role: 'superadmin' });
+        const me = (accounts || []).find((a) => a.username === username);
+        const data = me ? await activityAPI.get({ actor: me.id, limit: 10 }) : { entries: [] };
+        if (live) setEntries(data.entries || []);
+      } catch {
+        if (live) setEntries(null);
+      }
+    })();
+    return () => { live = false; };
+  }, []);
+  return (
+    <section className="sa-panel" aria-labelledby="my-activity">
+      <div className="sa-panel-head dark">
+        <h2 id="my-activity" className="sa-panel-title">Your account lately</h2>
+        <Link to="/activity">Activity Log <Icon name="chevron-right" size={13} /></Link>
+      </div>
+      {entries === undefined ? <p style={f.pad}>Loading…</p>
+        : entries === null ? <p style={f.pad}>Couldn’t load your activity.</p>
+          : entries.length === 0 ? <p style={f.pad}>Nothing logged for this account yet.</p>
+            : (
+              <ol style={f.recent}>
+                {entries.map((e) => {
+                  const a = actionLabel(e.action);
+                  return (
+                    <li key={e._id} style={f.recentRow}>
+                      <span style={f.recentWhat}>
+                        <span className="sa-swatch" style={{ background: `var(--s-${GROUP_HUE[groupOf(e.action)] || 'slate'})` }} aria-hidden="true" />
+                        {a.label}
+                      </span>
+                      <span style={f.recentText} title={e.summary}>{e.summary && e.summary !== a.label ? e.summary : ''}</span>
+                      <time className="sa-mono" dateTime={e.at} title={fmtDateTime(e.at)} style={{ color: t.textMuted, whiteSpace: 'nowrap' }}>{timeAgo(e.at)}</time>
+                    </li>
+                  );
+                })}
+              </ol>
+            )}
+      <p style={{ ...f.help, margin: 0, padding: '10px 16px 14px' }}>A sign-in you don’t recognise? Change the password now, then tell the team.</p>
+    </section>
+  );
+}
+
 const f = {
-  brand:    { display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', gap: 12 },
+  pad:        { margin: 0, padding: '14px 16px', fontSize: 15, color: t.textMuted },
+  recent:     { listStyle: 'none', margin: 0, padding: 0 },
+  recentRow:  { display: 'grid', gridTemplateColumns: 'minmax(120px, auto) minmax(0, 1fr) auto', alignItems: 'center', gap: 12, padding: '9px 16px', borderBottom: `1px solid ${t.divider}`, fontSize: 15 },
+  recentWhat: { display: 'inline-flex', alignItems: 'center', gap: 8, fontWeight: 700, color: t.textPrimary, whiteSpace: 'nowrap' },
+  recentText: { color: t.textSecondary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  brand:   { display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', gap: 12 },
   logo:     { width: 64, height: 64, objectFit: 'contain', borderRadius: 18, display: 'block' },
   wordmark: { fontFamily: fonts.display, color: t.onBrandSolid, fontWeight: 600, fontSize: 'clamp(24px, 2.4vw, 32px)', lineHeight: 1.1 },
   console:  { color: t.onBrandSolid, fontSize: 13, fontWeight: 500 },

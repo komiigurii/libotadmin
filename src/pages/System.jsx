@@ -1,14 +1,15 @@
 import { useCallback, useEffect, useId, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { systemAPI } from '../api/api';
 import {
-  Page, PageHeader, Button, StatusPill, Table, Th, Td, Loading, EmptyState, ErrorBanner, FilterTabs,
+  Page, PageHeader, Button, StatusPill, Table, Th, Td, Loading, ErrorBanner, FilterTabs,
   pageStyles as s,
 } from '../components/Layout';
 import Pagination from '../components/Pagination';
 import { notify, confirmAction, promptAction } from '../components/AppAlert';
 import Icon from '../components/Icon';
 import { publishHeartbeat } from '../auth/heartbeat';
-import { theme as t, radius, type, fonts } from '../theme';
+import { theme as t, radius, fonts } from '../theme';
 import { fmtDateTime, timeAgo } from '../utils/format';
 
 /*
@@ -30,6 +31,10 @@ import { fmtDateTime, timeAgo } from '../utils/format';
  *                   app and on everyone's dashboard for two weeks.
  *   Tools           clear the server's cache, its health, locked accounts.
  *   Maintenance log every window, who started and ended it, and the summary.
+ *
+ * Laid out like the rest of the super admin's console (2026-10-23): the band's
+ * strip says the state of each switch at a glance; maintenance and notices on
+ * the left, access and tools on the right, the log across the foot.
  */
 
 const toLocalInput = (d) => {
@@ -53,7 +58,9 @@ const duration = (from, to) => minutesText(Math.round((new Date(to) - new Date(f
 
 export default function System() {
   const [state, setState] = useState(null);
+  const [locked, setLocked] = useState(null);
   const [error, setError] = useState('');
+  const location = useLocation();
 
   const load = useCallback(async () => {
     try {
@@ -66,34 +73,56 @@ export default function System() {
       setError(errorOf(err));
     }
   }, []);
+  const loadLocked = useCallback(async () => {
+    try { setLocked(await systemAPI.locked()); } catch { setLocked([]); }
+  }, []);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { load(); loadLocked(); }, [load, loadLocked]);
+
+  // The dashboard's quick actions link to a card here (/system#tools).
+  const ready = !!state;
+  useEffect(() => {
+    if (ready && location.hash) document.getElementById(location.hash.slice(1))?.scrollIntoView({ block: 'start' });
+  }, [ready, location.hash]);
 
   const on = state?.maintenance?.on;
   const restricted = state?.restrictedRoles || [];
+  const roleState = (r) => (restricted.includes(r) ? 'Paused' : on ? 'Read-only' : 'Working');
+  const stats = state && [
+    { label: 'Maintenance', hue: 'violet', small: true, value: on ? 'On' : 'Off', tone: on ? 'warn' : 'good',
+      hint: on ? `since ${timeAgo(state.maintenance.startedAt)}` : state.lastMaintenance ? `last ended ${timeAgo(state.lastMaintenance.endedAt)}` : 'never run' },
+    { label: 'App and website', small: true, value: 'Open', tone: 'good', hint: 'maintenance never closes them' },
+    ...['admin', 'moderator'].map((r) => ({
+      label: r === 'admin' ? 'Admins' : 'Moderators', hue: 'blue', small: true, value: roleState(r), tone: roleState(r) === 'Working' ? 'good' : 'warn',
+      hint: restricted.includes(r) ? 'can’t sign in' : on ? 'can look, can’t save' : 'can sign in and save',
+    })),
+    { label: 'Update notice', hue: 'violet', small: true, value: state.notice ? 'Showing' : 'None', hint: state.notice ? state.notice.title : 'travelers see no notice' },
+    { label: 'Locked accounts', hue: 'blue', value: locked ? locked.length : '…', tone: locked?.length ? 'warn' : undefined,
+      hint: locked?.length ? locked.map((a) => a.username).join(', ') : 'none right now' },
+  ];
 
   return (
     <Page>
       <PageHeader
         title="System"
-        subtitle="Maintenance, who can use the console, update notices and the server’s tools. Only the super admin sees this page."
-        actions={<Button icon="refresh-cw" onClick={load}>Refresh</Button>}
+        subtitle="Maintenance, who can use the console, update notices and the server’s tools."
+        stats={stats || undefined}
+        actions={<Button icon="refresh-cw" onClick={() => { load(); loadLocked(); }}>Refresh</Button>}
       />
       {error && <ErrorBanner onDismiss={() => setError('')}>{error}</ErrorBanner>}
 
       {!state ? <Loading label="Loading the system’s state…" /> : (
         <>
-          <div style={x.statusRow} role="list" aria-label="System status">
-            {/* Maintenance never closes the app or the website. */}
-            <StatusChip label="App and website" ok okText="Open" />
-            <StatusChip label="Admins" ok={!restricted.includes('admin') && !on} okText="Working" offText={restricted.includes('admin') ? 'Paused' : 'Read-only'} />
-            <StatusChip label="Moderators" ok={!restricted.includes('moderator') && !on} okText="Working" offText={restricted.includes('moderator') ? 'Paused' : 'Read-only'} />
+          <div className="sa-grid sa-split-even">
+            <div className="sa-col">
+              <MaintenanceCard state={state} onChanged={load} />
+              <NoticesCard />
+            </div>
+            <div className="sa-col">
+              <AccessCard restricted={restricted} maintenanceOn={on} onChanged={load} />
+              <ToolsCard locked={locked} reloadLocked={loadLocked} />
+            </div>
           </div>
-
-          <MaintenanceCard state={state} onChanged={load} />
-          <AccessCard restricted={restricted} maintenanceOn={on} onChanged={load} />
-          <NoticesCard />
-          <ToolsCard />
           <MaintenanceLog key={on ? 'on' : 'off'} />
         </>
       )}
@@ -101,23 +130,23 @@ export default function System() {
   );
 }
 
-function StatusChip({ label, ok, okText, offText }) {
+// One card on this page: a title bar, a line of what it does, its controls.
+// `table`: the card holds a table flush to its edges, under an ink head
+// (the console's rule for tables; DESIGN.md).
+function Section({ id, title, description, children, tone, meta, table }) {
+  const titleId = useId();
   return (
-    <div style={x.chip} role="listitem">
-      <span style={{ ...x.dot, background: ok ? t.success : t.warning }} aria-hidden="true" />
-      <span style={x.chipLabel}>{label}</span>
-      <span style={{ ...x.chipValue, color: ok ? t.success : t.warning }}>{ok ? okText : offText}</span>
-    </div>
-  );
-}
-
-function Section({ title, description, children, tone }) {
-  const id = useId();
-  return (
-    <section style={{ ...x.card, ...(tone === 'warning' ? x.cardWarning : null) }} aria-labelledby={id}>
-      <h2 id={id} style={x.cardTitle}>{title}</h2>
-      {description && <p style={x.cardDesc}>{description}</p>}
-      {children}
+    <section id={id} className="sa-panel" style={{ ...(tone === 'warning' ? x.cardWarning : null), ...(table ? { overflow: 'hidden' } : null), scrollMarginTop: 68 }} aria-labelledby={titleId}>
+      <div className={`sa-panel-head${table ? ' dark' : ''}`}>
+        <h2 id={titleId} className="sa-panel-title">{title}</h2>
+        {meta}
+      </div>
+      {table ? children : (
+        <div className="sa-panel-body">
+          {description && <p style={x.cardDesc}>{description}</p>}
+          {children}
+        </div>
+      )}
     </section>
   );
 }
@@ -175,10 +204,12 @@ function MaintenanceCard({ state, onChanged }) {
 
   return (
     <Section
+      id="maintenance"
       title="Maintenance"
       tone={m.on ? 'warning' : undefined}
+      meta={m.on ? <StatusPill tone="warning" icon="tool">On</StatusPill> : <StatusPill tone="success" icon="check">Off</StatusPill>}
       description={m.on
-        ? `On since ${fmtDateTime(m.startedAt)}${m.startedBy?.username ? `, started by ${m.startedBy.username}` : ''}. Staff can look but not save; travelers aren’t affected.`
+        ? <>On since <span className="sa-mono">{fmtDateTime(m.startedAt)}</span>{m.startedBy?.username ? `, started by ${m.startedBy.username}` : ''}. Staff can look but not save; travelers aren’t affected.</>
         : 'For work on the console: while it’s on, admins and moderators can look but not save. The app and the website keep working for travelers. Starts now and lasts until you end it.'}
     >
       <div style={x.formGrid}>
@@ -235,27 +266,38 @@ function AccessCard({ restricted, maintenanceOn, onChanged }) {
     setBusy('');
   };
 
+  // One card per kind of staff account, each with its switch: on = they can
+  // use the console (the user's reference has a card per portal).
   return (
     <Section
       title="Who can use the console"
       description={`Pause one kind of staff account without closing the app, e.g. moderators while their pages change.${maintenanceOn ? ' During maintenance all staff are read-only anyway.' : ''}`}
     >
-      <div style={x.accessGrid}>
+      <div className="sa-rows" style={x.accessGrid}>
         {['admin', 'moderator'].map((role) => {
           const paused = restricted.includes(role);
+          const labelId = `access-${role}`;
           return (
-            <div key={role} style={x.accessRow}>
+            <div key={role} style={{ ...x.accessRow, ...(paused ? x.accessPaused : null) }}>
+              <span style={x.accessIcon}><Icon name={role === 'admin' ? 'shield' : 'map-pin'} size={18} /></span>
               <div style={{ minWidth: 0, flex: 1 }}>
                 <div style={x.accessName}>
-                  {ROLE_TEXT[role].name}
+                  <span id={labelId}>{ROLE_TEXT[role].name}</span>
                   <StatusPill tone={paused ? 'warning' : 'success'} icon={paused ? 'pause' : 'check'}>{paused ? 'Paused' : 'Can sign in'}</StatusPill>
                 </div>
                 <p style={x.accessDesc}>{paused ? ROLE_TEXT[role].off : ROLE_TEXT[role].on}</p>
               </div>
-              <Button size="sm" variant={paused ? 'success' : 'warning'} icon={paused ? 'user-check' : 'user-minus'}
-                disabled={busy === role} onClick={() => toggle(role)}>
-                {paused ? 'Let them in' : 'Pause access'}
-              </Button>
+              <button
+                type="button"
+                role="switch"
+                className="sa-switch"
+                aria-checked={!paused}
+                aria-labelledby={labelId}
+                aria-describedby={`${labelId}-hint`}
+                disabled={busy === role}
+                onClick={() => toggle(role)}
+              />
+              <span id={`${labelId}-hint`} className="visually-hidden">{paused ? 'Turn on to let them back in' : 'Turn off to pause their access'}</span>
             </div>
           );
         })}
@@ -311,7 +353,7 @@ function NoticesCard() {
 
   const shown = tried ? errors : {};
   return (
-    <Section title="Update notices" description="Tell travelers and staff about an update: one that’s coming, or one that’s done. The newest shows for two weeks.">
+    <Section id="notices" title="Update notices" description="Tell travelers and staff about an update: one that’s coming, or one that’s done. The newest shows for two weeks.">
       <form onSubmit={publish} noValidate>
         <FilterTabs label="Kind of notice" value={kind} onChange={setKind}
           options={[{ value: 'scheduled', label: 'An update is coming' }, { value: 'completed', label: 'An update is done' }]} />
@@ -351,7 +393,7 @@ function NoticesCard() {
                     : n._id === list.showingId ? <StatusPill tone="brand" icon="eye">Showing</StatusPill> : null}
                 </div>
                 <div style={s.itemDate}>
-                  {n.kind === 'scheduled' ? `Coming ${fmtDateTime(n.at)}` : 'Done'} · published {timeAgo(n.createdAt)}{n.publishedBy?.username ? ` by ${n.publishedBy.username}` : ''}
+                  {n.kind === 'scheduled' ? <>Coming <span className="sa-mono">{fmtDateTime(n.at)}</span></> : 'Done'} · published <span className="sa-mono">{timeAgo(n.createdAt)}</span>{n.publishedBy?.username ? ` by ${n.publishedBy.username}` : ''}
                 </div>
                 {n.message && <p style={x.noticeText}>{n.message}</p>}
               </div>
@@ -367,10 +409,9 @@ function NoticesCard() {
 
 // ── Tools ──────────────────────────────────────────────────────────────────
 
-function ToolsCard() {
+function ToolsCard({ locked, reloadLocked }) {
   const [cleared, setCleared] = useState(null);
   const [health, setHealth] = useState(null);
-  const [locked, setLocked] = useState(null);
   const [busy, setBusy] = useState('');
 
   const run = async (key, fn) => {
@@ -385,18 +426,15 @@ function ToolsCard() {
     setCleared(await systemAPI.clearCache());
   });
   const checkHealth = () => run('health', async () => setHealth((await systemAPI.health()).health));
-  const loadLocked = () => run('locked', async () => setLocked(await systemAPI.locked()));
   const unlock = (a) => run(`unlock-${a.id}`, async () => {
     await systemAPI.unlock(a.id);
     notify(`${a.username} can sign in again.`, { tone: 'success' });
-    setLocked(await systemAPI.locked());
+    await reloadLocked();
   });
 
-  useEffect(() => { loadLocked(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
   return (
-    <Section title="Tools" description="Everyday fixes that used to need a developer’s machine.">
-      <div style={x.tools}>
+    <Section id="tools" title="Tools" description="Everyday fixes that used to need a developer’s machine.">
+      <div className="sa-rows" style={x.tools}>
         <div style={x.tool}>
           <div style={x.toolHead}>
             <Icon name="refresh-cw" size={16} color={t.textSecondary} />
@@ -442,7 +480,7 @@ function ToolsCard() {
                     <li key={a.id} style={x.lockedItem}>
                       <span style={{ minWidth: 0 }}>
                         <strong style={{ color: t.textPrimary }}>{a.username}</strong>
-                        <span style={s.itemDate}> · until {fmtDateTime(a.lockedUntil)}</span>
+                        <span style={s.itemDate}> · until <span className="sa-mono">{fmtDateTime(a.lockedUntil)}</span></span>
                       </span>
                       <Button size="sm" icon="key" onClick={() => unlock(a)} disabled={busy === `unlock-${a.id}`}>Unlock</Button>
                     </li>
@@ -467,16 +505,20 @@ function MaintenanceLog() {
   }, [page]);
 
   return (
-    <Section title="Maintenance log" description="Every maintenance window: when, how long, who started and ended it, and what was done.">
-      {!data ? <Loading label="Loading the log…" />
-        : data.logs.length === 0 ? <EmptyState icon="tool" title="No maintenance yet" subtitle="Each one is kept here once it starts." />
+    <Section
+      table
+      title="Maintenance log"
+      meta={<span className="sa-panel-meta">Every window: when, how long, who, and what was done</span>}
+    >
+      {!data ? <p style={x.flushNote}>Loading the log…</p>
+        : data.logs.length === 0 ? <p style={x.flushNote}>No maintenance yet. Each one is kept here once it starts.</p>
           : (
             <>
-              <Table caption="Maintenance log" head={<><Th>Started</Th><Th>Length</Th><Th>By</Th><Th>What was done</Th></>}>
+              <Table bare caption="Maintenance log" head={<><Th>Started</Th><Th>Length</Th><Th>By</Th><Th>What was done</Th></>}>
                 {data.logs.map((l) => (
                   <tr key={l._id}>
-                    <Td style={{ whiteSpace: 'nowrap' }}>{fmtDateTime(l.startedAt)}</Td>
-                    <Td muted style={{ whiteSpace: 'nowrap' }}>{l.endedAt ? duration(l.startedAt, l.endedAt) : <StatusPill tone="warning" icon="clock">Going on</StatusPill>}</Td>
+                    <Td style={{ whiteSpace: 'nowrap' }}><span className="sa-mono">{fmtDateTime(l.startedAt)}</span></Td>
+                    <Td muted style={{ whiteSpace: 'nowrap' }}>{l.endedAt ? <span className="sa-mono">{duration(l.startedAt, l.endedAt)}</span> : <StatusPill tone="warning" icon="clock">Going on</StatusPill>}</Td>
                     <Td muted>{l.startedBy?.username || '—'}{l.endedBy?.username && l.endedBy.username !== l.startedBy?.username ? ` → ${l.endedBy.username}` : ''}</Td>
                     <Td>
                       <span style={{ ...s.clampCell, maxWidth: 420, whiteSpace: 'normal' }}>
@@ -486,7 +528,7 @@ function MaintenanceLog() {
                   </tr>
                 ))}
               </Table>
-              {data.pages > 1 && <Pagination page={data.page} pages={data.pages} onChange={setPage} label="Maintenance log pages" />}
+              {data.pages > 1 && <div style={{ padding: '10px 16px' }}><Pagination page={data.page} pages={data.pages} onChange={setPage} label="Maintenance log pages" /></div>}
             </>
           )}
     </Section>
@@ -494,21 +536,10 @@ function MaintenanceLog() {
 }
 
 const x = {
-  statusRow: { display: 'flex', gap: 10, flexWrap: 'wrap' },
-  chip: {
-    display: 'inline-flex', alignItems: 'center', gap: 8, padding: '7px 14px',
-    background: t.cardBg, border: `1px solid ${t.border}`, borderRadius: radius.pill,
-  },
-  dot:       { width: 8, height: 8, borderRadius: '50%', flexShrink: 0 },
-  chipLabel: { fontSize: 12.5, fontWeight: 600, color: t.textSecondary },
-  chipValue: { fontSize: 13, fontWeight: 700 },
-
-  // Longhand border, so the amber edge swaps cleanly when maintenance toggles.
-  card:        { background: t.cardBg, borderWidth: 1, borderStyle: 'solid', borderColor: t.border, borderRadius: radius.lg, padding: '18px 20px' },
   // Maintenance on: an amber edge, the one loud thing on the page.
   cardWarning: { borderColor: t.warning },
-  cardTitle:   { ...type.cardTitle, color: t.textPrimary, margin: 0 },
-  cardDesc:    { fontSize: 13.5, color: t.textSecondary, lineHeight: 1.5, margin: '4px 0 14px', maxWidth: 720 },
+  flushNote:   { margin: 0, padding: '14px 16px', fontSize: 14, color: t.textMuted },
+  cardDesc:    { fontSize: 13.5, color: t.textSecondary, lineHeight: 1.5, margin: '0 0 14px', maxWidth: 720 },
   formGrid:    { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '12px 16px' },
   optional:    { fontWeight: 500, color: t.textMuted },
   hint:        { fontSize: 12, color: t.textMuted, margin: '5px 0 0' },
@@ -516,8 +547,11 @@ const x = {
   // Shorthand, like the s.select / s.textarea it's spread over.
   invalid:     { border: `1px solid ${t.danger}` },
 
-  accessGrid:  { display: 'flex', flexDirection: 'column', gap: 10 },
-  accessRow:   { display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap', padding: '12px 14px', border: `1px solid ${t.divider}`, borderRadius: radius.md, background: t.sidebarBg },
+  accessGrid:  { display: 'flex', flexDirection: 'column', margin: '0 -8px' },
+  // Rows divided by hairlines (sa-rows), not cards inside the card.
+  accessRow:   { display: 'flex', alignItems: 'center', gap: 14, padding: '12px 8px' },
+  accessPaused: { background: t.warningBg, borderRadius: radius.sm },
+  accessIcon:  { width: 38, height: 38, borderRadius: radius.md, display: 'grid', placeItems: 'center', flexShrink: 0, background: 'var(--s-blue-soft)', color: t.textPrimary },
   accessName:  { display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', fontSize: 14, fontWeight: 700, color: t.textPrimary },
   accessDesc:  { fontSize: 12.5, color: t.textMuted, margin: '3px 0 0', lineHeight: 1.45 },
 
@@ -525,8 +559,8 @@ const x = {
   noticeItem:  { display: 'flex', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' },
   noticeText:  { fontSize: 13, color: t.textSecondary, margin: '4px 0 0', lineHeight: 1.45, overflowWrap: 'anywhere' },
 
-  tools:       { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 12 },
-  tool:        { display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 8, padding: '14px 16px', border: `1px solid ${t.divider}`, borderRadius: radius.md, background: t.sidebarBg, minWidth: 0 },
+  tools:       { display: 'flex', flexDirection: 'column' },
+  tool:        { display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 8, padding: '14px 0', minWidth: 0 },
   toolHead:    { display: 'flex', alignItems: 'center', gap: 8 },
   toolName:    { fontSize: 14, color: t.textPrimary },
   toolDesc:    { fontSize: 12.5, color: t.textMuted, lineHeight: 1.45, margin: 0 },

@@ -10,6 +10,10 @@ import { fmtDateTime, fmtDay, timeAgo } from '../utils/format';
 import { BULACAN_MUNICIPALITIES } from '../utils/municipalities';
 import { usernameProblem } from '../utils/passwordRule';
 import { actionLabel, STAFF_STATUS } from '../utils/activity';
+import { isSuperAdmin } from '../auth/roles';
+
+// A square icon-only button (the super admin's account rows).
+const sq = { width: 34, minHeight: 34, padding: 0 };
 
 /*
  * Admin and moderator accounts, shared by the super admin's Accounts page and
@@ -200,6 +204,7 @@ export function StaffTable({ accounts, extra, onChanged, canManage, caption = 'S
   });
 
   if (!accounts.length) return null;
+  const compact = isSuperAdmin();
   return (
     <>
       <Table
@@ -232,27 +237,49 @@ export function StaffTable({ accounts, extra, onChanged, canManage, caption = 'S
               <Td><StaffStatus status={a.status} /></Td>
               {extra && <Td align="right">{extra.cell(a)}</Td>}
               <Td>
-                <div style={s.personName}>{a.lastLoginAt ? `Signed in ${timeAgo(a.lastLoginAt)}` : 'Never signed in'}</div>
-                <div style={{ ...s.personSub, maxWidth: 180 }}>
+                <div style={s.personName}>{a.lastLoginAt ? <>Signed in <span className="sa-mono">{timeAgo(a.lastLoginAt)}</span></> : 'Never signed in'}</div>
+                {/* The super admin's rows have room (icon actions), so the
+                    whole line shows instead of being cut at 180 px. */}
+                <div style={compact ? { ...s.personSub, whiteSpace: 'normal' } : { ...s.personSub, maxWidth: 180 }}>
                   {a.lastChange
-                    ? <span title={a.lastChange.summary}>{actionLabel(a.lastChange.action).label} {fmtDay(a.lastChange.at)} by {a.lastChange.by || 'the system'}</span>
-                    : <span>Made {fmtDay(a.createdAt)}{a.createdBy ? ` by ${a.createdBy}` : ''}</span>}
+                    ? <span title={a.lastChange.summary}>{actionLabel(a.lastChange.action).label} <span className="sa-mono">{fmtDay(a.lastChange.at)}</span> by {a.lastChange.by || 'the system'}</span>
+                    : <span>Made <span className="sa-mono">{fmtDay(a.createdAt)}</span>{a.createdBy ? ` by ${a.createdBy}` : ''}</span>}
                 </div>
               </Td>
               <Td align="right">
-                <div style={{ ...s.cellActions, minWidth: 236 }}>
-                  <Button size="sm" icon="history" onClick={() => setHistoryOf(a)} aria-label={`History of ${a.username}`}>History</Button>
-                  {mine && <>
-                    <Button size="sm" icon="key" disabled={busy === a.id || !a.active} onClick={() => reset(a)}>Reset password</Button>
-                    {a.role === 'moderator' && (
-                      <Button size="sm" icon="move" disabled={busy === a.id || !a.active} onClick={() => setMoving(a)}>Move</Button>
-                    )}
-                    <Button size="sm" variant={a.active ? 'danger' : 'success'} icon={a.active ? 'user-minus' : 'user-check'}
-                      disabled={busy === a.id} onClick={() => toggle(a)}>
-                      {a.active ? 'Deactivate' : 'Reactivate'}
-                    </Button>
-                  </>}
-                </div>
+                {compact ? (
+                  // The super admin's console: one row of square icon buttons,
+                  // each coloured by what it does, named for screen readers
+                  // and in the tooltip (the user's reference does the same).
+                  <div style={{ ...s.cellActions, flexWrap: 'nowrap' }}>
+                    <Button icon="history" style={sq} onClick={() => setHistoryOf(a)} aria-label={`History of ${a.username}`} title="History" />
+                    {mine && <>
+                      <Button variant="warning" icon="key" style={sq} disabled={busy === a.id || !a.active} onClick={() => reset(a)}
+                        aria-label={`Reset the password of ${a.username}`} title="Reset password" />
+                      {a.role === 'moderator' && (
+                        <Button variant="subtle" icon="move" style={sq} disabled={busy === a.id || !a.active} onClick={() => setMoving(a)}
+                          aria-label={`Move ${a.username} to another town`} title="Move to another town" />
+                      )}
+                      <Button variant={a.active ? 'danger' : 'success'} icon={a.active ? 'user-minus' : 'user-check'} style={sq}
+                        disabled={busy === a.id} onClick={() => toggle(a)}
+                        aria-label={`${a.active ? 'Deactivate' : 'Reactivate'} ${a.username}`} title={a.active ? 'Deactivate' : 'Reactivate'} />
+                    </>}
+                  </div>
+                ) : (
+                  <div style={{ ...s.cellActions, minWidth: 236 }}>
+                    <Button size="sm" icon="history" onClick={() => setHistoryOf(a)} aria-label={`History of ${a.username}`}>History</Button>
+                    {mine && <>
+                      <Button size="sm" icon="key" disabled={busy === a.id || !a.active} onClick={() => reset(a)}>Reset password</Button>
+                      {a.role === 'moderator' && (
+                        <Button size="sm" icon="move" disabled={busy === a.id || !a.active} onClick={() => setMoving(a)}>Move</Button>
+                      )}
+                      <Button size="sm" variant={a.active ? 'danger' : 'success'} icon={a.active ? 'user-minus' : 'user-check'}
+                        disabled={busy === a.id} onClick={() => toggle(a)}>
+                        {a.active ? 'Deactivate' : 'Reactivate'}
+                      </Button>
+                    </>}
+                  </div>
+                )}
               </Td>
             </tr>
           );

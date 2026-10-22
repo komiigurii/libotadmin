@@ -1,8 +1,9 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
-import { statsAPI } from '../api/api';
+import { loadUsage } from '../utils/usage';
 import { Card, FilterTabs, Button, pageStyles as s } from './Layout';
 import { theme as t, radius, type } from '../theme';
 import { fmtNum } from '../utils/format';
+import { isSuperAdmin } from '../auth/roles';
 
 /*
  * How the app is used, day by day (mock defense 2026-10-21: "optional: graph
@@ -57,7 +58,7 @@ const H = 132;          // plot height
 const AXIS_W = 30;      // room for the y ticks
 const X_LABELS_H = 18;
 
-function ColumnChart({ points, label }) {
+function ColumnChart({ points, label, fill = 'var(--data-1)' }) {
   const wrapRef = useRef(null);
   const width = useWidth(wrapRef);
   const [hover, setHover] = useState(null);
@@ -92,7 +93,7 @@ function ColumnChart({ points, label }) {
             const on = hover === i;
             return (
               <g key={p.day}>
-                <path d={column(x, (p.count / top) * H)} fill="var(--data-1)" opacity={hover == null || on ? 1 : 0.55} />
+                <path d={column(x, (p.count / top) * H)} fill={fill} opacity={hover == null || on ? 1 : 0.55} />
                 {/* The whole day's band is the hover target, not just the column. */}
                 <rect
                   x={AXIS_W + i * band} y={0} width={band} height={H} fill="transparent"
@@ -123,6 +124,7 @@ function ColumnChart({ points, label }) {
 }
 
 export default function UsageCharts() {
+  const superAdmin = isSuperAdmin();
   const [days, setDays] = useState(30);
   const [data, setData] = useState(null);
   const [error, setError] = useState('');
@@ -133,7 +135,7 @@ export default function UsageCharts() {
   useEffect(() => {
     let live = true;
     setLoading(true);
-    statsAPI.usage(days)
+    loadUsage(days)
       .then((d) => { if (live) { setData(d); setError(''); } })
       .catch(() => { if (live) setError('Couldn’t load the usage figures.'); })
       .finally(() => { if (live) setLoading(false); });
@@ -185,21 +187,28 @@ export default function UsageCharts() {
               </table>
             </div>
           ) : (
-            <div id={tableId} style={c.grid}>
+            <div id={tableId} className="usage-grid" style={c.grid}>
               {SERIES.map((x) => {
                 const points = data.series[x.key];
                 const total = points.reduce((n, p) => n + p.count, 0);
                 const best = points.reduce((m, p) => (p.count > m.count ? p : m), points[0]);
+                // The super admin's console gives each measure its own hue
+                // (superadmin.css --chart-*), matching its swatch in the
+                // dashboard's strip; elsewhere all four stay the one data hue.
+                const fill = `var(--chart-${x.key}, var(--data-1))`;
                 return (
                   <section key={x.key} style={c.panel} aria-label={x.title}>
                     <div style={c.panelHead}>
-                      <h3 style={c.panelTitle}>{x.title}</h3>
+                      <h3 style={c.panelTitle}>
+                        {superAdmin && <span style={{ ...c.swatch, background: fill }} aria-hidden="true" />}
+                        {x.title}
+                      </h3>
                       <span style={c.total}>
                         {fmtNum(x.key === 'active' ? best.count : total)}
                         <span style={c.totalUnit}>{x.key === 'active' ? ' on the busiest day' : ` in ${days} days`}</span>
                       </span>
                     </div>
-                    <ColumnChart points={points} label={`${x.title}, last ${days} days, ${fmtNum(total)} in all`} />
+                    <ColumnChart points={points} fill={fill} label={`${x.title}, last ${days} days, ${fmtNum(total)} in all`} />
                     <p style={c.note}>{x.note}{x.key === 'active' && sinceText ? ` ${sinceText}` : ''}</p>
                   </section>
                 );
@@ -221,7 +230,8 @@ const c = {
   grid:     { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '18px 24px' },
   panel:    { minWidth: 0 },
   panelHead: { display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap', marginBottom: 8 },
-  panelTitle: { fontSize: 13.5, fontWeight: 600, color: t.textPrimary, margin: 0 },
+  panelTitle: { fontSize: 13.5, fontWeight: 600, color: t.textPrimary, margin: 0, display: 'flex', alignItems: 'center', gap: 7 },
+  swatch:   { width: 10, height: 10, borderRadius: 3, flexShrink: 0 },
   total:    { fontSize: 18, fontWeight: 600, color: t.textPrimary },
   totalUnit: { fontSize: 12, fontWeight: 500, color: t.textMuted },
   note:     { fontSize: 12, color: t.textMuted, margin: '6px 0 0', lineHeight: 1.45 },

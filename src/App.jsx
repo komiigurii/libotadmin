@@ -7,6 +7,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 // on the login screen.
 import Login  from './pages/Login';
 import Navbar from './components/Navbar';
+import SuperShell from './components/SuperShell';
 const Dashboard        = lazy(() => import('./pages/Dashboard'));
 const Spots            = lazy(() => import('./pages/Spots'));
 const SpotManagement   = lazy(() => import('./pages/SpotManagement'));
@@ -85,6 +86,33 @@ const SuperAdminRoute = ({ children }) => (
   isSuperAdmin() ? children : <Navigate to="/dashboard" replace />
 );
 
+// The frame around every signed-in page. The super admin's console has its
+// own (components/SuperShell.jsx: dark rail, top bar, Knewave and Dongle);
+// admins and moderators keep the cream rail. A component, so the role is read
+// when the frame mounts after sign-in, not when the app first loaded.
+function ConsoleShell({ children }) {
+  if (isSuperAdmin()) {
+    return (
+      <SuperShell>
+        <SessionWatcher />
+        <main id="main" tabIndex={-1} className="sa-main">{children}</main>
+      </SuperShell>
+    );
+  }
+  return (
+    <div className="admin-shell" style={shell.wrap}>
+      {/* First focusable element on the page. Without it a keyboard user tabs
+          through the entire sidebar on every page load before reaching the
+          table they came for. */}
+      <a href="#main" className="skip-link">Skip to content</a>
+      <Navbar />
+      <SessionWatcher />
+      {/* id + tabIndex give the skip link somewhere to land. */}
+      <main id="main" tabIndex={-1} style={shell.main}>{children}</main>
+    </div>
+  );
+}
+
 export default function App() {
   return (
     <AppAlertProvider>
@@ -107,15 +135,7 @@ export default function App() {
           path="/*"
           element={
             <PrivateRoute>
-              <div className="admin-shell" style={shell.wrap}>
-                {/* First focusable element on the page. Without it a keyboard
-                    user tabs through the entire sidebar on every page load
-                    before reaching the table they came for. */}
-                <a href="#main" className="skip-link">Skip to content</a>
-                <Navbar />
-                <SessionWatcher />
-                {/* id + tabIndex give the skip link below somewhere to land. */}
-                <main id="main" tabIndex={-1} style={shell.main}>
+              <ConsoleShell>
                   <MaintenanceBanner />
                   <Suspense fallback={<PageFallback />}>
                     <Routes>
@@ -161,8 +181,7 @@ export default function App() {
                       <Route path="*" element={<Navigate to="/dashboard" replace />} />
                     </Routes>
                   </Suspense>
-                </main>
-              </div>
+              </ConsoleShell>
             </PrivateRoute>
           }
         />

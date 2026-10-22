@@ -12,6 +12,9 @@ dist
 dist-ssr
 *.local
 
+# Impeccable's review screenshots (local evidence, regenerated each review)
+.impeccable/review/
+
 # Environment / secrets
 .env
 .env.local

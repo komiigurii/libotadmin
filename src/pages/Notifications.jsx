@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { notificationsAPI } from '../api/api';
-import { Page, PageHeader, Button, Loading, EmptyState, ErrorBanner, pageStyles as s } from '../components/Layout';
+import { Page, PageHeader, Button, Loading, EmptyState, ErrorBanner, Table, Th, Td, pageStyles as s } from '../components/Layout';
 import Pagination from '../components/Pagination';
 import Icon from '../components/Icon';
-import { publishHeartbeat } from '../auth/heartbeat';
+import { publishHeartbeat, useHeartbeat } from '../auth/heartbeat';
+import { isSuperAdmin } from '../auth/roles';
 import { theme as t, radius } from '../theme';
-import { fmtDateTime, timeAgo } from '../utils/format';
+import { fmtDateTime, fmtNum, timeAgo } from '../utils/format';
 
 /*
  * Notifications — the bell, for every role (mock defense 2026-10-21): the
@@ -14,12 +15,13 @@ import { fmtDateTime, timeAgo } from '../utils/format';
  * your account, and answers to the tickets you sent.
  */
 
+// `hue`: the kind's series hue in the super admin's console (superadmin.css).
 const KIND = {
-  maintenance: { icon: 'tool',          label: 'System' },
-  update:      { icon: 'sparkle',       label: 'Update' },
-  account:     { icon: 'shield',        label: 'Your account' },
-  ticket:      { icon: 'message-square', label: 'Ticket' },
-  request:     { icon: 'send',          label: 'Request' },
+  maintenance: { icon: 'tool',          label: 'System',       hue: 'violet' },
+  update:      { icon: 'sparkle',       label: 'Update',       hue: 'violet' },
+  account:     { icon: 'shield',        label: 'Your account', hue: 'blue' },
+  ticket:      { icon: 'message-square', label: 'Ticket',      hue: 'marigold' },
+  request:     { icon: 'send',          label: 'Request',      hue: 'slate' },
 };
 
 export default function Notifications() {
@@ -61,18 +63,68 @@ export default function Notifications() {
     }
   };
 
+  const superAdmin = isSuperAdmin();
+  const beat = useHeartbeat();
+  // Most of the super admin's bell is tickets, so the strip says how many
+  // still wait (the rail's Tickets badge, from the heartbeat).
+  const stats = superAdmin && [
+    { label: 'Unread', value: data ? fmtNum(data.unread) : '…', tone: data?.unread ? 'warn' : 'good', hint: data?.unread ? 'marked with a dot below' : 'you’re up to date' },
+    { label: 'All notifications', value: data ? fmtNum(data.total) : '…', hint: 'kept in your bell' },
+    { label: 'Tickets waiting', hue: 'marigold', to: '/tickets', value: beat?.openTickets != null ? fmtNum(beat.openTickets) : '…', hint: 'open or being worked on' },
+  ];
+
   return (
     <Page>
       <PageHeader
         title="Notifications"
         count={data?.unread || undefined}
-        subtitle="Maintenance and updates, changes to your account, and answers to your tickets."
+        subtitle={superAdmin
+          ? 'New tickets and password requests, locked accounts, maintenance and updates, and changes to your account.'
+          : 'Maintenance and updates, changes to your account, and answers to your tickets.'}
+        stats={stats || undefined}
         actions={data?.unread > 0 && <Button icon="check" onClick={readAll}>Mark all read</Button>}
       />
       {error && <ErrorBanner onDismiss={() => setError('')}>{error}</ErrorBanner>}
       {!data ? <Loading label="Loading notifications…" />
         : data.notifications.length === 0 ? <EmptyState icon="bell" title="Nothing yet" subtitle="You’ll be told here when something needs you." />
-          : (
+          : superAdmin ? (
+            // The super admin's console: one dense table, a row per notice.
+            <>
+              <Table caption="Notifications" head={<><Th width={160}>Kind</Th><Th>Notification</Th><Th width={130}>When</Th><Th width={90} align="right" /></>}>
+                {data.notifications.map((n) => {
+                  const k = KIND[n.kind] || KIND.update;
+                  const unread = !n.readAt;
+                  return (
+                    <tr key={n._id} onClick={() => open(n)} style={{ cursor: 'pointer' }}>
+                      <Td>
+                        <span style={x.kind}>
+                          <span className="sa-swatch" style={{ background: `var(--s-${k.hue})` }} aria-hidden="true" />
+                          {k.label}
+                        </span>
+                      </Td>
+                      <Td>
+                        <div style={{ ...x.title, display: 'flex', alignItems: 'center', gap: 8, fontWeight: unread ? 700 : 600 }}>
+                          {unread && <span style={{ ...x.dot, marginTop: 0 }} aria-hidden="true" />}
+                          {unread && <span className="visually-hidden">Unread: </span>}
+                          {n.title}
+                        </div>
+                        {n.body && <div style={{ ...x.body, marginTop: 2 }}>{n.body}</div>}
+                      </Td>
+                      <Td muted><span className="sa-mono" title={fmtDateTime(n.createdAt)}>{timeAgo(n.createdAt)}</span></Td>
+                      <Td align="right">
+                        {(n.link || unread) && (
+                          <Button size="sm" onClick={(e) => { e.stopPropagation(); open(n); }} aria-label={`${n.link ? 'Open' : 'Mark read'}: ${n.title}`}>
+                            {n.link ? 'Open' : 'Mark read'}
+                          </Button>
+                        )}
+                      </Td>
+                    </tr>
+                  );
+                })}
+              </Table>
+              {data.pages > 1 && <Pagination page={data.page} pages={data.pages} onChange={setPage} label="Notification pages" />}
+            </>
+          ) : (
             <>
               <ul style={x.list} aria-label="Notifications">
                 {data.notifications.map((n) => {
@@ -105,6 +157,7 @@ export default function Notifications() {
 }
 
 const x = {
+  kind: { display: 'inline-flex', alignItems: 'center', gap: 8, fontWeight: 700, color: t.textPrimary, whiteSpace: 'nowrap' },
   list: { listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 8 },
   item: {
     display: 'flex', alignItems: 'flex-start', gap: 12, width: '100%', textAlign: 'left', cursor: 'pointer',

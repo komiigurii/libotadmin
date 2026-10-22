@@ -31,6 +31,12 @@
    The warm capiz-cream page from the mobile app, value for value, so the admin
    reads as the same product. The website uses the same values. */
 :root {
+  /* The faces, as tokens so a console can swap them (the super admin's does,
+     in superadmin.css). theme.jsx's `fonts` read these. */
+  --font-sans:    'Schibsted Grotesk Variable', 'Schibsted Grotesk', system-ui, -apple-system, sans-serif;
+  --font-display: 'Newsreader Variable', 'Newsreader', Georgia, serif;
+  --font-mono:    ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+
   --bg:              #FBF8F2;
   --sidebar-bg:      #F4EFE4;
   --card-bg:         #FFFFFF;
