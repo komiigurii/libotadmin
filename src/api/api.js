@@ -25,14 +25,14 @@ api.interceptors.request.use((config) => {
 
 // A 401 on any call made with a token means the server no longer accepts it
 // (expired, signed out elsewhere, the account was removed, or JWT_SECRET was
-// rotated). Sign-in is excluded: a 401 there is just a wrong password. So is
-// sign-out, which clears the session itself.
+// rotated). Sign-in and sign-out are excluded from this — a 401 on sign-in is
+// just a wrong password, and sign-out clears the session itself.
 api.interceptors.response.use(
   (res) => res,
   (err) => {
     const url = err?.config?.url || '';
-    const isSignInOrOut = url.includes('/api/auth/admin-login') || url.includes('/api/auth/admin-logout');
-    if (err?.response?.status === 401 && getToken() && !isSignInOrOut) {
+    const isAuthRoute = url.includes('/api/auth/admin-login') || url.includes('/api/auth/admin-logout');
+    if (err?.response?.status === 401 && getToken() && !isAuthRoute) {
       endSession('expired');
     }
     return Promise.reject(err);
@@ -135,6 +135,8 @@ export const reportAPI = {
 
 export const authAPI = {
   // Sign-in is by assigned username (the backend still accepts an email).
+  // The same endpoint handles all three roles: admin, moderator, superadmin.
+  // The role in the response decides where the frontend routes.
   login: (username, password) =>
     api.post('/api/auth/admin-login', { username, password }).then(r => r.data),
   // Ends the session on the server too, so the stored token is useless after.
@@ -182,6 +184,47 @@ export const uploadAPI = {
       })
       .then(r => r.data);
   },
+};
+
+/*
+ * System-level controls, superadmin only.
+ *
+ * These routes don't exist yet on the backend — add them behind
+ * requireAdminRole('superadmin') when you're ready. The frontend calls are
+ * already wired; the backend just needs to respond.
+ *
+ * Suggested backend routes (all under /api/superadmin):
+ *   GET  /status                   → { maintenanceMode, disabledRoles, message }
+ *   POST /maintenance              → { maintenanceMode: true }
+ *   DELETE /maintenance            → { maintenanceMode: false }
+ *   POST /disable-role             → body: { role: 'admin'|'moderator' }
+ *   DELETE /disable-role/:role     → re-enables that role
+ *   PUT  /maintenance-message      → body: { message: string }
+ */
+export const superadminAPI = {
+  // Current system state: maintenance mode on/off, which roles are locked out,
+  // and the message shown to locked-out users on the login page.
+  getStatus: () =>
+    api.get('/api/superadmin/status').then(r => r.data),
+
+  // Flip maintenance mode. While on, the login endpoint should reject
+  // admin/moderator sign-ins with a 503 + the maintenance message.
+  enableMaintenance: () =>
+    api.post('/api/superadmin/maintenance').then(r => r.data),
+  disableMaintenance: () =>
+    api.delete('/api/superadmin/maintenance').then(r => r.data),
+
+  // Disable a specific role without full maintenance mode — useful for
+  // taking moderators offline while admins keep working (or vice versa).
+  disableRole: (role) =>
+    api.post('/api/superadmin/disable-role', { role }).then(r => r.data),
+  enableRole: (role) =>
+    api.delete(`/api/superadmin/disable-role/${role}`).then(r => r.data),
+
+  // The message admins and moderators see when they try to sign in during
+  // maintenance. Empty string removes it.
+  setMaintenanceMessage: (message) =>
+    api.put('/api/superadmin/maintenance-message', { message }).then(r => r.data),
 };
 
 export default api;

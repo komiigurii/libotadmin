@@ -12,7 +12,13 @@ import loginBg from '../assets/login-bg.jpg';
 import './Login.css';
 
 /*
- * Sign-in for admins and moderators.
+ * Sign-in for admins, moderators, and the superadmin.
+ *
+ * The same form and endpoint handle all three roles. After a successful login
+ * the role from the server response decides where to go:
+ *   superadmin → /superadmin  (system maintenance screen, no shared Navbar)
+ *   admin      → /dashboard
+ *   moderator  → /dashboard
  *
  * Built from the console's own frame, so signing in already looks like the
  * panel you land in: the teal rail with the emblem in its dark well, LIBOT BULACAN in
@@ -100,8 +106,13 @@ export default function Login() {
       const data = await authAPI.login(username.trim(), password);
       if (data.success && data.token) {
         saveSession({ token: data.token, role: data.role, city: data.city });
-        // Both roles start on the dashboard: it shows what's waiting on them.
-        navigate('/dashboard', { replace: true });
+        // Route by role. Superadmin goes to their own maintenance screen;
+        // admin and moderator both start on the shared dashboard.
+        if (data.role === 'superadmin') {
+          navigate('/superadmin', { replace: true });
+        } else {
+          navigate('/dashboard', { replace: true });
+        }
       } else {
         setError(data.message || "Couldn't sign you in. Check your username and password.");
       }
@@ -264,24 +275,15 @@ const s = {
   },
   logo: { width: 62, height: 62, objectFit: 'contain', borderRadius: 17, display: 'block' },
   brandText: { display: 'flex', flexDirection: 'column', alignItems: 'center' },
-  // Fluid, not a flat 32px: "LIBOT BULACAN" is 357px wide at 32px, more than
-  // the rail holds just above the 860px breakpoint (~286px); 2.2vw keeps it
-  // one line there and reaches 32px on wide screens.
   wordmark: {
     fontFamily: fonts.display, color: t.onBrandSolid, fontWeight: 700, fontSize: 'clamp(22px, 2.2vw, 32px)',
     lineHeight: 1, letterSpacing: '0.18em', textTransform: 'uppercase', whiteSpace: 'nowrap',
-    // Tracking also pads the last letter; this re-centres the word.
     paddingLeft: '0.18em',
   },
-  // Full white, not onBrandSolidMuted: at 10.5px this needs 4.5:1, and 86%
-  // white is 4.2:1 on the dark theme's teal (white: 5.1, light theme 5.9).
   console: {
     marginTop: 8, color: t.onBrandSolid, fontSize: 10.5, fontWeight: 700,
     letterSpacing: '0.24em', textTransform: 'uppercase',
   },
-  // The sidebar tagline's type, on teal instead of cream: white carries the
-  // contrast (≥ 5:1 on the rail teal in both themes); the yellow pass slips
-  // out from under it the way the print's inks are off-register.
   slogan: {
     width: '100%', maxWidth: 400, margin: 0,
     fontFamily: fonts.display, fontStyle: 'italic', fontWeight: 700,
@@ -313,11 +315,8 @@ const s = {
   input: {
     width: '100%', height: 46, padding: '0 14px', boxSizing: 'border-box',
     borderRadius: radius.md, borderWidth: 1, borderStyle: 'solid', borderColor: t.border,
-    // Cream inside the white card, the same fill the spot form's inputs use.
     background: t.sidebarBg, color: t.textPrimary, fontFamily: 'inherit', fontSize: 15, outline: 'none',
   },
-  // Same longhand as `input`, so React swaps it cleanly (see the SpotForm note
-  // in the design-system docs about shorthand/longhand mixing).
   inputInvalid: { borderColor: t.danger },
   passwordWrap: { position: 'relative' },
   eyeBtn: {

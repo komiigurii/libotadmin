@@ -15,6 +15,8 @@ export const getToken = () => localStorage.getItem('token');
 
 export function saveSession({ token, role, city }) {
   localStorage.setItem('token', token);
+  // Don't coerce — preserves 'superadmin' as-is. The old default of 'admin'
+  // was fine when only two roles existed; now it would break superadmin routing.
   localStorage.setItem('role', role || 'admin');
   localStorage.setItem('city', city || '');
 }

@@ -19,6 +19,8 @@ const BannedAccounts   = lazy(() => import('./pages/BannedAccounts'));
 const UserProgress     = lazy(() => import('./pages/UserProgress'));
 const Moderators       = lazy(() => import('./pages/Moderators'));
 const MyTravelers      = lazy(() => import('./pages/MyTravelers'));
+const SuperAdmin       = lazy(() => import('./pages/Superadmin'));
+
 import { AppAlertProvider } from './components/AppAlert';
 import { theme as t } from './theme';
 import { hasValidSession, getToken, clearSession } from './auth/session';
@@ -28,12 +30,28 @@ function PageFallback() {
   return <div style={shell.fallback}>Loading…</div>;
 }
 
+/* Any valid session passes this gate. Role checks happen in the role guards below. */
 const PrivateRoute = ({ children }) => {
   if (hasValidSession()) return children;
-  // A stored-but-expired token gets the "session expired" note on sign-in.
   const reason = getToken() ? '?reason=expired' : '';
   clearSession();
   return <Navigate to={`/login${reason}`} replace />;
+};
+
+/*
+ * SuperAdminRoute — only 'superadmin' sessions may pass. Anyone else with a
+ * valid session gets sent to /dashboard (their home), not /login, so they
+ * don't lose work mid-session.
+ */
+const SuperAdminRoute = ({ children }) => {
+  if (!hasValidSession()) {
+    const reason = getToken() ? '?reason=expired' : '';
+    clearSession();
+    return <Navigate to={`/login${reason}`} replace />;
+  }
+  const role = localStorage.getItem('role');
+  if (role !== 'superadmin') return <Navigate to="/dashboard" replace />;
+  return children;
 };
 
 // Both guards send the other role to the dashboard — the one page every role
@@ -56,6 +74,21 @@ export default function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/login" element={<Login />} />
+
+        {/*
+         * Superadmin lives at /superadmin, completely outside the shared shell.
+         * It has no Navbar or sidebar — it's a control surface, not a content panel.
+         */}
+        <Route
+          path="/superadmin"
+          element={
+            <SuperAdminRoute>
+              <Suspense fallback={<PageFallback />}>
+                <SuperAdmin />
+              </Suspense>
+            </SuperAdminRoute>
+          }
+        />
 
         <Route
           path="/*"
