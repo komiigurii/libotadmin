@@ -9,6 +9,7 @@ import { ChangeList, ProposalFieldList } from '../components/ChangeDiff';
 import { MISSION_FIELD_LABELS } from '../utils/changeDiff';
 import { fmtDateTime } from '../utils/format';
 import Icon from '../components/Icon';
+import { useLive } from '../api/live';
 
 const KIND_LABELS = {
   spot:               'Spot edit',
@@ -41,9 +42,12 @@ export default function ModRequests({ embedded = false, onCount }) {
   const [acting, setActing] = useState(null);
   const [expandedKey, setExpandedKey] = useState(null);
 
-  const load = async () => {
-    setLoading(true);
-    setError(null);
+  // `quiet`: a live update — no spinner, and a failure keeps the queue shown.
+  const load = async ({ quiet = false } = {}) => {
+    if (!quiet) {
+      setLoading(true);
+      setError(null);
+    }
     try {
       // allSettled, NOT all. This queue is assembled from three independent
       // endpoints, and with Promise.all a single one failing rejected the whole
@@ -134,13 +138,16 @@ export default function ModRequests({ embedded = false, onCount }) {
       setRequests(all);
     } catch (err) {
       console.error(err);
-      setError('Couldn’t load the approval queue.');
-      setRequests([]);
+      if (!quiet) {
+        setError('Couldn’t load the approval queue.');
+        setRequests([]);
+      }
     }
-    setLoading(false);
+    if (!quiet) setLoading(false);
   };
 
   useEffect(() => { load(); }, []);
+  useLive(['approvals', 'spots', 'missions'], () => load({ quiet: true }));
 
   const visible = requests.filter(r => !kindFilter || r.kind === kindFilter);
   const pendingCount = requests.filter(r => r.status === 'pending').length;

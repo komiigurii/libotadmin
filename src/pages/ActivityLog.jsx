@@ -1,5 +1,6 @@
-import { Fragment, useCallback, useEffect, useState } from 'react';
+import { Fragment, useCallback, useEffect, useRef, useState } from 'react';
 import { activityAPI } from '../api/api';
+import { useLiveTick } from '../api/live';
 import {
   Page, PageHeader, Toolbar, SearchInput, Button, Table, Th, Td,
   Loading, EmptyState, ErrorBanner, pageStyles as s,
@@ -49,13 +50,18 @@ export default function ActivityLog() {
     return () => clearTimeout(timer);
   }, [query]);
 
+  // New entries appear as staff work; a failed live reload keeps the page.
+  const changed = useLiveTick(['activity']);
+  const seen = useRef(changed);
   useEffect(() => {
     let live = true;
+    const quiet = seen.current !== changed;
+    seen.current = changed;
     activityAPI.get({ page, limit: PAGE_SIZE, ...(group ? { action: group } : {}), ...(search ? { q: search } : {}) })
       .then((d) => { if (live) { setData(d); setError(''); } })
-      .catch(() => { if (live) setError('Couldn’t load the activity log.'); });
+      .catch(() => { if (live && !quiet) setError('Couldn’t load the activity log.'); });
     return () => { live = false; };
-  }, [page, group, search, asked]);
+  }, [page, group, search, asked, changed]);
 
   // Each kind's total: one small ask each.
   const loadCounts = useCallback(async () => {
@@ -63,7 +69,7 @@ export default function ActivityLog() {
     const values = await Promise.all(ACTION_GROUPS.map((g) => total(g.value)));
     setCounts(Object.fromEntries(ACTION_GROUPS.map((g, i) => [g.value, values[i]])));
   }, []);
-  useEffect(() => { loadCounts(); }, [loadCounts]);
+  useEffect(() => { loadCounts(); }, [loadCounts, changed]);
 
   const pick = (g) => { setGroup(g); setPage(1); };
   const n = (v) => (v == null ? '…' : fmtNum(v));

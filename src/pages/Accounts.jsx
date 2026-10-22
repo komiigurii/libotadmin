@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { accountsAPI } from '../api/api';
 import {
@@ -13,6 +13,7 @@ import Icon from '../components/Icon';
 import { theme as t, radius, type } from '../theme';
 import { fmtDay, fmtNum, timeAgo } from '../utils/format';
 import { standingLabel } from '../utils/standing';
+import { useLive, useLiveTick } from '../api/live';
 
 /*
  * Accounts — the super admin's view of every account in the system (mock
@@ -75,17 +76,20 @@ export default function Accounts() {
   const [canMake, setCanMake] = useState([]);
   const [staffLoading, setStaffLoading] = useState(true);
   const [staffError, setStaffError] = useState('');
-  const loadStaff = useCallback(async () => {
-    setStaffLoading(true);
-    setStaffError('');
+  // `quiet`: a live update — no spinner, and a failure keeps the list shown.
+  const loadStaff = useCallback(async ({ quiet = false } = {}) => {
+    if (!quiet) {
+      setStaffLoading(true);
+      setStaffError('');
+    }
     try {
       const data = await accountsAPI.getStaff();
       setAccounts(data.accounts || []);
       setCanMake(data.canMake || []);
     } catch {
-      setStaffError('Couldn’t load the accounts.');
+      if (!quiet) setStaffError('Couldn’t load the accounts.');
     }
-    setStaffLoading(false);
+    if (!quiet) setStaffLoading(false);
   }, []);
 
   // Travelers: paged on the server; the counts are one small ask per standing.
@@ -97,6 +101,9 @@ export default function Accounts() {
   }, []);
 
   useEffect(() => { loadStaff(); loadTravelerCounts(); }, [loadStaff, loadTravelerCounts]);
+  // Sign-ins, slips and account changes; sign-ups and standing.
+  useLive(['staff'], () => loadStaff({ quiet: true }));
+  useLive(['travelers'], loadTravelerCounts);
   // The link's choices are read once; the address goes back to /accounts.
   useEffect(() => { if ([...params.keys()].length) setParams({}, { replace: true }); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -255,13 +262,19 @@ function TravelersView({ status, title }) {
     return () => clearTimeout(timer);
   }, [query]);
 
+  // New sign-ups, standing, points and last-active times as they change. A
+  // failed live reload keeps the list without an error.
+  const changed = useLiveTick(['travelers', 'progress']);
+  const seen = useRef(changed);
   useEffect(() => {
     let live = true;
+    const quiet = seen.current !== changed;
+    seen.current = changed;
     accountsAPI.getTravelers({ page, limit: PAGE_SIZE, ...(status ? { status } : {}), ...(search ? { q: search } : {}) })
       .then((d) => { if (live) { setData(d); setError(''); } })
-      .catch(() => { if (live) setError('Couldn’t load the travelers.'); });
+      .catch(() => { if (live && !quiet) setError('Couldn’t load the travelers.'); });
     return () => { live = false; };
-  }, [page, status, search]);
+  }, [page, status, search, changed]);
 
   return (
     <>
@@ -331,13 +344,18 @@ function TravelersView({ status, title }) {
 function TravelerDrawer({ traveler, onClose }) {
   const [data, setData] = useState(null);
   const [error, setError] = useState('');
+  // Kept current while open; a failed live reload keeps what's shown.
+  const changed = useLiveTick(['travelers', 'progress', 'reviews']);
+  const seen = useRef(changed);
   useEffect(() => {
     let live = true;
+    const quiet = seen.current !== changed;
+    seen.current = changed;
     accountsAPI.getTraveler(traveler.id)
       .then((d) => { if (live) setData(d); })
-      .catch(() => { if (live) setError('Couldn’t load this traveler.'); });
+      .catch(() => { if (live && !quiet) setError('Couldn’t load this traveler.'); });
     return () => { live = false; };
-  }, [traveler.id]);
+  }, [traveler.id, changed]);
 
   const u = data?.traveler;
   return (

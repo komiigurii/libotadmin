@@ -7,6 +7,7 @@ import {
 } from '../components/Layout';
 import { fmtDateTime, fmtDay } from '../utils/format';
 import { standingLabel } from '../utils/standing';
+import { useLive } from '../api/live';
 
 function remaining(expiresAt) {
   const ms = new Date(expiresAt) - Date.now();
@@ -29,20 +30,25 @@ export default function BannedAccounts() {
   const [busyId,  setBusyId]  = useState(null);
   const [expandedId, setExpandedId] = useState(null);
 
-  const load = async () => {
-    setLoading(true);
-    setError('');
+  // `quiet`: a live update — no spinner, and a failure keeps the list shown.
+  const load = async ({ quiet = false } = {}) => {
+    if (!quiet) {
+      setLoading(true);
+      setError('');
+    }
     try {
       const data = await bannedAccountsAPI.getAll();
       setUsers(data || []);
     } catch (err) {
       console.error('Failed to load banned accounts:', err);
-      setError('Couldn’t load suspended and banned accounts.');
+      if (!quiet) setError('Couldn’t load suspended and banned accounts.');
     }
-    setLoading(false);
+    if (!quiet) setLoading(false);
   };
 
   useEffect(() => { load(); }, []);
+  // A suspension, ban, unban or appeal from anywhere (the app's appeals too).
+  useLive(['travelers'], () => load({ quiet: true }));
 
   const handleUnban = async (clerkUserId) => {
     if (!(await confirmAction('Lift the suspension or ban on this account?', { confirmText: 'Unban' }))) return;

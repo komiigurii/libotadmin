@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { authAPI } from '../api/api';
 import { classifyTokenChange, getToken, saveSession, SESSION_CHECK_EVENT } from '../auth/session';
 import { publishHeartbeat } from '../auth/heartbeat';
+import { connectLive, disconnectLive, subscribeLive } from '../api/live';
 
 /*
  * Keeps an open window honest about its session (mock defense 2026-10-21:
@@ -19,7 +20,11 @@ import { publishHeartbeat } from '../auth/heartbeat';
  *   - tabs of the same browser share one stored session. When another tab
  *     signs out, this one goes to sign-in too; when another tab signs in
  *     (perhaps as a different account), this one reloads to follow it, so it
- *     never shows one account's pages with another's token.
+ *     never shows one account's pages with another's token;
+ *   - it holds the live connection (api/live.js) while signed in, and asks at
+ *     once when the server says the session ended or the bell, tickets, the
+ *     approval queue or the system's state changed. The 45 s check stays, for
+ *     a network that blocks the live connection.
  */
 const EVERY_MS = 45_000;
 
@@ -60,6 +65,8 @@ export default function SessionWatcher() {
     // Once now as well, so the bell's count is there when the page opens.
     check();
     const timer = setInterval(check, EVERY_MS);
+    connectLive();
+    const unsubscribe = subscribeLive(['session', 'notifications', 'tickets', 'approvals', 'system'], check);
     document.addEventListener('visibilitychange', onVisible);
     window.addEventListener('focus', onVisible);
     window.addEventListener('storage', onStorage);
@@ -71,6 +78,8 @@ export default function SessionWatcher() {
       window.removeEventListener('focus', onVisible);
       window.removeEventListener('storage', onStorage);
       window.removeEventListener(SESSION_CHECK_EVENT, check);
+      unsubscribe();
+      disconnectLive();
     };
   }, []);
 

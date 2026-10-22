@@ -5,6 +5,7 @@ import { Page, PageHeader, Toolbar, FilterTabs, Button, Loading, ErrorBanner, Em
 import Icon from '../components/Icon';
 import TownSeal from '../components/TownSeal';
 import { notify } from '../components/AppAlert';
+import { useLive } from '../api/live';
 
 // Town Badges — a traveler earns a town's badge by finishing every mission at
 // every spot in it, and finishing towns earns titles (LibotBackend
@@ -143,18 +144,23 @@ export default function TownBadges() {
   const [error, setError] = useState(null);
   const [show, setShow] = useState('spots');
 
-  const load = async () => {
-    setLoading(true);
-    setError(null);
+  // `quiet`: a live update. Each card keeps what is being typed into it.
+  const load = async ({ quiet = false } = {}) => {
+    if (!quiet) {
+      setLoading(true);
+      setError(null);
+    }
     try {
       setTowns(await townBadgeAPI.getAdmin());
     } catch (err) {
       console.error('[TownBadges]', err);
-      setError('Couldn’t load the town badges.');
+      if (!quiet) setError('Couldn’t load the town badges.');
     }
-    setLoading(false);
+    if (!quiet) setLoading(false);
   };
   useEffect(() => { load(); }, []);
+  // Spot counts and "earned by" as they change, and another admin's save.
+  useLive(['badges', 'spots', 'progress'], () => load({ quiet: true }));
 
   const withSpots = towns.filter((x) => x.spots > 0);
   const visible = show === 'spots' ? withSpots : towns;

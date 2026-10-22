@@ -6,6 +6,7 @@ import {
 } from '../components/Layout';
 import { fmtDay, timeAgo } from '../utils/format';
 import { standingLabel } from '../utils/standing';
+import { useLive } from '../api/live';
 
 // Travelers — for a moderator: the travelers who have visited the spots in
 // their municipality (QA 2026-10-16: user management within their
@@ -30,22 +31,29 @@ export default function MyTravelers() {
   const [search,    setSearch]    = useState('');
   const [filter,    setFilter]    = useState('');
 
-  const load = async () => {
-    setLoading(true);
-    setError('');
+  // `quiet`: a live update — no spinner, and a failure keeps the list shown.
+  const load = async ({ quiet = false } = {}) => {
+    if (!quiet) {
+      setLoading(true);
+      setError('');
+    }
     try {
       const data = await myTravelersAPI.getAll();
       setRows(data?.travelers || []);
       setTown(data?.municipality || '');
       setSpotCount(data?.spotCount || 0);
     } catch (err) {
-      setError(err?.response?.data?.message || 'Couldn’t load the travelers.');
-      setRows([]);
+      if (!quiet) {
+        setError(err?.response?.data?.message || 'Couldn’t load the travelers.');
+        setRows([]);
+      }
     }
-    setLoading(false);
+    if (!quiet) setLoading(false);
   };
 
   useEffect(() => { load(); }, []);
+  // New visits to the town's spots, and travelers' standing.
+  useLive(['progress', 'travelers', 'spots'], () => load({ quiet: true }));
 
   const flagged = (r) => r.status !== 'active' || r.warnings > 0;
   const visible = useMemo(() => {

@@ -6,6 +6,7 @@ import {
   pageStyles as s,
 } from '../components/Layout';
 import { fmtDay } from '../utils/format';
+import { useLive } from '../api/live';
 
 // Admin only: moderators work on attractions and their own requests.
 export default function InactiveUsers() {
@@ -15,20 +16,26 @@ export default function InactiveUsers() {
   const [error,   setError]   = useState(null);
   const [acting,  setActing]  = useState(null);
 
-  const load = async () => {
-    setLoading(true);
-    setError(null);
+  // `quiet`: a live update — no spinner, and a failure keeps the list shown.
+  const load = async ({ quiet = false } = {}) => {
+    if (!quiet) {
+      setLoading(true);
+      setError(null);
+    }
     try {
       const data = await inactiveUsersAPI.getAll();
       setUsers(data?.users || []);
     } catch {
-      setError('Couldn’t load inactive accounts.');
-      setUsers([]);
+      if (!quiet) {
+        setError('Couldn’t load inactive accounts.');
+        setUsers([]);
+      }
     }
-    setLoading(false);
+    if (!quiet) setLoading(false);
   };
 
   useEffect(() => { load(); }, []);
+  useLive(['travelers', 'progress'], () => load({ quiet: true }));
 
   const archive = async (clerkUserId) => {
     if (!(await confirmAction(

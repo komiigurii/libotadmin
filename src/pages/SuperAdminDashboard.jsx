@@ -6,8 +6,9 @@ import UsageCharts from '../components/UsageCharts';
 import Icon from '../components/Icon';
 import { fmtNum as fmt, plural, timeAgo, fmtDateTime } from '../utils/format';
 import { actionLabel, groupOf, GROUP_HUE } from '../utils/activity';
-import { loadUsage } from '../utils/usage';
+import { loadUsage, forgetUsage } from '../utils/usage';
 import { useHealthSamples, pingVerdict, uptimeText, EVERY_MS } from '../utils/healthSamples';
+import { useLive } from '../api/live';
 
 /*
  * The super admin's dashboard. The super admin's console holds only the super
@@ -62,12 +63,15 @@ export default function SuperAdminDashboard() {
   const [refreshing, setRefreshing] = useState(false);
   const health = useHealthSamples();
 
-  const refresh = useCallback(async () => {
-    setRefreshing(true);
+  // `quiet`: a live update, which doesn't turn the button to "Refreshing…".
+  const refresh = useCallback(async ({ quiet = false } = {}) => {
+    if (!quiet) setRefreshing(true);
     setData(await load());
-    setRefreshing(false);
+    if (!quiet) setRefreshing(false);
   }, []);
   useEffect(() => { refresh(); }, [refresh]);
+  // Seven requests a time, so at most every 5 s however busy it gets.
+  useLive(['system', 'tickets', 'staff', 'travelers', 'activity', 'progress', 'reviews'], () => { forgetUsage(); refresh({ quiet: true }); }, { gap: 5000 });
 
   const loading = data === null;
   const sys = data?.system;

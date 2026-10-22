@@ -6,6 +6,7 @@ import {
 } from '../components/Layout';
 import { AddAccountForm, StaffTable } from '../components/StaffAccounts';
 import CredentialSlip from '../components/CredentialSlip';
+import { useLive } from '../api/live';
 
 // Moderators — every moderator account, for the administrator (QA 2026-10-16:
 // "makita ni PHACTO yung mga mod accounts (si admin gagawa ng mod accounts)").
@@ -22,19 +23,26 @@ export default function Moderators() {
   const [adding,  setAdding]  = useState(false);
   const [slip,    setSlip]    = useState(null);
 
-  const load = async () => {
-    setLoading(true);
-    setError('');
+  // `quiet`: a live update — no spinner, and a failure keeps the list shown.
+  const load = async ({ quiet = false } = {}) => {
+    if (!quiet) {
+      setLoading(true);
+      setError('');
+    }
     try {
       setMods(await moderatorsAPI.getAll());
     } catch {
-      setError('Couldn’t load the moderator accounts.');
-      setMods([]);
+      if (!quiet) {
+        setError('Couldn’t load the moderator accounts.');
+        setMods([]);
+      }
     }
-    setLoading(false);
+    if (!quiet) setLoading(false);
   };
 
   useEffect(() => { load(); }, []);
+  // Account changes and sign-ins, and the request counts.
+  useLive(['staff', 'approvals'], () => load({ quiet: true }));
 
   const visible = useMemo(() => {
     const q = search.trim().toLowerCase();

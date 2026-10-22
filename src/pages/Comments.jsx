@@ -9,6 +9,7 @@ import Pagination from '../components/Pagination';
 import { fmtDateTime, fmtNum } from '../utils/format';
 import Icon from '../components/Icon';
 import { theme as t, radius } from '../theme';
+import { useLive } from '../api/live';
 
 // Rate and Review — admin only (named as the paper names it; it was "Reviews
 // & Feedback"). Every review travelers have left, 20 to a page, and the
@@ -40,9 +41,12 @@ export default function Comments() {
     return () => clearTimeout(timer);
   }, [query]);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
+  // `quiet`: a live update — no spinner, and a failure keeps the page shown.
+  const load = useCallback(async ({ quiet = false } = {}) => {
+    if (!quiet) {
+      setLoading(true);
+      setError(null);
+    }
     try {
       setData(await commentAPI.getAll({
         page, limit: PAGE_SIZE,
@@ -51,12 +55,14 @@ export default function Comments() {
         ...(rating ? { rating } : {}),
       }));
     } catch {
-      setError('Couldn’t load reviews.');
+      if (!quiet) setError('Couldn’t load reviews.');
     }
-    setLoading(false);
+    if (!quiet) setLoading(false);
   }, [page, search, tab, rating]);
 
   useEffect(() => { load(); }, [load]);
+  // New reviews as travelers post them; a warning changes the writer's standing.
+  useLive(['reviews', 'travelers'], () => load({ quiet: true }));
 
   const reviews = (data?.reviews || []).filter((c) => c?._id);
   const filtersOn = !!(search || tab || rating);

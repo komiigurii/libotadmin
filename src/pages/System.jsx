@@ -9,6 +9,7 @@ import Pagination from '../components/Pagination';
 import { notify, confirmAction, promptAction } from '../components/AppAlert';
 import Icon from '../components/Icon';
 import { publishHeartbeat } from '../auth/heartbeat';
+import { useLive, useLiveTick } from '../api/live';
 import { theme as t, radius, fonts } from '../theme';
 import { fmtDateTime, timeAgo } from '../utils/format';
 
@@ -62,7 +63,8 @@ export default function System() {
   const [error, setError] = useState('');
   const location = useLocation();
 
-  const load = useCallback(async () => {
+  // `quiet`: a live update; a failure keeps what's shown.
+  const load = useCallback(async ({ quiet = false } = {}) => {
     try {
       const data = await systemAPI.get();
       setState(data);
@@ -70,14 +72,16 @@ export default function System() {
       // The banner and the rail follow at once, not at the next heartbeat.
       publishHeartbeat({ system: { maintenance: data.maintenance, restricted: false, restrictedRoles: data.restrictedRoles, notice: data.notice } });
     } catch (err) {
-      setError(errorOf(err));
+      if (!quiet) setError(errorOf(err));
     }
   }, []);
   const loadLocked = useCallback(async () => {
-    try { setLocked(await systemAPI.locked()); } catch { setLocked([]); }
+    try { setLocked(await systemAPI.locked()); } catch { setLocked((shown) => shown ?? []); }
   }, []);
 
   useEffect(() => { load(); loadLocked(); }, [load, loadLocked]);
+  // Another window of the console, and accounts locking or unlocking.
+  useLive(['system', 'staff'], () => { load({ quiet: true }); loadLocked(); });
 
   // The dashboard's quick actions link to a card here (/system#tools).
   const ready = !!state;
@@ -320,9 +324,10 @@ function NoticesCard() {
   const ids = { title: useId(), msg: useId(), at: useId() };
 
   const load = useCallback(() => {
-    systemAPI.notices({ page, limit: 5 }).then(setList).catch(() => setList({ notices: [], pages: 1, page: 1 }));
+    systemAPI.notices({ page, limit: 5 }).then(setList).catch(() => setList((shown) => shown ?? { notices: [], pages: 1, page: 1 }));
   }, [page]);
   useEffect(() => { load(); }, [load]);
+  useLive(['system'], load);
 
   const errors = {};
   if (title.trim().length < 3) errors.title = 'Give it a title (3 characters or more).';
@@ -498,11 +503,15 @@ function ToolsCard({ locked, reloadLocked }) {
 function MaintenanceLog() {
   const [data, setData] = useState(null);
   const [page, setPage] = useState(1);
+  // A window ending adds its row (a failed reload keeps the rows shown).
+  const changed = useLiveTick(['system']);
   useEffect(() => {
     let live = true;
-    systemAPI.logs({ page, limit: 10 }).then((d) => { if (live) setData(d); }).catch(() => { if (live) setData({ logs: [], pages: 1, page: 1, total: 0 }); });
+    systemAPI.logs({ page, limit: 10 })
+      .then((d) => { if (live) setData(d); })
+      .catch(() => { if (live) setData((shown) => shown ?? { logs: [], pages: 1, page: 1, total: 0 }); });
     return () => { live = false; };
-  }, [page]);
+  }, [page, changed]);
 
   return (
     <Section

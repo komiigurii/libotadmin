@@ -8,6 +8,7 @@ import { ChangeList, ProposalFieldList } from '../components/ChangeDiff';
 import { changedFieldLabels, recordFromRequest, MISSION_FIELD_LABELS } from '../utils/changeDiff';
 import { fmtDateTime } from '../utils/format';
 import Icon from '../components/Icon';
+import { useLive } from '../api/live';
 
 // Request Tracking — every request this moderator has sent and where it
 // stands: new spots, edits to existing ones, deletions, and food spot
@@ -43,9 +44,12 @@ export default function MyReviewRequests() {
   const [statusFilter, setStatusFilter] = useState('');
   const [expanded, setExpanded] = useState(null);
 
-  const load = async () => {
-    setLoading(true);
-    setError(null);
+  // `quiet`: a live update (an admin decided), without the spinner.
+  const load = async ({ quiet = false } = {}) => {
+    if (!quiet) {
+      setLoading(true);
+      setError(null);
+    }
     // allSettled: one source failing shouldn't hide the others.
     const [spotsRes, proposalsRes, deletesRes, changesRes] = await Promise.allSettled([
       spotAPI.getMine(),
@@ -124,6 +128,7 @@ export default function MyReviewRequests() {
   };
 
   useEffect(() => { load(); }, []);
+  useLive(['approvals', 'spots', 'missions'], () => load({ quiet: true }));
 
   const visible = requests.filter((r) => !statusFilter || r.status === statusFilter);
   const count = (st) => requests.filter((r) => r.status === st).length;
