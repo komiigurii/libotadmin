@@ -22,9 +22,9 @@ import { fmtDateTime, timeAgo } from '../utils/format';
  * (routes/system.js), inside the console instead of on a page of their own,
  * because the super admin can do everything an admin can as well.
  *
- *   Maintenance     the app shows "Under maintenance" and refuses travelers;
- *                   admins and moderators can look but not save, and are told
- *                   in their bell. Ending it asks what was done, for the log.
+ *   Maintenance     admins and moderators can look but not save, and are told
+ *                   in their bell. Travelers aren't affected (user rule
+ *                   2026-10-23). Ending it asks what was done, for the log.
  *   Access          pause admins or moderators without a full maintenance.
  *   Update notices  "an update is coming" / "an update is done", shown in the
  *                   app and on everyone's dashboard for two weeks.
@@ -84,7 +84,8 @@ export default function System() {
       {!state ? <Loading label="Loading the system’s state…" /> : (
         <>
           <div style={x.statusRow} role="list" aria-label="System status">
-            <StatusChip label="App and website" ok={!on} okText="Open" offText="Under maintenance" />
+            {/* Maintenance never closes the app or the website. */}
+            <StatusChip label="App and website" ok okText="Open" />
             <StatusChip label="Admins" ok={!restricted.includes('admin') && !on} okText="Working" offText={restricted.includes('admin') ? 'Paused' : 'Read-only'} />
             <StatusChip label="Moderators" ok={!restricted.includes('moderator') && !on} okText="Working" offText={restricted.includes('moderator') ? 'Paused' : 'Read-only'} />
           </div>
@@ -132,7 +133,7 @@ function MaintenanceCard({ state, onChanged }) {
 
   const startIt = async () => {
     const ok = await confirmAction(
-      'Travelers see “Under maintenance” in the app straight away. Admins and moderators can look around the console but can’t save, and each is told in their bell.',
+      'Admins and moderators can look around the console but can’t save, and each is told in their bell. Travelers aren’t affected: the app and the website keep working.',
       { title: 'Start maintenance now?', confirmText: 'Start maintenance', tone: 'warning' },
     );
     if (!ok) return;
@@ -157,14 +158,14 @@ function MaintenanceCard({ state, onChanged }) {
 
   const endIt = async () => {
     const summary = await promptAction(
-      'Everyone can use the app and the console again once you end it. Say what was done; it goes in the maintenance log and to the staff.',
+      'Admins and moderators can save again once you end it. Say what was done; it goes in the maintenance log and to the staff.',
       { title: 'End maintenance?', label: 'What was done', placeholder: 'e.g. Moved the database to a bigger plan. Nothing was lost.', minLength: 10, maxLength: 2000, confirmText: 'End maintenance' },
     );
     if (summary == null) return;
     setBusy(true);
     try {
       await systemAPI.endMaintenance(summary);
-      notify('Maintenance is over. The app is open again.', { tone: 'success' });
+      notify('Maintenance is over. Staff can save again.', { tone: 'success' });
       setMessage('');
       setEndAt('');
       await onChanged();
@@ -177,15 +178,15 @@ function MaintenanceCard({ state, onChanged }) {
       title="Maintenance"
       tone={m.on ? 'warning' : undefined}
       description={m.on
-        ? `On since ${fmtDateTime(m.startedAt)}${m.startedBy?.username ? `, started by ${m.startedBy.username}` : ''}. Travelers can’t use the app; staff can look but not save.`
-        : 'For work that needs everyone out: a database move, a big update. Starts now and lasts until you end it.'}
+        ? `On since ${fmtDateTime(m.startedAt)}${m.startedBy?.username ? `, started by ${m.startedBy.username}` : ''}. Staff can look but not save; travelers aren’t affected.`
+        : 'For work on the console: while it’s on, admins and moderators can look but not save. The app and the website keep working for travelers. Starts now and lasts until you end it.'}
     >
       <div style={x.formGrid}>
         <div style={{ minWidth: 0 }}>
-          <label htmlFor={ids.msg} style={s.panelLabel}>Message travelers see <span style={x.optional}>(optional)</span></label>
+          <label htmlFor={ids.msg} style={s.panelLabel}>Message staff see <span style={x.optional}>(optional)</span></label>
           <textarea id={ids.msg} value={message} onChange={(e) => setMessage(e.target.value)} maxLength={300} rows={3}
-            placeholder="Libot Bulacan is being updated. Please check back soon." style={s.textarea} />
-          <p style={x.hint}>Without one, the app says “Libot Bulacan is being updated. Please check back soon.”</p>
+            placeholder="e.g. Moving the database to a bigger plan." style={s.textarea} />
+          <p style={x.hint}>Shown to admins and moderators in their banner and bell.</p>
         </div>
         <div style={{ minWidth: 0 }}>
           <label htmlFor={ids.end} style={s.panelLabel}>Expected back <span style={x.optional}>(optional)</span></label>
@@ -237,7 +238,7 @@ function AccessCard({ restricted, maintenanceOn, onChanged }) {
   return (
     <Section
       title="Who can use the console"
-      description={`Pause one kind of staff account without closing the app, e.g. moderators while their pages change.${maintenanceOn ? ' During maintenance everyone is read-only anyway.' : ''}`}
+      description={`Pause one kind of staff account without closing the app, e.g. moderators while their pages change.${maintenanceOn ? ' During maintenance all staff are read-only anyway.' : ''}`}
     >
       <div style={x.accessGrid}>
         {['admin', 'moderator'].map((role) => {

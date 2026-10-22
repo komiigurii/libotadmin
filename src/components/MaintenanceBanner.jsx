@@ -10,7 +10,7 @@ import Icon from './Icon';
  * The strip above every page that says what the system is doing (mock defense
  * 2026-10-21: "magkakaroon dapat ng notif ang admin kapag under maintenance"):
  *   - maintenance on: staff can look but not save; the super admin is reminded
- *     that travelers are locked out until it's ended;
+ *     to end it (travelers are never affected);
  *   - this role paused by the super admin;
  *   - the newest update notice, which each person can put away.
  * It reads the heartbeat (auth/heartbeat.js), so it appears and disappears on
@@ -45,7 +45,7 @@ export default function MaintenanceBanner() {
         <Icon name="tool" size={15} weight="bold" />
         {superAdmin ? (
           <span>
-            <strong>Maintenance is on.</strong> Travelers can’t use the app and staff can’t save.{back}{' '}
+            <strong>Maintenance is on.</strong> Admins and moderators can’t save; travelers aren’t affected.{back}{' '}
             <Link to="/system" style={b.link}>End it on the System page</Link>
           </span>
         ) : (

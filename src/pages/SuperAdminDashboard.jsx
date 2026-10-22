@@ -71,7 +71,7 @@ export default function SuperAdminDashboard() {
   const reveal = (i) => ({ animationDelay: `${i * 70}ms` });
 
   const attention = [
-    sys?.maintenance?.on && { icon: 'tool', label: 'Maintenance is on', detail: 'Travelers can’t use the app. End it when the work is done.', to: '/system', tone: 'warning', count: null },
+    sys?.maintenance?.on && { icon: 'tool', label: 'Maintenance is on', detail: 'Admins and moderators can’t save. End it when the work is done.', to: '/system', tone: 'warning', count: null },
     sys?.restrictedRoles?.length > 0 && { icon: 'pause', label: `${sys.restrictedRoles.map((r) => (r === 'admin' ? 'Admins' : 'Moderators')).join(' and ')} paused`, detail: 'They can’t use the console until you let them back in.', to: '/system', tone: 'warning', count: null },
     { icon: 'flag', label: 'Open tickets', detail: passwordRequests ? `${plural(passwordRequests, 'password request')} among them` : 'Problems admins and moderators reported', to: '/tickets', count: openTickets },
     { icon: 'lock', label: 'Locked accounts', detail: 'Too many wrong passwords', to: '/system', count: data?.locked ? data.locked.length : null },
