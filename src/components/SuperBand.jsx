@@ -3,7 +3,7 @@ import Icon from './Icon';
 
 /*
  * The band every super admin page opens with (2026-10-23, the user's
- * reference): the title in Knewave, one line of what's live, the page's
+ * reference): the title in bold capitals, one line of what's live, the page's
  * actions, and the stat strip. Layout's PageHeader draws this for the super
  * admin, so pages pass `stats` and `live` to PageHeader and nothing else
  * changes for the other consoles.

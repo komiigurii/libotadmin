@@ -10,8 +10,8 @@
  */
 
 /* ── Type ────────────────────────────────────────────────────────────────────
-   Every console sets words in Dongle and the wordmark in Knewave (both loaded
-   in index.css). This one also sets page titles and big numbers in Knewave. */
+   As in every console (index.css): Dongle for everything, bold for titles and
+   numbers, and Knewave for the LibotBulacan wordmark only. */
 
 /* ── LIGHT ───────────────────────────────────────────────────────────────────
    Pale sage paper under white panels; the shell, the page bands and table
@@ -25,9 +25,6 @@
    is routine sign-ins, deliberately not a hue. Text never wears these: a
    swatch beside the words carries the identity. */
 :root[data-console='superadmin'] {
-  --font-display: 'Knewave Libot', 'Dongle Libot', system-ui, sans-serif;
-  --title-case:   none;
-
   --bg:             #EDF1EF;
   --sidebar-bg:     #F2F6F4;
   --card-bg:        #FFFFFF;
@@ -237,7 +234,7 @@
   width: 34px; height: 34px; border-radius: 50%; flex-shrink: 0;
   display: grid; place-items: center;
   background: var(--accent); color: var(--on-accent);
-  font-family: var(--font-display); font-size: 14px;
+  font-family: var(--font-display); font-weight: 700; font-size: 15px;
 }
 .sa-account-text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .sa-account-name { font-size: 16px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -325,8 +322,8 @@
 }
 .sa-band-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px 24px; flex-wrap: wrap; }
 .sa-band-title {
-  font-family: var(--font-display); font-size: 36px; line-height: 1.02; font-weight: 400;
-  margin: 0; color: var(--sa-shell-text); letter-spacing: 0.005em; overflow-wrap: anywhere;
+  font-family: var(--font-display); font-size: 36px; line-height: 1.02; font-weight: 700;
+  text-transform: uppercase; margin: 0; color: var(--sa-shell-text); letter-spacing: 0.01em; overflow-wrap: anywhere;
 }
 .sa-band-count {
   display: inline-flex; vertical-align: 0.35em; margin-left: 10px;
@@ -371,11 +368,10 @@ a.sa-cell:hover { background: var(--sa-shell-raised); }
 .sa-cell-label .sa-swatch { margin-top: 3px; }
 .sa-cell-row { display: flex; align-items: flex-end; justify-content: space-between; gap: 10px; min-width: 0; }
 .sa-cell-value {
-  font-family: var(--font-display); font-size: 34px; line-height: 1; color: var(--sa-shell-text);
+  font-family: var(--font-display); font-weight: 700; font-size: 34px; line-height: 1; color: var(--sa-shell-text);
   white-space: nowrap; letter-spacing: 0.01em;
 }
-/* A word, not a number ("Paused", a username): Dongle bold. Knewave is for
-   numerals, titles and the brand only (the user's split, 2026-10-23). */
+/* A word, not a number ("Paused", a username): smaller, and allowed to wrap. */
 .sa-cell-value.small {
   font-family: var(--font-sans); font-weight: 700; font-size: 25px; line-height: 1.05; letter-spacing: 0;
   padding-top: 4px; white-space: normal; overflow-wrap: anywhere;

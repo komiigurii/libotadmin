@@ -16,11 +16,11 @@
  */
 
 /* ── Type ────────────────────────────────────────────────────────────────────
-   One pair for all three consoles (the user's reference, 2026-10-23): Knewave
-   (Tyler Finck) sets the LibotBulacan wordmark; Dongle (Yanghee Ryu) sets every
-   other word. The super admin's console also sets its titles and big numbers
-   in Knewave (superadmin.css). Both SIL OFL 1.1, self-hosted (the CSP allows
-   fonts from this site only), Latin subsets only.
+   One face for all three consoles (the user, 2026-10-23: "Lahat ng font
+   dongle gamit, ibat ibang thickness lang. Yung logo lang yung knewave"):
+   Dongle (Yanghee Ryu) for every word, regular or bold; Knewave (Tyler Finck)
+   for the LibotBulacan wordmark and nothing else. Both SIL OFL 1.1,
+   self-hosted (the CSP allows fonts from this site only), Latin subsets only.
 
    Dongle's letters are small for their size: its x-height is 0.30 em where a
    normal UI sans sits near 0.53. Rather than restate every font size in the
@@ -81,14 +81,12 @@
    The warm capiz-cream page from the mobile app, value for value, so the admin
    reads as the same product. The website uses the same values. */
 :root {
-  /* The faces, as tokens so a console can swap them (the super admin's does,
-     in superadmin.css). theme.jsx's `fonts` read these. Page titles here are
-     Dongle bold in capitals; the super admin's are Knewave as written. */
+  /* The faces, as tokens; theme.jsx's `fonts` read these. Display is the
+     title and big-number face (used bold), brand is the wordmark's. */
   --font-sans:    'Dongle Libot', system-ui, -apple-system, sans-serif;
   --font-display: 'Dongle Libot', system-ui, -apple-system, sans-serif;
   --font-brand:   'Knewave Libot', 'Dongle Libot', system-ui, sans-serif;
   --font-mono:    ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
-  --title-case:   uppercase;
 
   --bg:              #FBF8F2;
   --sidebar-bg:      #F4EFE4;

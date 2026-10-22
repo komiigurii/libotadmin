@@ -394,7 +394,7 @@ const d = {
   rowLabel: { display: 'flex', alignItems: 'center', gap: 7, fontSize: 16, fontWeight: 700, color: 'var(--text-primary)' },
   rowDetail: { fontSize: 14.5, color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   chevron:  { display: 'inline-flex', flexShrink: 0, color: 'var(--text-muted)' },
-  badge:    { flexShrink: 0, minWidth: 30, textAlign: 'center', fontFamily: 'var(--font-display)', fontSize: 19, lineHeight: 1, padding: '5px 10px 4px', borderRadius: 8, background: 'var(--accent)', color: 'var(--on-accent)' },
+  badge:    { flexShrink: 0, minWidth: 30, textAlign: 'center', fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 19, lineHeight: 1, padding: '5px 10px 4px', borderRadius: 8, background: 'var(--accent)', color: 'var(--on-accent)' },
   clear:    { flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 15, fontWeight: 700, color: 'var(--success)' },
   muted:    { fontSize: 15, color: 'var(--text-muted)' },
   pad:      { margin: 0, padding: '14px 16px', fontSize: 15, color: 'var(--text-muted)' },
@@ -404,7 +404,7 @@ const d = {
 
   healthTop:  { display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, padding: '14px 16px 6px' },
   healthLabel: { display: 'flex', alignItems: 'center', gap: 7, fontSize: 16, fontWeight: 700, color: 'var(--text-primary)' },
-  bigNum:     { fontFamily: 'var(--font-display)', fontSize: 40, lineHeight: 1, color: 'var(--text-primary)', whiteSpace: 'nowrap' },
+  bigNum:     { fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 40, lineHeight: 1, color: 'var(--text-primary)', whiteSpace: 'nowrap' },
   unit:       { fontFamily: 'var(--font-sans)', fontSize: 18, color: 'var(--text-muted)', marginLeft: 3 },
   healthFoot: { display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', padding: '6px 16px 12px', fontSize: 14, color: 'var(--text-muted)', borderBottom: '1px solid var(--divider)' },
   facts:      { margin: 0, padding: 0 },
@@ -413,7 +413,7 @@ const d = {
   factV:      { margin: 0, color: 'var(--text-primary)', textAlign: 'right' },
 
   staffRow:   { display: 'flex', alignItems: 'center', gap: 11, padding: '9px 16px', borderBottom: '1px solid var(--divider)' },
-  staffAvatar: { width: 32, height: 32, borderRadius: '50%', flexShrink: 0, display: 'grid', placeItems: 'center', background: 'var(--s-blue-soft)', color: 'var(--text-primary)', fontFamily: 'var(--font-display)', fontSize: 15 },
+  staffAvatar: { width: 32, height: 32, borderRadius: '50%', flexShrink: 0, display: 'grid', placeItems: 'center', background: 'var(--s-blue-soft)', color: 'var(--text-primary)', fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 15 },
   staffName:  { display: 'block', fontSize: 16, fontWeight: 700, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   staffSub:   { display: 'block', fontSize: 14, color: 'var(--text-muted)' },
 

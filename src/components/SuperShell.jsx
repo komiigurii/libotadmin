@@ -23,7 +23,7 @@ import '../superadmin.css';
  *   top bar   the fold button, the system's state, the bell and the theme.
  *
  * While mounted it marks <html data-console="superadmin">, which is what
- * switches on superadmin.css: Knewave and Dongle, the ink shell, the series
+ * switches on superadmin.css: the ink shell, the page bands, the series
  * hues. public/theme-init.js sets the same mark before first paint.
  */
 
@@ -416,7 +416,7 @@ function ProfileDialog({ username, onClose, onPassword }) {
         <div style={{ background: 'var(--sa-band)', color: 'var(--sa-shell-text)', padding: '22px 22px 18px', display: 'flex', alignItems: 'center', gap: 14 }}>
           <span className="sa-avatar" style={{ width: 54, height: 54, fontSize: 24 }} aria-hidden="true">{(username || 'S').charAt(0).toUpperCase()}</span>
           <div style={{ minWidth: 0, flex: 1 }}>
-            <h2 id={titleId} style={{ margin: 0, fontFamily: 'var(--font-display)', fontWeight: 400, fontSize: 26, lineHeight: 1.05, overflowWrap: 'anywhere' }}>{username || 'Super admin'}</h2>
+            <h2 id={titleId} style={{ margin: 0, fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 26, lineHeight: 1.05, overflowWrap: 'anywhere' }}>{username || 'Super admin'}</h2>
             <p style={{ margin: '4px 0 0', fontSize: 15, color: 'var(--sa-shell-muted)' }}>Your account</p>
           </div>
           <button type="button" className="sa-icon-btn boxed" onClick={onClose} aria-label="Close" autoFocus><Icon name="x" size={16} /></button>

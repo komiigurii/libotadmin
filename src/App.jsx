@@ -87,7 +87,7 @@ const SuperAdminRoute = ({ children }) => (
 );
 
 // The frame around every signed-in page. The super admin's console has its
-// own (components/SuperShell.jsx: dark rail, top bar, Knewave and Dongle);
+// own (components/SuperShell.jsx: dark rail, top bar, page bands);
 // admins and moderators keep the cream rail. A component, so the role is read
 // when the frame mounts after sign-in, not when the app first loaded.
 function ConsoleShell({ children }) {
