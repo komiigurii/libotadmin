@@ -5,14 +5,14 @@ import {
   Page, PageHeader, Toolbar, SearchInput, FilterTabs, List, Button, Tag, StatusPill,
   Loading, ErrorBanner, EmptyState, Avatar, ReviewPhotos, pageStyles as s,
 } from '../components/Layout';
-import Pagination from '../components/Pagination';
+import Pagination, { PAGE_SIZE } from '../components/Pagination';
 import { fmtDateTime, fmtNum } from '../utils/format';
 import Icon from '../components/Icon';
 import { theme as t, radius } from '../theme';
 import { useLive } from '../api/live';
 
 // Rate and Review — admin only (named as the paper names it; it was "Reviews
-// & Feedback"). Every review travelers have left, 20 to a page, and the
+// & Feedback"). Every review travelers have left, ten to a page, and the
 // spec's user-management actions on its author: warn, suspend, ban
 // permanently, or delete the review itself.
 //
@@ -21,7 +21,6 @@ import { useLive } from '../api/live';
 // "Filtered" tag and have their own tab, and the admin can read what was
 // actually written, to warn the writer.
 
-const PAGE_SIZE = 20;
 const STARS = [{ value: '', label: 'Any rating' }, ...[5, 4, 3, 2, 1].map((n) => ({ value: String(n), label: `${n} star${n === 1 ? '' : 's'}` }))];
 
 export default function Comments() {

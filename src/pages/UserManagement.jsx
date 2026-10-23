@@ -7,6 +7,7 @@ import {
   Loading, EmptyState, ErrorBanner, Avatar, pageStyles,
 } from '../components/Layout';
 import TravelerDrawer from '../components/TravelerDrawer';
+import { Paged, usePaged } from '../components/Pagination';
 import { Facts, DetailSection, DetailText } from '../components/Details';
 import { fmtNum, fmtDateTime, fmtDay, timeAgo } from '../utils/format';
 import { standingLabel } from '../utils/standing';
@@ -116,6 +117,7 @@ function AllUsersPanel() {
       [r.name, r.email, r.municipality].some(v => (v || '').toLowerCase().includes(q))
     );
   }, [rows, search]);
+  const paged = usePaged(filtered, search);
 
   return (
     <>
@@ -138,6 +140,7 @@ function AllUsersPanel() {
           subtitle={rows.length === 0 ? 'Users appear here once they sign up.' : 'Try a different search.'}
         />
       ) : (
+        <Paged {...paged} label="User pages">
         <Table
           caption="All users"
           head={<>
@@ -149,7 +152,7 @@ function AllUsersPanel() {
             <Th align="right">Last active</Th>
           </>}
         >
-          {filtered.map(r => (
+          {paged.rows.map(r => (
             <Row key={r.clerkUserId} onOpen={() => setOpen(overviewOf(r))} label={`Overview of ${r.name}`}>
               <Td>
                 <TravelerCell
@@ -171,6 +174,7 @@ function AllUsersPanel() {
             </Row>
           ))}
         </Table>
+        </Paged>
       )}
 
       {open && <TravelerDrawer traveler={open} onClose={() => setOpen(null)} />}
@@ -243,6 +247,7 @@ function BannedAccountsPanel() {
       (u.email?.toLowerCase() || '').includes(q)
     );
   });
+  const paged = usePaged(filtered, search);
 
   return (
     <>
@@ -269,6 +274,7 @@ function BannedAccountsPanel() {
       ) : filtered.length === 0 ? (
         <EmptyState icon="users" title="No accounts match" subtitle="Try a different name or email." />
       ) : (
+        <Paged {...paged} label="Suspended and banned pages">
         <Table
           caption="Suspended and banned accounts"
           head={<>
@@ -279,7 +285,7 @@ function BannedAccountsPanel() {
             <Th align="right">Action</Th>
           </>}
         >
-          {filtered.map(u => {
+          {paged.rows.map(u => {
             const hasAppeal = !!u.appealStatus && u.appealStatus !== 'none';
             const appeal    = APPEAL_STATUS[u.appealStatus];
             const busy      = busyId === u.clerkUserId;
@@ -335,6 +341,7 @@ function BannedAccountsPanel() {
             );
           })}
         </Table>
+        </Paged>
       )}
 
       {opened && (
@@ -411,6 +418,7 @@ function InactiveUsersPanel() {
 
   useEffect(() => { load(); }, []);
   useLive(['travelers', 'progress'], () => load({ quiet: true }));
+  const paged = usePaged(users);
 
   const archive = async (clerkUserId) => {
     if (!(await confirmAction(
@@ -440,6 +448,7 @@ function InactiveUsersPanel() {
           subtitle="Nobody has been away for 30 days or more."
         />
       ) : (
+        <Paged {...paged} label="Inactive account pages">
         <Table
           caption="Inactive accounts"
           head={<>
@@ -451,7 +460,7 @@ function InactiveUsersPanel() {
             <Th align="right">Action</Th>
           </>}
         >
-          {users.map(u => {
+          {paged.rows.map(u => {
             const busy = acting === u.clerkUserId;
             return (
               <Row key={u.clerkUserId} onOpen={() => setOpen(overviewOf(u))} label={`Overview of ${u.name || 'this traveler'}`}>
@@ -494,6 +503,7 @@ function InactiveUsersPanel() {
             );
           })}
         </Table>
+        </Paged>
       )}
 
       {open && <TravelerDrawer traveler={open} onClose={() => setOpen(null)} />}
@@ -546,6 +556,7 @@ function TravelerProgressPanel() {
       return [r.name, r.email, r.municipality].some(v => (v || '').toLowerCase().includes(q));
     });
   }, [rows, search, onlyExplorers]);
+  const paged = usePaged(visible, `${search}|${onlyExplorers}`);
 
   const explorers = rows.filter(r => r.spotsVisited > 0).length;
 
@@ -598,6 +609,7 @@ function TravelerProgressPanel() {
             : 'Try a different search or filter.'}
         />
       ) : (
+        <Paged {...paged} label="Leaderboard pages">
         <Table
           caption="Traveler leaderboard"
           head={<>
@@ -612,7 +624,7 @@ function TravelerProgressPanel() {
             <Th align="right">Last active</Th>
           </>}
         >
-          {visible.map(r => (
+          {paged.rows.map(r => (
             <Row key={r.clerkUserId} onOpen={() => setOpen(overviewOf(r))} label={`Overview of ${r.name}`}>
               <Td>
                 <span style={{
@@ -644,6 +656,7 @@ function TravelerProgressPanel() {
             </Row>
           ))}
         </Table>
+        </Paged>
       )}
 
       {open && <TravelerDrawer traveler={open} onClose={() => setOpen(null)} />}

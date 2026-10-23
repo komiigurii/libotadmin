@@ -5,7 +5,7 @@ import {
   Page, PageHeader, Button, StatusPill, Table, Th, Td, Row, Loading, ErrorBanner, FilterTabs,
   pageStyles as s,
 } from '../components/Layout';
-import Pagination from '../components/Pagination';
+import Pagination, { PAGE_SIZE } from '../components/Pagination';
 import MaintenanceDrawer from '../components/MaintenanceDrawer';
 import { notify, confirmAction, promptAction } from '../components/AppAlert';
 import Icon from '../components/Icon';
@@ -408,7 +408,7 @@ function NoticesCard() {
   const ids = { title: useId(), msg: useId(), at: useId() };
 
   const load = useCallback(() => {
-    systemAPI.notices({ page, limit: 5 }).then(setList).catch(() => setList((shown) => shown ?? { notices: [], pages: 1, page: 1 }));
+    systemAPI.notices({ page, limit: PAGE_SIZE }).then(setList).catch(() => setList((shown) => shown ?? { notices: [], pages: 1, page: 1 }));
   }, [page]);
   useEffect(() => { load(); }, [load]);
   useLive(['system'], load);
@@ -564,7 +564,7 @@ function MaintenanceLog() {
   const changed = useLiveTick(['system']);
   useEffect(() => {
     let live = true;
-    systemAPI.logs({ page, limit: 10 })
+    systemAPI.logs({ page, limit: PAGE_SIZE })
       .then((d) => { if (live) setData(d); })
       .catch(() => { if (live) setData((shown) => shown ?? { logs: [], pages: 1, page: 1, total: 0 }); });
     return () => { live = false; };

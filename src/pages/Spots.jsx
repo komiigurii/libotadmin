@@ -9,7 +9,7 @@ import {
 } from '../components/Layout';
 import { fmtNum, plural } from '../utils/format';
 import Icon from '../components/Icon';
-import Pagination from '../components/Pagination';
+import Pagination, { PAGE_SIZE } from '../components/Pagination';
 import { useLive } from '../api/live';
 
 const role = () => localStorage.getItem('role');
@@ -329,7 +329,6 @@ export default function Spots({ embedded = false, onCount }) {
 
 const EmbeddedShell = ({ children }) => <>{children}</>;
 
-const PAGE_SIZE = 10;
 const categoriesOf = (x) => (Array.isArray(x.category) ? x.category : x.category ? [x.category] : []);
 
 const s = {

@@ -3,6 +3,7 @@ import { townBadgeAPI, uploadAPI } from '../api/api';
 import { theme as t, radius, fonts } from '../theme';
 import { Page, PageHeader, Toolbar, FilterTabs, Button, Loading, ErrorBanner, EmptyState, pageStyles } from '../components/Layout';
 import Icon from '../components/Icon';
+import { Paged, usePaged } from '../components/Pagination';
 import { notify } from '../components/AppAlert';
 import { useLive } from '../api/live';
 
@@ -143,6 +144,7 @@ export default function TownBadges() {
 
   const withSpots = towns.filter((x) => x.spots > 0);
   const visible = show === 'spots' ? withSpots : towns;
+  const paged = usePaged(visible, show);
   const missingArt = withSpots.filter((x) => !x.saved.image).length;
 
   const onSaved = (municipality, badge) =>
@@ -184,9 +186,11 @@ export default function TownBadges() {
       ) : visible.length === 0 ? (
         <EmptyState icon="map-pin" title="No town has spots yet" subtitle="A town's badge can be earned once it has at least one spot." />
       ) : (
-        <div style={s.grid}>
-          {visible.map((town) => <TownCard key={town.municipality} town={town} onSaved={onSaved} />)}
-        </div>
+        <Paged {...paged} label="Town pages">
+          <div style={s.grid}>
+            {paged.rows.map((town) => <TownCard key={town.municipality} town={town} onSaved={onSaved} />)}
+          </div>
+        </Paged>
       )}
     </Page>
   );

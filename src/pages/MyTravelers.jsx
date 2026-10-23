@@ -5,6 +5,7 @@ import {
   Loading, EmptyState, ErrorBanner, Avatar, pageStyles as s,
 } from '../components/Layout';
 import Drawer from '../components/Drawer';
+import { Paged, usePaged } from '../components/Pagination';
 import { Facts, DetailSection, VisitList, detailStyles as d } from '../components/Details';
 import { fmtDay, fmtNum, timeAgo } from '../utils/format';
 import { standingLabel } from '../utils/standing';
@@ -69,6 +70,7 @@ export default function MyTravelers() {
       return !q || [r.name, r.homeMunicipality, ...(r.spotNames || [])].some((v) => (v || '').toLowerCase().includes(q));
     });
   }, [rows, search, filter, town]);
+  const paged = usePaged(visible, `${search}|${filter}`);
 
   const locals = rows.filter((r) => r.homeMunicipality === town).length;
   const spotsWord = `${spotCount} ${spotCount === 1 ? 'spot' : 'spots'}`;
@@ -113,6 +115,7 @@ export default function MyTravelers() {
       ) : visible.length === 0 ? (
         <EmptyState icon="users" title="No travelers match" subtitle="Try a different search or filter." />
       ) : (
+        <Paged {...paged} label="Traveler pages">
         <Table
           caption={`Travelers who visited spots in ${town}`}
           head={<>
@@ -122,7 +125,7 @@ export default function MyTravelers() {
             <Th>Standing</Th>
           </>}
         >
-          {visible.map((r) => {
+          {paged.rows.map((r) => {
             const st = STATUS[r.status] || STATUS.active;
             return (
               <Row key={r.id} onOpen={() => setOpenId(r.id)} label={`Details of ${r.name}`}>
@@ -152,6 +155,7 @@ export default function MyTravelers() {
             );
           })}
         </Table>
+        </Paged>
       )}
 
       {opened && <TravelerDetails r={opened} town={town} spotCount={spotCount} onClose={() => setOpenId(null)} />}

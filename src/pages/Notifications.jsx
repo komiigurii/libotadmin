@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { notificationsAPI } from '../api/api';
 import { Page, PageHeader, Button, Loading, EmptyState, ErrorBanner, Table, Th, Td } from '../components/Layout';
-import Pagination from '../components/Pagination';
+import { PAGE_SIZE, Paged } from '../components/Pagination';
 import { publishHeartbeat, useHeartbeat } from '../auth/heartbeat';
 import { useLive } from '../api/live';
 import { isAdminOnly, isSuperAdmin } from '../auth/roles';
@@ -25,7 +25,7 @@ export default function Notifications() {
 
   const load = async (p = page) => {
     try {
-      const d = await notificationsAPI.get({ page: p, limit: 20 });
+      const d = await notificationsAPI.get({ page: p, limit: PAGE_SIZE });
       setData(d);
       setError('');
       publishHeartbeat({ unread: d.unread });
@@ -87,7 +87,7 @@ export default function Notifications() {
         : data.notifications.length === 0 ? <EmptyState icon="bell" title="Nothing yet" subtitle="You’ll be told here when something needs you." />
           : (
             // One dense table, a row per notice.
-            <>
+            <Paged page={data.page} pages={data.pages} total={data.total} count={data.notifications.length} onChange={setPage} label="Notification pages">
               <Table caption="Notifications" head={<><Th width={160}>Kind</Th><Th>Notification</Th><Th width={130}>When</Th><Th width={90} align="right" /></>}>
                 {data.notifications.map((n) => {
                   const k = noticeKind(n.kind);
@@ -120,8 +120,7 @@ export default function Notifications() {
                   );
                 })}
               </Table>
-              {data.pages > 1 && <Pagination page={data.page} pages={data.pages} onChange={setPage} label="Notification pages" />}
-            </>
+            </Paged>
           )}
     </Page>
   );

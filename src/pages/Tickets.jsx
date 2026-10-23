@@ -6,7 +6,7 @@ import {
   Page, PageHeader, Toolbar, SearchInput, Button, StatusPill, Tag, Loading, EmptyState, ErrorBanner,
   Table, Th, Td, pageStyles as s,
 } from '../components/Layout';
-import Pagination from '../components/Pagination';
+import { PAGE_SIZE, Paged } from '../components/Pagination';
 import CredentialSlip from '../components/CredentialSlip';
 import { notify, confirmAction } from '../components/AppAlert';
 import Icon from '../components/Icon';
@@ -71,7 +71,7 @@ function TicketQueue() {
   // `quiet`: a live update; a failure keeps the list shown.
   const load = useCallback(async ({ quiet = false } = {}) => {
     try {
-      setData(await ticketsAPI.list({ page, limit: 25, ...(status ? { status } : {}), ...(category ? { category } : {}), ...(search ? { q: search } : {}) }));
+      setData(await ticketsAPI.list({ page, limit: PAGE_SIZE, ...(status ? { status } : {}), ...(category ? { category } : {}), ...(search ? { q: search } : {}) }));
       setError('');
     } catch (err) { if (!quiet) setError(errorOf(err)); }
   }, [page, status, category, search]);
@@ -142,7 +142,7 @@ function TicketQueue() {
               <EmptyState icon="inbox" title={status === 'open' ? 'Nothing open' : 'No tickets here'}
                 subtitle="New ones show here, and in your bell." />
             ) : (
-              <>
+              <Paged page={data.page} pages={data.pages} total={data.total} count={data.tickets.length} onChange={setPage} label="Ticket pages">
                 {/* Beside the filter list there's no room for seven columns,
                     so the replies and the last update sit under the title. */}
                 <Table caption="Tickets" head={<><Th width={64}>No.</Th><Th width="36%">Ticket</Th><Th>About</Th><Th>From</Th><Th>Status</Th></>}>
@@ -169,8 +169,7 @@ function TicketQueue() {
                     );
                   })}
                 </Table>
-                {data.pages > 1 && <Pagination page={data.page} pages={data.pages} onChange={setPage} label="Ticket pages" />}
-              </>
+              </Paged>
             )}
         </div>
       </div>
@@ -198,7 +197,7 @@ function ReportProblem() {
   // `quiet`: a live update (the super admin answered); a failure keeps the list.
   const load = useCallback(async ({ quiet = false } = {}) => {
     try {
-      setData(await ticketsAPI.list({ page, limit: 20, ...(status ? { status } : {}), ...(search ? { q: search } : {}) }));
+      setData(await ticketsAPI.list({ page, limit: PAGE_SIZE, ...(status ? { status } : {}), ...(search ? { q: search } : {}) }));
       setError('');
     } catch (err) { if (!quiet) setError(errorOf(err)); }
   }, [page, status, search]);
@@ -248,7 +247,7 @@ function ReportProblem() {
           <EmptyState icon="inbox" title={status === 'open' ? 'Nothing open' : 'No tickets here'}
             subtitle="Use New ticket to report a problem." />
         ) : (
-          <>
+          <Paged page={data.page} pages={data.pages} total={data.total} count={data.tickets.length} onChange={setPage} label="Ticket pages">
             <Table caption="Your tickets" head={<><Th width={64}>No.</Th><Th width="38%">Ticket</Th><Th>About</Th><Th align="right">Replies</Th><Th>Updated</Th><Th>Status</Th></>}>
               {data.tickets.map((tk) => {
                 const cat = CATEGORY[tk.category] || CATEGORY.other;
@@ -267,8 +266,7 @@ function ReportProblem() {
                 );
               })}
             </Table>
-            {data.pages > 1 && <Pagination page={data.page} pages={data.pages} onChange={setPage} label="Ticket pages" />}
-          </>
+          </Paged>
         )}
     </Page>
   );

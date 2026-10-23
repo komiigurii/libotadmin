@@ -4,7 +4,7 @@ import { Button, StatusPill, Table, Th, Td, Row, Avatar, Loading, EmptyState, pa
 import { notify, confirmAction } from './AppAlert';
 import CredentialSlip from './CredentialSlip';
 import Drawer from './Drawer';
-import Pagination from './Pagination';
+import Pagination, { PAGE_SIZE, Paged, usePaged } from './Pagination';
 import { Facts, DetailSection, detailStyles as d } from './Details';
 import Icon from './Icon';
 import { theme as t, radius, shadow, type } from '../theme';
@@ -55,8 +55,6 @@ const townUsername = (town, accounts) => {
   for (let n = 2; taken.has(name); n += 1) name = `${base}${n}`;
   return name;
 };
-
-const STAFF_PAGE = 10;
 
 /**
  * roles: which kinds this person may make (['admin','moderator'] for the super
@@ -200,9 +198,9 @@ export function StaffTable({ accounts, extra, onChanged, canManage, canResetPass
   const opened = openId && accounts.find((a) => a.id === openId);
   // Ten a page (mock defense notes, 2026-10-23). A filter or search that
   // shortens the list keeps the page in range.
-  const pages = Math.max(1, Math.ceil(accounts.length / STAFF_PAGE));
+  const pages = Math.max(1, Math.ceil(accounts.length / PAGE_SIZE));
   const at = Math.min(page, pages);
-  const rows = accounts.slice((at - 1) * STAFF_PAGE, at * STAFF_PAGE);
+  const rows = accounts.slice((at - 1) * PAGE_SIZE, at * PAGE_SIZE);
 
   const act = async (id, fn) => {
     setBusy(id);
@@ -313,7 +311,7 @@ export function StaffTable({ accounts, extra, onChanged, canManage, canResetPass
       </Table>
       {pages > 1 && (
         <div style={f.pageFoot}>
-          <span style={s.itemDate}>{(at - 1) * STAFF_PAGE + 1}–{(at - 1) * STAFF_PAGE + rows.length} of {accounts.length}</span>
+          <span style={s.itemDate}>{(at - 1) * PAGE_SIZE + 1}–{(at - 1) * PAGE_SIZE + rows.length} of {accounts.length}</span>
           <Pagination page={at} pages={pages} onChange={setPage} label={`${caption} pages`} />
         </div>
       )}
@@ -376,10 +374,12 @@ function MoveDialog({ account, accounts, onClose, onMoved }) {
 }
 
 export function HistoryList({ entries }) {
+  const paged = usePaged(entries);
   if (!entries.length) return <EmptyState icon="history" title="Nothing yet" subtitle="Changes and sign-ins show here." />;
   return (
+    <Paged {...paged} label="History pages">
     <ol style={f.history}>
-      {entries.map((e) => {
+      {paged.rows.map((e) => {
         const a = actionLabel(e.action);
         return (
           <li key={e._id} style={f.historyItem}>
@@ -398,6 +398,7 @@ export function HistoryList({ entries }) {
         );
       })}
     </ol>
+    </Paged>
   );
 }
 

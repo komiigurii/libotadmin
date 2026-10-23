@@ -8,7 +8,7 @@ import {
 import { AddAccountForm, StaffTable } from '../components/StaffAccounts';
 import { notify, confirmAction, promptAction } from '../components/AppAlert';
 import CredentialSlip from '../components/CredentialSlip';
-import Pagination from '../components/Pagination';
+import Pagination, { PAGE_SIZE, Paged, usePaged } from '../components/Pagination';
 import { Bone } from '../components/Skeleton';
 import Drawer from '../components/Drawer';
 import TravelerDrawer, { Standing } from '../components/TravelerDrawer';
@@ -366,8 +366,6 @@ function StaffView({ accounts, all, title, canMake, loading, error, onDismissErr
   );
 }
 
-const PAGE_SIZE = 25;
-
 function TravelersView({ status, title, onShowDeleted }) {
   const [data, setData] = useState(null);
   const [error, setError] = useState('');
@@ -479,6 +477,7 @@ function LockedView({ locked, kind, title, error, onDismissError, reload, onUnlo
   const [busy, setBusy] = useState('');
   const all = locked?.accounts || [];
   const shown = all.filter((acc) => lockedMatches(acc, kind));
+  const paged = usePaged(shown, kind);
 
   const run = async (key, fn) => {
     setBusy(key);
@@ -538,6 +537,7 @@ function LockedView({ locked, kind, title, error, onDismissError, reload, onUnlo
       {!locked ? (!error && <Loading label="Loading locked accounts…" cols={4} media="avatar" />)
         : shown.length === 0 ? <EmptyState icon="unlock" title={nobody} subtitle="Accounts locked by wrong passwords show here until they’re unlocked or their lock runs out." />
           : (
+            <Paged {...paged} label="Locked account pages">
             <Table
               caption="Locked accounts"
               head={<>
@@ -547,7 +547,7 @@ function LockedView({ locked, kind, title, error, onDismissError, reload, onUnlo
                 <Th align="right" />
               </>}
             >
-              {shown.map((acc) => (
+              {paged.rows.map((acc) => (
                 <tr key={`${acc.kind}-${acc.id}`}>
                   <Td>
                     <div style={s.person}>
@@ -575,6 +575,7 @@ function LockedView({ locked, kind, title, error, onDismissError, reload, onUnlo
                 </tr>
               ))}
             </Table>
+            </Paged>
           )}
 
       <p style={{ ...s.itemDate, margin: 0 }}>

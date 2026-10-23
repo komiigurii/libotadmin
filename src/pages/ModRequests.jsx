@@ -9,6 +9,7 @@ import { ChangeList, ProposalFieldList } from '../components/ChangeDiff';
 import { MISSION_FIELD_LABELS } from '../utils/changeDiff';
 import { fmtDateTime } from '../utils/format';
 import Icon from '../components/Icon';
+import { Paged, usePaged } from '../components/Pagination';
 import { useLive } from '../api/live';
 
 const KIND_LABELS = {
@@ -150,6 +151,7 @@ export default function ModRequests({ embedded = false, onCount }) {
   useLive(['approvals', 'spots', 'missions'], () => load({ quiet: true }));
 
   const visible = requests.filter(r => !kindFilter || r.kind === kindFilter);
+  const paged = usePaged(visible, kindFilter);
   const pendingCount = requests.filter(r => r.status === 'pending').length;
   useEffect(() => { if (!loading) onCount?.(pendingCount); }, [loading, pendingCount, onCount]);
 
@@ -230,8 +232,9 @@ export default function ModRequests({ embedded = false, onCount }) {
             : 'Try another filter.'}
         />
       ) : (
+        <Paged {...paged} label="Request pages">
         <List>
-          {visible.map((r) => {
+          {paged.rows.map((r) => {
             const isPending = r.status === 'pending';
             const isActing = acting === r.id;
             const key = `${r.kind}-${r.id}`;
@@ -321,6 +324,7 @@ export default function ModRequests({ embedded = false, onCount }) {
             );
           })}
         </List>
+        </Paged>
       )}
     </Shell>
   );

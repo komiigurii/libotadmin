@@ -23,7 +23,7 @@ import { actionLabel, ACTION_GROUPS, GROUP_HUE, MIX_ORDER, groupOf } from '../ut
  * tags in the table. Rows are grouped by day; a row opens the whole entry.
  */
 
-const PAGE_SIZE = 30;
+const PAGE_SIZE = 10;
 const ROLE = { superadmin: 'Super admin', admin: 'Admin', moderator: 'Moderator' };
 const TZ = 'Asia/Manila';
 

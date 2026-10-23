@@ -8,6 +8,7 @@ import { ChangeList, ProposalFieldList } from '../components/ChangeDiff';
 import { changedFieldLabels, recordFromRequest, MISSION_FIELD_LABELS } from '../utils/changeDiff';
 import { fmtDateTime } from '../utils/format';
 import Icon from '../components/Icon';
+import { Paged, usePaged } from '../components/Pagination';
 import { useLive } from '../api/live';
 
 // Request Tracking — every request this moderator has sent and where it
@@ -131,6 +132,7 @@ export default function MyReviewRequests() {
   useLive(['approvals', 'spots', 'missions'], () => load({ quiet: true }));
 
   const visible = requests.filter((r) => !statusFilter || r.status === statusFilter);
+  const paged = usePaged(visible, statusFilter);
   const count = (st) => requests.filter((r) => r.status === st).length;
 
   return (
@@ -168,8 +170,9 @@ export default function MyReviewRequests() {
             : 'Try another filter.'}
         />
       ) : (
+        <Paged {...paged} label="Submission pages">
         <List>
-          {visible.map((r) => {
+          {paged.rows.map((r) => {
             const key = `${r.kind}-${r.id}`;
             const isOpen = expanded === key;
             const labels = r.kind === 'mission' ? MISSION_FIELD_LABELS : undefined;
@@ -242,6 +245,7 @@ export default function MyReviewRequests() {
             );
           })}
         </List>
+        </Paged>
       )}
     </Page>
   );
