@@ -654,22 +654,10 @@ function TravelerProgressPanel() {
 // ─── Default export ───────────────────────────────────────────────────────────
 
 const TAB_META = {
-  [TAB.ALL]: {
-    label:    'All Users',
-    title:    'All Users',
-  },
-  [TAB.BANS]: {
-    label:    'Suspended & Banned',
-    title:    'Suspensions & Bans',
-  },
-  [TAB.INACTIVE]: {
-    label:    'Inactive',
-    title:    'Inactive Accounts',
-  },
-  [TAB.PROGRESS]: {
-    label:    'Leaderboard',
-    title:    'Traveler Progress',
-  },
+  [TAB.ALL]:      { label: 'All Users' },
+  [TAB.BANS]:     { label: 'Suspended & Banned' },
+  [TAB.INACTIVE]: { label: 'Inactive' },
+  [TAB.PROGRESS]: { label: 'Leaderboard' },
 };
 
 export default function UserManagement() {
@@ -679,11 +667,13 @@ export default function UserManagement() {
   const asked = params.get('tab');
   const tab = Object.values(TAB).includes(asked) ? asked : TAB.ALL;
   const setTab = (key) => setParams(key === TAB.ALL ? {} : { tab: key }, { replace: true });
-  const meta = TAB_META[tab];
 
+  // One name for the page whichever tab is open, like the rail's link: the
+  // heading and the browser tab used to change with every tab (mock defense
+  // notes, 2026-10-23: "tab name … changing … but still in the same page").
   return (
     <Page>
-      <PageHeader title={meta.title} subtitle={meta.subtitle} />
+      <PageHeader title="User Management" />
 
       <div style={tabBarStyle}>
         {Object.values(TAB).map(key => (
