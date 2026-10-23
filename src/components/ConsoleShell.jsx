@@ -3,13 +3,15 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import Icon from './Icon';
 import logo from '../assets/logo.png';
 import { useThemePref } from '../theme';
-import { useHeartbeat } from '../auth/heartbeat';
+import { publishHeartbeat, useHeartbeat } from '../auth/heartbeat';
 import { clearSession, getToken } from '../auth/session';
 import { getRole } from '../auth/roles';
-import { accountsAPI, authAPI } from '../api/api';
+import { accountsAPI, authAPI, notificationsAPI } from '../api/api';
+import { useLive } from '../api/live';
 import { confirmAction } from './AppAlert';
 import { Button } from './Layout';
-import { fmtDay, timeAgo } from '../utils/format';
+import { fmtDateTime, fmtDay, timeAgo } from '../utils/format';
+import { noticeKind } from '../utils/notificationKinds';
 import '../console.css';
 
 /*
@@ -23,7 +25,8 @@ import '../console.css';
  *             Folds to icons from the top bar's button (remembered), always on
  *             a tablet, and becomes a drawer on a phone.
  *   top bar   the fold button, the system's state (the super admin's, or the
- *             town you look after), the bell and the theme.
+ *             town you look after), the bell (a dropdown of the newest
+ *             notifications; not in the rail since 2026-10-23) and the theme.
  *
  * While mounted it marks <html data-console="<role>">, which is what switches
  * on console.css: the ink shell, the page bands, the series hues.
@@ -87,22 +90,26 @@ const MODERATOR_NAV = [
   ] },
 ];
 
-// Every role's bell; admins and moderators also report problems from here
-// (the super admin answers them under Tickets).
-const inboxNav = (superAdmin) => ({ group: 'Inbox', items: [
-  { label: 'Notifications', path: '/notifications', icon: 'bell', badge: 'unread', hint: 'Your bell', keys: 'bell inbox unread' },
-  ...(superAdmin ? [] : [{ label: 'Report a Problem', path: '/tickets', icon: 'flag', hint: 'Tell the super admin about a problem', keys: 'ticket report problem bug help' }]),
-] });
+// Admins and moderators report problems from here (the super admin answers
+// them under Tickets).
+const HELP_NAV = { group: 'Help', items: [
+  { label: 'Report a Problem', path: '/tickets', icon: 'flag', hint: 'Tell the super admin about a problem', keys: 'ticket report problem bug help' },
+] };
 
 const CONSOLES = {
   superadmin: { nav: SUPER_ADMIN_NAV, name: 'Super admin console', role: 'Super admin', jump: 'maintenance, tickets, accounts' },
-  admin:      { nav: ADMIN_NAV,       name: 'Admin Console',       role: 'Admin',       jump: 'spots, approvals, reviews' },
-  moderator:  { nav: MODERATOR_NAV,   name: 'Moderator Console',   role: 'Moderator',   jump: 'spots, submissions, travelers' },
+  admin:      { nav: [...ADMIN_NAV, HELP_NAV],     name: 'Admin Console',     role: 'Admin',     jump: 'spots, approvals, reviews' },
+  moderator:  { nav: [...MODERATOR_NAV, HELP_NAV], name: 'Moderator Console', role: 'Moderator', jump: 'spots, submissions, travelers' },
 };
 
+// Pages outside the rail that Jump to page still finds.
 const EXTRA = [
+  { label: 'Notifications', path: '/notifications', icon: 'bell', hint: 'Everything in your bell', keys: 'bell inbox unread' },
   { label: 'Change password', path: '/change-password', icon: 'key', hint: 'Your own password', keys: 'password security' },
 ];
+
+// How many of the newest the bell's dropdown shows.
+const BELL_SHOWS = 8;
 
 const isHere = (path, current) => current === path || current.startsWith(`${path}/`);
 const RAIL_KEY = 'libot_admin_rail';
@@ -177,7 +184,7 @@ export default function ConsoleShell({ children }) {
     navigate('/login');
   };
 
-  const nav = [...kind.nav, inboxNav(superAdmin)];
+  const { nav } = kind;
   const counts = { unread: beat?.unread || 0, tickets: beat?.openTickets || 0, approvals: beat?.pendingApprovals || 0 };
   const all = nav.flatMap((g) => g.items);
   const current = [...all, ...EXTRA].find((i) => isHere(i.path, location.pathname));
@@ -256,10 +263,7 @@ export default function ConsoleShell({ children }) {
           <div className="sa-topbar-title">{current?.label || kind.name}</div>
           <div className="sa-topbar-space" />
           {superAdmin ? <SystemState system={beat?.system} /> : <StaffState system={beat?.system} scope={scope} />}
-          <Link to="/notifications" className="sa-icon-btn boxed" aria-label={counts.unread ? `Notifications, ${counts.unread} unread` : 'Notifications'}>
-            <Icon name="bell" size={18} />
-            {counts.unread > 0 && <span className="sa-count" aria-hidden="true">{counts.unread > 99 ? '99+' : counts.unread}</span>}
-          </Link>
+          <BellMenu unread={counts.unread} />
           <ThemeMenu />
         </header>
         {children}
@@ -310,6 +314,123 @@ function StaffState({ system, scope }) {
       <Icon name="map-pin" size={14} />
       <span className="sa-state-text">{scope}</span>
     </span>
+  );
+}
+
+// The bell: the newest notifications in a panel under the button. Opening one
+// marks it read and goes where it points; "See all" is the whole list.
+function BellMenu({ unread }) {
+  const navigate = useNavigate();
+  const [open, setOpen] = useState(false);
+  const [data, setData] = useState(null);
+  const [error, setError] = useState('');
+  const ref = useRef(null);
+  const panelId = useId();
+  const close = useCallback(() => setOpen(false), []);
+  useDismiss(open, close, ref);
+
+  const load = useCallback(async () => {
+    try {
+      const d = await notificationsAPI.get({ page: 1, limit: BELL_SHOWS });
+      setData(d);
+      setError('');
+      publishHeartbeat({ unread: d.unread });
+    } catch {
+      setError('Couldn’t load your notifications.');
+    }
+  }, []);
+  const toggle = () => { if (!open) load(); setOpen(!open); };
+  // A new notice, or one read in another window, while it's open.
+  useLive(['notifications'], () => { if (open) load(); });
+
+  const pick = async (n) => {
+    if (!n.readAt) {
+      try {
+        const { unread: left } = await notificationsAPI.read(n._id);
+        publishHeartbeat({ unread: left });
+        setData((d) => ({ ...d, notifications: d.notifications.map((x) => (x._id === n._id ? { ...x, readAt: new Date().toISOString() } : x)) }));
+      } catch { /* still go where it points */ }
+    }
+    if (n.link) { setOpen(false); navigate(n.link); }
+  };
+
+  const readAll = async () => {
+    try {
+      await notificationsAPI.readAll();
+      publishHeartbeat({ unread: 0 });
+      load();
+    } catch {
+      setError('Couldn’t mark them read. Try again.');
+    }
+  };
+
+  const seeAll = () => { setOpen(false); navigate('/notifications'); };
+
+  return (
+    <div className="sa-rel" ref={ref}>
+      <button type="button" className="sa-icon-btn boxed" onClick={toggle}
+        aria-haspopup="dialog" aria-expanded={open} aria-controls={open ? panelId : undefined}
+        aria-label={unread ? `Notifications, ${unread} unread` : 'Notifications'} title="Notifications">
+        <Icon name="bell" size={18} weight={open ? 'fill' : 'regular'} />
+        {unread > 0 && <span className="sa-count" aria-hidden="true">{unread > 99 ? '99+' : unread}</span>}
+      </button>
+      {open && (
+        <div className="sa-menu sa-bell" id={panelId} role="dialog" aria-label="Notifications">
+          <div className="sa-bell-head">
+            <span className="sa-bell-title">Notifications</span>
+            {unread > 0 && <span className="sa-bell-unread">{unread} unread</span>}
+            {unread > 0 && (
+              <button type="button" className="sa-bell-action" onClick={readAll}>
+                <Icon name="check" size={14} weight="bold" /> Mark all read
+              </button>
+            )}
+          </div>
+          {error && <p className="sa-bell-note danger" role="alert">{error}</p>}
+          {!data ? (!error && <p className="sa-bell-note">Loading…</p>)
+            : data.notifications.length === 0 ? (
+              <div className="sa-bell-empty">
+                <Icon name="bell" size={24} />
+                <strong>Nothing yet</strong>
+                <span>You’ll be told here when something needs you.</span>
+              </div>
+            ) : (
+              <ul className="sa-bell-list">
+                {data.notifications.map((n) => {
+                  const k = noticeKind(n.kind);
+                  const isNew = !n.readAt;
+                  const body = (
+                    <>
+                      <span className="sa-swatch" style={{ background: `var(--s-${k.hue})` }} aria-hidden="true" />
+                      <span className="sa-bell-text">
+                        <span className="sa-bell-meta">
+                          {k.label} · <time className="sa-mono" dateTime={n.createdAt} title={fmtDateTime(n.createdAt)}>{timeAgo(n.createdAt)}</time>
+                        </span>
+                        <span className="sa-bell-item-title">
+                          {isNew && <span className="visually-hidden">Unread: </span>}
+                          {n.title}
+                        </span>
+                        {n.body && <span className="sa-bell-body">{n.body}</span>}
+                      </span>
+                      {isNew && <span className="sa-bell-dot" aria-hidden="true" />}
+                    </>
+                  );
+                  return (
+                    <li key={n._id}>
+                      {/* Read and going nowhere: nothing to click. */}
+                      {n.link || isNew
+                        ? <button type="button" className="sa-bell-item" data-unread={isNew || undefined} onClick={() => pick(n)}>{body}</button>
+                        : <div className="sa-bell-item">{body}</div>}
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          <button type="button" className="sa-bell-foot" onClick={seeAll}>
+            See all notifications <Icon name="arrow-right" size={14} />
+          </button>
+        </div>
+      )}
+    </div>
   );
 }
 

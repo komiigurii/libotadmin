@@ -8,21 +8,14 @@ import { useLive } from '../api/live';
 import { isAdminOnly, isSuperAdmin } from '../auth/roles';
 import { theme as t } from '../theme';
 import { fmtDateTime, fmtNum, timeAgo } from '../utils/format';
+import { noticeKind } from '../utils/notificationKinds';
 
 /*
  * Notifications — the bell, for every role (mock defense 2026-10-21): the
  * system going into maintenance or an update coming, changes someone made to
- * your account, and answers to the tickets you sent.
+ * your account, and answers to the tickets you sent. The bell's dropdown in
+ * the top bar shows the newest; this page is the whole list ("See all").
  */
-
-// `hue`: the kind's series hue (console.css).
-const KIND = {
-  maintenance: { icon: 'tool',          label: 'System',       hue: 'violet' },
-  update:      { icon: 'sparkle',       label: 'Update',       hue: 'violet' },
-  account:     { icon: 'shield',        label: 'Your account', hue: 'blue' },
-  ticket:      { icon: 'message-square', label: 'Ticket',      hue: 'marigold' },
-  request:     { icon: 'send',          label: 'Request',      hue: 'slate' },
-};
 
 export default function Notifications() {
   const navigate = useNavigate();
@@ -97,7 +90,7 @@ export default function Notifications() {
             <>
               <Table caption="Notifications" head={<><Th width={160}>Kind</Th><Th>Notification</Th><Th width={130}>When</Th><Th width={90} align="right" /></>}>
                 {data.notifications.map((n) => {
-                  const k = KIND[n.kind] || KIND.update;
+                  const k = noticeKind(n.kind);
                   const unread = !n.readAt;
                   return (
                     <tr key={n._id} onClick={() => open(n)} style={{ cursor: 'pointer' }}>

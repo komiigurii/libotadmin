@@ -293,6 +293,55 @@
 .sa-state.warn .sa-state-dot { background: var(--sa-band-warning); }
 .sa-rel { position: relative; }
 
+/* The bell's dropdown: the newest notifications, newest first. */
+.sa-bell { right: 0; top: 46px; width: 400px; padding: 0; overflow: hidden; display: flex; flex-direction: column; }
+.sa-bell-head {
+  display: flex; align-items: center; gap: 10px;
+  padding: 12px 12px 10px 16px; border-bottom: 1px solid var(--divider);
+}
+.sa-bell-title { font-family: var(--font-display); font-size: 20px; font-weight: 700; text-transform: uppercase; line-height: 1; }
+.sa-bell-unread { font-size: 14px; color: var(--text-muted); white-space: nowrap; }
+.sa-bell-action {
+  margin-left: auto; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; flex-shrink: 0;
+  padding: 5px 9px; border: none; border-radius: 7px; background: transparent;
+  color: var(--brand); font-size: 15px; font-weight: 700; cursor: pointer;
+}
+.sa-bell-action:hover, .sa-bell-action:focus-visible { background: var(--brand-soft); }
+.sa-bell-list { list-style: none; margin: 0; padding: 4px; max-height: min(440px, calc(100vh - 190px)); overflow-y: auto; overscroll-behavior: contain; }
+.sa-bell-list li + li { border-top: 1px solid var(--divider); }
+.sa-bell-item {
+  display: flex; align-items: flex-start; gap: 10px; width: 100%;
+  padding: 10px 10px 10px 12px; border: none; border-radius: 8px;
+  background: transparent; color: var(--text-primary); text-align: left; font: inherit;
+}
+button.sa-bell-item { cursor: pointer; }
+button.sa-bell-item:hover, button.sa-bell-item:focus-visible { background: var(--card-bg-hover); }
+.sa-bell-item[data-unread] { background: var(--brand-soft); }
+.sa-bell-item .sa-swatch { margin-top: 4px; }
+.sa-bell-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.sa-bell-meta { font-size: 13px; color: var(--text-muted); }
+[data-console] .sa-bell-meta .sa-mono { font-size: 12px; }
+.sa-bell-item-title { font-size: 16px; font-weight: 600; line-height: 1.2; overflow-wrap: anywhere; }
+.sa-bell-item[data-unread] .sa-bell-item-title { font-weight: 700; }
+.sa-bell-body {
+  font-size: 14px; color: var(--text-secondary); line-height: 1.35; overflow-wrap: anywhere;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.sa-bell-dot { width: 8px; height: 8px; margin-top: 6px; border-radius: 50%; background: var(--brand); flex-shrink: 0; }
+.sa-bell-note { margin: 0; padding: 16px; font-size: 15px; color: var(--text-muted); }
+.sa-bell-note.danger { color: var(--danger); padding-bottom: 4px; }
+.sa-bell-empty {
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  padding: 26px 16px 22px; text-align: center; color: var(--text-muted); font-size: 15px;
+}
+.sa-bell-empty strong { color: var(--text-primary); font-size: 17px; margin-top: 6px; }
+.sa-bell-foot {
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 11px; border: none; border-top: 1px solid var(--divider); background: transparent;
+  color: var(--brand); font-size: 15px; font-weight: 700; cursor: pointer;
+}
+.sa-bell-foot:hover, .sa-bell-foot:focus-visible { background: var(--card-bg-hover); }
+
 /* Page area */
 [data-console] .admin-page {
   max-width: none !important;
@@ -581,6 +630,9 @@ a.sa-cell:hover { background: var(--sa-shell-raised); }
      drawer's account line says the town. */
   .sa-scope { display: none !important; }
   .sa-topbar-title { display: block; }
+  /* Under the top bar, edge to edge: the bell sits too far right to hang a
+     full panel from it. */
+  .sa-bell { position: fixed; top: 58px; left: 12px; right: 12px; width: auto; }
   .sa-backdrop { position: fixed; inset: 0; z-index: 65; background: var(--overlay); }
   [data-console] .admin-page { padding: 12px 12px 28px !important; gap: 12px !important; }
   .sa-band { padding: 18px 16px 16px; border-radius: 12px; }
