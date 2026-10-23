@@ -68,7 +68,7 @@ const ADMIN_NAV = [
   ] },
   { group: 'Travelers', items: [
     { label: 'User Management', path: '/user-management', icon: 'user', hint: 'Manage user accounts and permissions', keys: 'user management accounts permissions' },
-    { label: 'Town Badges', path: '/town-badges', icon: 'star', hint: 'The towns travelers have finished', keys: 'badge town explorer voyager goat' },
+    { label: 'Town & District Badges', path: '/town-badges', icon: 'star', hint: 'The towns and districts travelers have finished, and their badge images', keys: 'badge town district title bronze silver gold goat' },
   ] },
   { group: 'Team', items: [
     { label: 'Moderators Management', path: '/moderators', icon: 'users', hint: 'The town moderators’ accounts', keys: 'moderator lgu account add reset slip town' },

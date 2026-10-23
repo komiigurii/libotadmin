@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { townBadgeAPI, uploadAPI } from '../api/api';
+import api, { townBadgeAPI, uploadAPI } from '../api/api';
 import { theme as t, radius, fonts } from '../theme';
 import { Page, PageHeader, Toolbar, FilterTabs, Button, Loading, ErrorBanner, EmptyState, pageStyles } from '../components/Layout';
 import Icon from '../components/Icon';
@@ -7,14 +7,24 @@ import { Paged, usePaged } from '../components/Pagination';
 import { notify } from '../components/AppAlert';
 import { useLive } from '../api/live';
 
-// Town Badges — a traveler earns a town's badge by finishing every mission at
-// every spot in it, and finishing towns earns titles (LibotBackend
-// utils/achievements.js). Here the admin sets each town's badge image, and that
-// image is the badge — no drawn stand-in. The name and wording are the
-// same pattern for every town and can't be edited (mock defense notes,
-// 2026-10-23: edited wording would make the achievements inconsistent), so a
-// save also puts back any wording changed before. Admins only, like the
-// backend route.
+// Town & District Badges — the tiers of achievement (LibotBackend
+// utils/achievements.js; the thesis panel, 2026-10-24): finishing every mission
+// at every spot in a town earns its badge and "<Town> Traveler" (bronze);
+// every town in a district that has spots, the district's badge and "District
+// 1 Traveler" (silver); every town in Bulacan, The GOAT Traveler (gold, a title
+// only). Here the admin sets each town's and district's badge image, and that
+// image is the badge — no drawn stand-in. The name and wording are the same
+// pattern for every one and can't be edited (mock defense notes, 2026-10-23:
+// edited wording would make the achievements inconsistent), so a save also
+// puts back any town wording changed before. Admins only, like the backend
+// routes.
+
+// The district badges' images (LibotBackend routes/districtBadges.js).
+const districtBadgeAPI = {
+  getAdmin: () => api.get('/api/achievements/district-badges/admin').then((r) => r.data.districts || []),
+  save: (district, data) =>
+    api.put(`/api/achievements/district-badges/${encodeURIComponent(district)}`, data).then((r) => r.data.badge),
+};
 
 // Badge art keeps its transparency: resized as PNG, never re-encoded to JPEG.
 function shrinkBadge(file, max = 512) {
@@ -38,15 +48,34 @@ function shrinkBadge(file, max = 512) {
   });
 }
 
-// Every town's badge says the same thing about its own town.
-const badgeName = (town) => town;
-const badgeWording = (town) => `Finished every mission in ${town}`;
+// What each kind of badge says, and how its image is saved. Every town's badge
+// says the same thing about its own town; a district's about its district.
+const KINDS = {
+  town: {
+    tier: 'Bronze',
+    id: (x) => x.municipality,
+    name: (x) => x.municipality,
+    wording: (x) => `Finished every mission in ${x.municipality}`,
+    title: (x) => `${x.municipality} Traveler`,
+    save: (x, image) => townBadgeAPI.save(x.municipality, { name: '', description: '', image }),
+  },
+  district: {
+    tier: 'Silver',
+    id: (x) => x.district,
+    name: (x) => x.name,
+    wording: (x) => `Finished every mission in ${x.name}: ${x.towns.join(', ')}`,
+    title: (x) => x.title?.name || `${x.name} Traveler`,
+    save: (x, image) => districtBadgeAPI.save(x.district, { image }),
+  },
+};
 
-function TownCard({ town, onSaved }) {
+function BadgeCard({ item, kind, onSaved }) {
+  const k = KINDS[kind];
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const fileRef = useRef(null);
-  const image = town.saved.image;
+  const image = item.saved.image;
+  const name = k.name(item);
 
   // An image is saved as soon as it's picked (or taken off): there is
   // nothing else on the card to change.
@@ -54,11 +83,11 @@ function TownCard({ town, onSaved }) {
     setBusy(true);
     setError('');
     try {
-      const badge = await townBadgeAPI.save(town.municipality, { name: '', description: '', image: url });
-      onSaved(town.municipality, badge);
+      const badge = await k.save(item, url);
+      onSaved(kind, k.id(item), badge);
       notify(url
-        ? `${town.municipality}'s badge image is saved. Travelers see it next time they open their achievements.`
-        : `${town.municipality}'s badge image is removed.`, { tone: 'success', title: 'Saved' });
+        ? `${name}'s badge image is saved. Travelers see it next time they open their achievements.`
+        : `${name}'s badge image is removed.`, { tone: 'success', title: 'Saved' });
     } catch (err) {
       setError(err?.response?.data?.message || err.message || 'Could not save');
     }
@@ -81,13 +110,13 @@ function TownCard({ town, onSaved }) {
   };
 
   return (
-    <article style={s.card} aria-label={`${town.municipality} badge`}>
+    <article style={{ ...s.card, borderTop: `3px solid ${kind === 'town' ? s.bronze : s.silver}` }} aria-label={`${name} badge`}>
       <div style={s.art}>
         {image ? (
           <img src={image} alt="" style={s.artImg} onError={() => setError('That image link is broken — upload it again.')} />
         ) : (
           <button type="button" style={s.emptyArt} onClick={() => fileRef.current?.click()} disabled={busy}
-            aria-label={`Upload ${town.municipality}'s badge image`}>
+            aria-label={`Upload ${name}'s badge image`}>
             <Icon name="image" size={22} />
             <span>No image</span>
           </button>
@@ -96,14 +125,19 @@ function TownCard({ town, onSaved }) {
 
       <div style={s.cardBody}>
         <div style={s.cardHead}>
-          <h2 style={s.townName}>{badgeName(town.municipality)}</h2>
+          <h2 style={s.townName}>{name}</h2>
           <span style={s.meta}>
-            {town.spots ? `${town.spots} spot${town.spots === 1 ? '' : 's'}` : 'No spots yet'}
+            {item.spots ? `${item.spots} spot${item.spots === 1 ? '' : 's'}` : 'No spots yet'}
             {' · '}
-            {town.earnedBy} earned
+            {item.earnedBy} earned
           </span>
         </div>
-        <p style={s.wording}>{badgeWording(town.municipality)}</p>
+        <p style={s.wording}>{k.wording(item)}</p>
+        <p style={s.titleLine}>
+          <span aria-hidden="true" style={{ ...s.dot, background: kind === 'town' ? s.bronze : s.silver }} />
+          <span style={s.tier}>{k.tier}</span>
+          <span>· Comes with the title <strong style={s.titleName}>{k.title(item)}</strong></span>
+        </p>
 
         <div style={s.actions}>
           <Button size="sm" icon="image" onClick={() => fileRef.current?.click()} disabled={busy}>
@@ -120,6 +154,7 @@ function TownCard({ town, onSaved }) {
 
 export default function TownBadges() {
   const [towns, setTowns] = useState([]);
+  const [districts, setDistricts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [show, setShow] = useState('spots');
@@ -131,10 +166,12 @@ export default function TownBadges() {
       setError(null);
     }
     try {
-      setTowns(await townBadgeAPI.getAdmin());
+      const [townList, districtList] = await Promise.all([townBadgeAPI.getAdmin(), districtBadgeAPI.getAdmin()]);
+      setTowns(townList);
+      setDistricts(districtList);
     } catch (err) {
       console.error('[TownBadges]', err);
-      if (!quiet) setError('Couldn’t load the town badges.');
+      if (!quiet) setError('Couldn’t load the badges.');
     }
     if (!quiet) setLoading(false);
   };
@@ -143,27 +180,36 @@ export default function TownBadges() {
   useLive(['badges', 'spots', 'progress'], () => load({ quiet: true }));
 
   const withSpots = towns.filter((x) => x.spots > 0);
-  const visible = show === 'spots' ? withSpots : towns;
+  const districtsWithSpots = districts.filter((x) => x.spots > 0);
+  const kind = show === 'districts' ? 'district' : 'town';
+  const visible = show === 'spots' ? withSpots : show === 'all' ? towns : districts;
   const paged = usePaged(visible, show);
-  const missingArt = withSpots.filter((x) => !x.saved.image).length;
+  const missingTownArt = withSpots.filter((x) => !x.saved.image).length;
+  const missingDistrictArt = districtsWithSpots.filter((x) => !x.saved.image).length;
 
-  const onSaved = (municipality, badge) =>
-    setTowns((prev) => prev.map((x) => (x.municipality === municipality ? { ...x, ...badge, saved: badge.saved } : x)));
+  const onSaved = (savedKind, id, badge) => {
+    const merge = (x) => ({ ...x, ...badge, saved: { ...x.saved, ...badge.saved } });
+    if (savedKind === 'town') setTowns((prev) => prev.map((x) => (x.municipality === id ? merge(x) : x)));
+    else setDistricts((prev) => prev.map((x) => (x.district === id ? merge(x) : x)));
+  };
 
   return (
     <Page>
       <PageHeader
-        title="Town Badges"
-        count={loading ? '…' : withSpots.length}
+        title="Town & District Badges"
+        count={loading ? '…' : withSpots.length + districtsWithSpots.length}
       />
 
       {error && <ErrorBanner onDismiss={() => setError(null)}>{error}</ErrorBanner>}
 
-      {!loading && missingArt > 0 && (
+      {!loading && missingTownArt + missingDistrictArt > 0 && (
         <div style={s.note}>
           <Icon name="info" size={14} />
           <span>
-            {missingArt} of {withSpots.length} towns with spots have no badge image yet.
+            {[
+              missingTownArt && `${missingTownArt} of ${withSpots.length} towns with spots`,
+              missingDistrictArt && `${missingDistrictArt} of ${districtsWithSpots.length} districts with spots`,
+            ].filter(Boolean).join(' and ')} have no badge image yet.
           </span>
         </div>
       )}
@@ -175,20 +221,23 @@ export default function TownBadges() {
           value={show}
           onChange={setShow}
           options={[
-            { value: 'spots', label: 'Towns with spots', count: withSpots.length },
-            { value: 'all',   label: 'All 24 towns',     count: towns.length },
+            { value: 'spots',     label: 'Towns with spots', count: withSpots.length },
+            { value: 'all',       label: 'All 24 towns',     count: towns.length },
+            { value: 'districts', label: 'Districts',        count: districts.length },
           ]}
         />
       </Toolbar>
 
       {loading ? (
-        <Loading label="Loading the town badges…" kind="tiles" />
+        <Loading label="Loading the badges…" kind="tiles" />
       ) : visible.length === 0 ? (
         <EmptyState icon="map-pin" title="No town has spots yet" subtitle="A town's badge can be earned once it has at least one spot." />
       ) : (
-        <Paged {...paged} label="Town pages">
+        <Paged {...paged} label={kind === 'town' ? 'Town pages' : 'District pages'}>
           <div style={s.grid}>
-            {paged.rows.map((town) => <TownCard key={town.municipality} town={town} onSaved={onSaved} />)}
+            {paged.rows.map((item) => (
+              <BadgeCard key={KINDS[kind].id(item)} item={item} kind={kind} onSaved={onSaved} />
+            ))}
           </div>
         </Paged>
       )}
@@ -198,6 +247,11 @@ export default function TownBadges() {
 
 const s = {
   ...pageStyles,
+  // The tiers' metals (the app's bronze and silver), only as the cards' top
+  // edge and the dot by the tier's name: the words stay in the theme's colours.
+  bronze: '#B4703A',
+  silver: '#8E9AA3',
+  dot: { width: 8, height: 8, borderRadius: 4, flexShrink: 0, alignSelf: 'center' },
   grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: 14 },
   card: {
     display: 'flex', gap: 16, padding: 16, background: t.cardBg, borderRadius: radius.lg,
@@ -217,6 +271,9 @@ const s = {
   townName: { fontFamily: fonts.display, fontSize: 20, fontWeight: 600, letterSpacing: '-0.01em', margin: 0, color: t.textPrimary },
   meta: { fontSize: 12, color: t.textMuted, fontVariantNumeric: 'tabular-nums' },
   wording: { fontSize: 14, color: t.textSecondary, lineHeight: 1.4, margin: 0 },
+  titleLine: { display: 'flex', alignItems: 'baseline', gap: 6, flexWrap: 'wrap', fontSize: 13, color: t.textSecondary, margin: 0 },
+  tier: { fontWeight: 700, color: t.textPrimary },
+  titleName: { color: t.textPrimary, fontWeight: 600 },
   actions: { display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginTop: 6 },
   error: { display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: t.danger, margin: 0 },
   note: {
