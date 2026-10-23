@@ -191,7 +191,7 @@ export function AddAccountForm({ roles, accounts, onCancel, onMade }) {
  * onUnlock(account): given only to the super admin, who unlocks a locked row
  * of any role (user rule 2026-10-23).
  */
-export function StaffTable({ accounts, extra, onChanged, canManage, onUnlock, caption = 'Staff accounts', townInName = false }) {
+export function StaffTable({ accounts, extra, onChanged, canManage, canResetPassword, onUnlock, caption = 'Staff accounts', townInName = false }) {
   const [slip, setSlip] = useState(null);
   const [moving, setMoving] = useState(null);
   const [openId, setOpenId] = useState(null);
@@ -293,12 +293,14 @@ export function StaffTable({ accounts, extra, onChanged, canManage, onUnlock, ca
                       aria-label={`Unlock ${a.username}`} title="Unlock" />
                   )}
                   {mine && <>
-                    <Button variant="warning" icon="key" style={sq} disabled={busy === a.id || !a.active} onClick={() => reset(a)}
-                      aria-label={`Reset the password of ${a.username}`} title="Reset password" />
+                    {canResetPassword !== false && (
+                      <Button variant="warning" icon="key" style={sq} disabled={busy === a.id || !a.active} onClick={() => reset(a)}
+                        aria-label={`Reset the password of ${a.username}`} title="Reset password" />
+                    )}
                     {a.role === 'moderator' && (
                       <Button variant="subtle" icon="move" style={sq} disabled={busy === a.id || !a.active} onClick={() => setMoving(a)}
                         aria-label={`Move ${a.username} to another town`} title="Move to another town" />
-                    )}
+                      )}
                     <Button variant={a.active ? 'danger' : 'success'} icon={a.active ? 'user-minus' : 'user-check'} style={sq}
                       disabled={busy === a.id} onClick={() => toggle(a)}
                       aria-label={`${a.active ? 'Deactivate' : 'Reactivate'} ${a.username}`} title={a.active ? 'Deactivate' : 'Reactivate'} />

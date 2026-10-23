@@ -97,6 +97,7 @@ export default function Moderators() {
           townInName
           accounts={visible}
           canManage={() => true}
+          canResetPassword={false}
           onChanged={replace}
           extra={{
             head: 'Requests',
