@@ -6,13 +6,13 @@ import {
   Loading, EmptyState, ErrorBanner, pageStyles as s,
 } from '../components/Layout';
 import { AddAccountForm, StaffTable, HistoryList } from '../components/StaffAccounts';
-import { notify, promptAction } from '../components/AppAlert';
+import { notify, confirmAction, promptAction } from '../components/AppAlert';
 import CredentialSlip from '../components/CredentialSlip';
 import Pagination from '../components/Pagination';
 import Drawer from '../components/Drawer';
 import Icon from '../components/Icon';
 import { theme as t, radius, type } from '../theme';
-import { fmtDay, fmtNum, plural, timeAgo } from '../utils/format';
+import { fmtDateTime, fmtDay, fmtNum, plural, timeAgo } from '../utils/format';
 import { standingLabel } from '../utils/standing';
 import { useLive, useLiveTick } from '../api/live';
 
@@ -22,17 +22,20 @@ import { useLive, useLiveTick } from '../api/live';
  * Account Creation"):
  *   Staff     admins and moderators: make one (credential slip), reset a
  *             password, deactivate, move a moderator, see each account's history.
- *             A locked account of any role, super admins too, can be unlocked.
  *   Travelers every app account, paged and searchable, with when it joined, its
  *             standing, and an overview of one traveler.
+ *   Locked    every account locked by wrong passwords: staff of any role, super
+ *             admins too, and travelers (Clerk's lock). Unlock one or all (user
+ *             rule 2026-10-23; moved here from the System page's tools, user
+ *             2026-10-23).
  *   Archived  banned, inactive and self-deleted accounts, kept and hidden from
  *             everyone else; any of them can be restored (user request
  *             2026-10-23). A deleted one gets a new sign-in for the same email.
  *
  * Laid out from the user's reference (2026-10-23): the band counts both kinds,
  * a filter list on the left picks what the table shows. Links can open a view
- * directly: ?view=travelers, ?view=archived, ?status=firstSignIn, ?add=1 (the
- * dashboard's).
+ * directly: ?view=travelers, ?view=locked, ?view=archived, ?status=firstSignIn,
+ * ?add=1 (the dashboard's).
  */
 
 const STAFF_ROLES = [
@@ -44,7 +47,6 @@ const STAFF_ROLES = [
 const STAFF_STATUSES = [
   { value: 'active',      label: 'Active',             icon: 'check' },
   { value: 'firstSignIn', label: 'Temporary password', icon: 'key' },
-  { value: 'locked',      label: 'Locked',             icon: 'lock' },
   { value: 'deactivated', label: 'Deactivated',        icon: 'slash' },
 ];
 const TRAVELER_STATUSES = [
@@ -57,6 +59,13 @@ const TRAVELER_STATUSES = [
 ];
 // A temporary password whose slip ran out still counts as "Temporary password".
 const staffMatches = (a, status) => !status || a.status === status || (status === 'firstSignIn' && a.status === 'slipExpired');
+const LOCKED_FILTERS = [
+  { value: '',         label: 'All locked', icon: 'lock' },
+  { value: 'staff',    label: 'Staff',      icon: 'shield' },
+  { value: 'traveler', label: 'Travelers',  icon: 'users' },
+];
+const lockedMatches = (acc, kind) => !kind || acc.kind === kind;
+const LOCKED_ROLE = { superadmin: 'Super admin', admin: 'Admin', moderator: 'Moderator', traveler: 'Traveler' };
 const STANDING = {
   active:    { tone: 'success', icon: 'check',  label: 'Good standing' },
   muted:     { tone: 'warning', icon: 'pause',  label: 'Muted' },
@@ -117,10 +126,11 @@ async function restoreArchived(acc) {
 
 export default function Accounts() {
   const [params, setParams] = useSearchParams();
-  const [view, setView] = useState(['travelers', 'archived'].includes(params.get('view')) ? params.get('view') : 'staff');
+  const [view, setView] = useState(['travelers', 'locked', 'archived'].includes(params.get('view')) ? params.get('view') : 'staff');
   const [role, setRole] = useState('');
   const [staffStatus, setStaffStatus] = useState(STAFF_STATUSES.some((o) => o.value === params.get('status')) ? params.get('status') : '');
   const [travelerStatus, setTravelerStatus] = useState('');
+  const [lockedKind, setLockedKind] = useState('');
   const [archiveReason, setArchiveReason] = useState('');
   const [adding, setAdding] = useState(params.get('add') === '1');
 
@@ -153,41 +163,59 @@ export default function Accounts() {
     setTravelerCounts(Object.fromEntries(TRAVELER_STATUSES.map((o, i) => [o.value, values[i]])));
   }, []);
 
+  // Locked: one short list, staff from the database and travelers from Clerk.
+  const [locked, setLocked] = useState(null);
+  const [lockedError, setLockedError] = useState('');
+  const loadLocked = useCallback(async ({ quiet = false } = {}) => {
+    try {
+      setLocked(await systemAPI.locked());
+      setLockedError('');
+    } catch {
+      if (!quiet) setLockedError('Couldn’t load the locked accounts.');
+    }
+  }, []);
+
   // Archived: the counts come with any page of the list.
   const [archivedCounts, setArchivedCounts] = useState(null);
   const loadArchivedCounts = useCallback(async () => {
     try { setArchivedCounts((await accountsAPI.getArchived({ limit: 1 })).counts); } catch { /* the rail shows no numbers */ }
   }, []);
 
-  useEffect(() => { loadStaff(); loadTravelerCounts(); loadArchivedCounts(); }, [loadStaff, loadTravelerCounts, loadArchivedCounts]);
-  // Sign-ins, slips and account changes; sign-ups, standing, archiving and restores.
-  useLive(['staff'], () => loadStaff({ quiet: true }));
+  useEffect(() => { loadStaff(); loadTravelerCounts(); loadLocked(); loadArchivedCounts(); }, [loadStaff, loadTravelerCounts, loadLocked, loadArchivedCounts]);
+  // Sign-ins, lockouts, unlocks, slips and account changes; sign-ups,
+  // standing, archiving and restores.
+  useLive(['staff'], () => { loadStaff({ quiet: true }); loadLocked({ quiet: true }); });
   useLive(['travelers'], () => { loadTravelerCounts(); loadArchivedCounts(); });
   // The link's choices are read once; the address goes back to /accounts.
   useEffect(() => { if ([...params.keys()].length) setParams({}, { replace: true }); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const showStaff = (r, st = '') => { setView('staff'); setRole(r); setStaffStatus(st); };
   const showTravelers = (st) => { setView('travelers'); setTravelerStatus(st); };
+  const showLocked = (kind) => { setView('locked'); setLockedKind(kind); };
   const showArchived = (reason) => { setView('archived'); setArchiveReason(reason); };
 
   const nStaff = (fn) => (staffLoading ? null : accounts.filter(fn).length);
   const n = (v) => (v == null ? '…' : fmtNum(v));
   const onSlip = nStaff((a) => staffMatches(a, 'firstSignIn'));
   const inTrouble = travelerCounts && travelerCounts.suspended != null && travelerCounts.banned != null ? travelerCounts.suspended + travelerCounts.banned : null;
+  const nLocked = locked?.accounts.length;
+  // Six figures (the strip folds six to three on a tablet): Locked took
+  // Deactivated staff's place, whose count stays in the rail.
   const stats = [
     { label: 'Admins', hue: 'blue', value: n(nStaff((a) => a.role === 'admin')), hint: 'run spots, reviews and travelers', onClick: () => showStaff('admin'), current: view === 'staff' && role === 'admin' && !staffStatus },
     { label: 'Moderators', hue: 'blue', value: n(nStaff((a) => a.role === 'moderator')), hint: 'one per town', onClick: () => showStaff('moderator'), current: view === 'staff' && role === 'moderator' && !staffStatus },
     { label: 'Temporary password', hue: 'blue', value: n(onSlip), tone: onSlip ? 'warn' : undefined, hint: 'waiting for a first sign-in', onClick: () => showStaff('', 'firstSignIn'), current: view === 'staff' && staffStatus === 'firstSignIn' },
-    { label: 'Deactivated staff', hue: 'blue', value: n(nStaff((a) => a.status === 'deactivated')), hint: 'kept, can’t sign in', onClick: () => showStaff('', 'deactivated'), current: view === 'staff' && staffStatus === 'deactivated' },
     { label: 'Travelers', hue: 'teal', value: n(travelerCounts?.['']), hint: 'every app account', onClick: () => showTravelers(''), current: view === 'travelers' && !travelerStatus },
     { label: 'Suspended or banned', hue: 'teal', value: n(inTrouble), tone: inTrouble ? 'warn' : undefined, hint: 'locked out of the app', onClick: () => showTravelers('suspended'), current: view === 'travelers' && (travelerStatus === 'suspended' || travelerStatus === 'banned') },
+    { label: 'Locked accounts', hue: 'blue', value: n(nLocked), tone: nLocked ? 'warn' : undefined,
+      hint: nLocked ? locked.accounts.map((acc) => acc.label).join(', ') : 'too many wrong passwords', onClick: () => showLocked(''), current: view === 'locked' && !lockedKind },
   ];
 
   return (
     <Page>
       <PageHeader
         title="Accounts"
-        subtitle="Make admin and moderator accounts, reset their passwords or turn them off, look up any traveler, and restore archived accounts. Nothing is ever deleted."
+        subtitle="Make admin and moderator accounts, reset their passwords or turn them off, look up any traveler, unlock locked accounts and restore archived ones. Nothing is ever deleted."
         stats={stats}
         actions={canMake.length > 0 && <Button variant="primary" icon="user-plus" onClick={() => { showStaff(''); setAdding(true); }}>Add account</Button>}
       />
@@ -208,7 +236,7 @@ export default function Accounts() {
             <div className="sa-filter-label">Staff status</div>
             {STAFF_STATUSES.map((o) => {
               const c = nStaff((a) => staffMatches(a, o.value));
-              const flag = (o.value === 'firstSignIn' || o.value === 'locked') && c > 0;
+              const flag = o.value === 'firstSignIn' && c > 0;
               return (
                 <button key={o.value} type="button" className="sa-filter"
                   aria-pressed={view === 'staff' && staffStatus === o.value} onClick={() => showStaff('', o.value)}>
@@ -228,6 +256,21 @@ export default function Accounts() {
               </button>
             ))}
           </div>
+          <div className="sa-filter-group" role="group" aria-label="Locked accounts">
+            <div className="sa-filter-label">Locked</div>
+            {LOCKED_FILTERS.map((o) => {
+              const c = locked ? locked.accounts.filter((acc) => lockedMatches(acc, o.value)).length : null;
+              // Clerk didn't answer: the travelers' number isn't known.
+              const unknown = o.value === 'traveler' && locked?.travelersUnavailable;
+              return (
+                <button key={o.value || 'all'} type="button" className="sa-filter"
+                  aria-pressed={view === 'locked' && lockedKind === o.value} onClick={() => showLocked(o.value)}>
+                  <Icon name={o.icon} size={15} /> {o.label}
+                  <span className={`sa-filter-n${c && !unknown ? ' flag' : ''}`}>{!locked ? '' : unknown ? '—' : n(c)}</span>
+                </button>
+              );
+            })}
+          </div>
           <div className="sa-filter-group" role="group" aria-label="Archived accounts">
             <div className="sa-filter-label">Archived</div>
             {ARCHIVE_FILTERS.map((o) => (
@@ -243,6 +286,16 @@ export default function Accounts() {
         <div className="sa-col">
           {view === 'archived' ? (
             <ArchivedView reason={archiveReason} title={ARCHIVE_FILTERS.find((o) => o.value === archiveReason)?.label} />
+          ) : view === 'locked' ? (
+            <LockedView
+              locked={locked}
+              kind={lockedKind}
+              title={LOCKED_FILTERS.find((o) => o.value === lockedKind)?.label}
+              error={lockedError}
+              onDismissError={() => setLockedError('')}
+              reload={loadLocked}
+              onUnlocked={() => Promise.all([loadLocked({ quiet: true }), loadStaff({ quiet: true })])}
+            />
           ) : view === 'staff' ? (
             <StaffView
               accounts={accounts.filter((a) => (!role || a.role === role) && staffMatches(a, staffStatus))}
@@ -256,7 +309,7 @@ export default function Accounts() {
               setAdding={setAdding}
               onMade={loadStaff}
               onChanged={(acc) => setAccounts((prev) => prev.map((a) => (a.id === acc.id ? acc : a)))}
-              onUnlock={async (acc) => { await systemAPI.unlock({ kind: 'staff', id: acc.id }); await loadStaff({ quiet: true }); }}
+              onUnlock={async (acc) => { await systemAPI.unlock({ kind: 'staff', id: acc.id }); await Promise.all([loadStaff({ quiet: true }), loadLocked({ quiet: true })]); }}
             />
           ) : (
             <TravelersView status={travelerStatus} title={TRAVELER_STATUSES.find((o) => o.value === travelerStatus)?.label}
@@ -411,6 +464,122 @@ function TravelersView({ status, title, onShowDeleted }) {
           )}
 
       {open && <TravelerDrawer traveler={open} onClose={() => setOpen(null)} />}
+    </>
+  );
+}
+
+/*
+ * Every account locked by wrong passwords, with Unlock on each and Unlock all.
+ * A traveler's lock happens in Clerk and sends no live update, hence Check
+ * again. `reload({ quiet })` asks for the list again; `onUnlocked` after an
+ * unlock (the staff rows change too).
+ */
+function LockedView({ locked, kind, title, error, onDismissError, reload, onUnlocked }) {
+  const [busy, setBusy] = useState('');
+  const all = locked?.accounts || [];
+  const shown = all.filter((acc) => lockedMatches(acc, kind));
+
+  const run = async (key, fn) => {
+    setBusy(key);
+    try { await fn(); } catch (err) {
+      notify(err?.response?.data?.message || 'Couldn’t reach the server. Try again.', { tone: 'danger' });
+    }
+    setBusy('');
+  };
+  const unlock = (acc) => run(`${acc.kind}-${acc.id}`, async () => {
+    await systemAPI.unlock(acc);
+    notify(`${acc.label} can sign in again.`, { tone: 'success' });
+    await onUnlocked();
+  });
+  const unlockAll = async () => {
+    const ok = await confirmAction(`All ${all.length} can try their passwords again at once. Unlock them only if you know these were their own wrong tries.`, { title: 'Unlock every locked account?', confirmText: 'Unlock all' });
+    if (ok) await unlockEvery();
+  };
+  const unlockEvery = () => run('all', async () => {
+    const r = await systemAPI.unlockAll();
+    notify(
+      r.failed.length
+        ? `Unlocked ${r.unlocked}. Clerk didn’t unlock ${r.failed.join(', ')}; try again.`
+        : `Unlocked ${r.unlocked} account${r.unlocked === 1 ? '' : 's'}. They can sign in again.`,
+      { tone: r.failed.length ? 'warning' : 'success' },
+    );
+    await onUnlocked();
+  });
+
+  const nobody = kind === 'traveler' ? 'No traveler is locked'
+    : kind === 'staff' || locked?.travelersUnavailable ? 'No staff account is locked'
+      : 'No account is locked';
+
+  return (
+    <>
+      <Toolbar>
+        <span style={a.scope}>{title || 'All locked'}{locked ? ` · ${fmtNum(shown.length)}` : ''}</span>
+        <div style={a.toolbarEnd}>
+          {/* Unlock all frees every locked account, so it sits on the whole list only. */}
+          {!kind && all.length > 1 && (
+            <Button size="sm" icon="unlock" onClick={unlockAll} disabled={!!busy}>
+              {busy === 'all' ? 'Unlocking…' : `Unlock all ${all.length}`}
+            </Button>
+          )}
+          <Button size="sm" variant="subtle" icon="refresh-cw" onClick={() => run('check', reload)} disabled={busy === 'check'}>
+            {busy === 'check' ? 'Checking…' : 'Check again'}
+          </Button>
+        </div>
+      </Toolbar>
+
+      {error && <ErrorBanner onDismiss={onDismissError}>{error}</ErrorBanner>}
+      {locked?.travelersUnavailable && kind !== 'staff' && (
+        <p style={a.warn} role="status">
+          <Icon name="alert-circle" size={14} color={t.warning} /> Couldn’t ask Clerk which travelers are locked. Staff are shown; check again in a moment.
+        </p>
+      )}
+
+      {!locked ? (!error && <Loading label="Loading locked accounts…" />)
+        : shown.length === 0 ? <EmptyState icon="unlock" title={nobody} subtitle="Accounts locked by wrong passwords show here until they’re unlocked or their lock runs out." />
+          : (
+            <Table
+              caption="Locked accounts"
+              head={<>
+                <Th>Account</Th>
+                <Th>Kind</Th>
+                <Th>Locked until</Th>
+                <Th align="right" />
+              </>}
+            >
+              {shown.map((acc) => (
+                <tr key={`${acc.kind}-${acc.id}`}>
+                  <Td>
+                    <div style={s.person}>
+                      <Avatar name={acc.label} size={32} />
+                      <div style={{ minWidth: 0 }}>
+                        <div style={s.personName}>{acc.label}</div>
+                        {(acc.kind === 'traveler' ? acc.email : acc.municipality) && (
+                          <div style={s.personSub}>{acc.kind === 'traveler' ? acc.email : acc.municipality}</div>
+                        )}
+                      </div>
+                    </div>
+                  </Td>
+                  <Td>{LOCKED_ROLE[acc.role] || acc.role}</Td>
+                  <Td muted style={{ whiteSpace: 'nowrap' }}>
+                    {acc.lockedUntil ? <span className="sa-mono">{fmtDateTime(acc.lockedUntil)}</span> : 'Until it’s unlocked'}
+                  </Td>
+                  <Td align="right">
+                    <Button size="sm" variant="success" icon="unlock" style={{ whiteSpace: 'nowrap' }}
+                      disabled={busy === `${acc.kind}-${acc.id}` || busy === 'all'}
+                      aria-label={`Unlock ${acc.label}`}
+                      onClick={() => unlock(acc)}>
+                      {busy === `${acc.kind}-${acc.id}` ? 'Unlocking…' : 'Unlock'}
+                    </Button>
+                  </Td>
+                </tr>
+              ))}
+            </Table>
+          )}
+
+      <p style={{ ...s.itemDate, margin: 0 }}>
+        Five wrong passwords lock any account for a while: a super admin, admin or moderator here in the console, a
+        traveler in the app. Unlock one once you know it was them.
+      </p>
     </>
   );
 }
@@ -616,6 +785,8 @@ function TravelerDrawer({ traveler, onClose }) {
 const a = {
   scope:  { fontSize: 15, fontWeight: 700, color: t.textPrimary, whiteSpace: 'nowrap' },
   footer: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' },
+  toolbarEnd: { marginLeft: 'auto', display: 'flex', gap: 8, flexWrap: 'wrap' },
+  warn:   { display: 'flex', alignItems: 'flex-start', gap: 6, margin: 0, fontSize: 13, color: t.textSecondary, lineHeight: 1.45 },
   stack:  { display: 'flex', flexDirection: 'column', gap: 18 },
   facts:  { margin: 0, display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 10 },
   fact:   { padding: '10px 12px', borderRadius: radius.md, background: t.sidebarBg, border: `1px solid ${t.border}` },
