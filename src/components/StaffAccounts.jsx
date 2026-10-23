@@ -24,7 +24,7 @@ const sq = { width: 34, minHeight: 34, padding: 0 };
  *     admin. No name and no password: the server makes a temporary password,
  *     shown once on the credential slip.
  *   - StaffTable: each account's status, last sign-in and "Last changed by …",
- *     with Reset password (a new slip; admins only, never a moderator),
+ *     with Reset password (a new slip; the super admin's page only),
  *     Delete (to the archive) or Restore, Move town,
  *     and Unlock on a locked row (the super admin's page only). A row (or its
  *     History button) opens the account's details and history. Ten a page.
@@ -190,11 +190,11 @@ export function AddAccountForm({ roles, accounts, onCancel, onMade }) {
  * canManage(account): whether this person may act on that row.
  * onUnlock(account): given only to the super admin, who unlocks a locked row
  * of any role (user rule 2026-10-23).
- * A moderator's password is never reset here: they use Forgot password on the
- * sign-in page (user rule 2026-10-24). Delete moves an account to the archive;
- * a deleted row (the super admin's Archived → Deleted staff) has Restore.
+ * canReset: Reset password on the rows, the super admin's only; the admin's
+ * Moderators page has none (user rule 2026-10-24). Delete moves an account to
+ * the archive; a deleted row (Archived → Deleted staff) has Restore.
  */
-export function StaffTable({ accounts, extra, onChanged, canManage, onUnlock, caption = 'Staff accounts', townInName = false }) {
+export function StaffTable({ accounts, extra, onChanged, canManage, canReset = false, onUnlock, caption = 'Staff accounts', townInName = false }) {
   const [slip, setSlip] = useState(null);
   const [moving, setMoving] = useState(null);
   const [openId, setOpenId] = useState(null);
@@ -298,7 +298,7 @@ export function StaffTable({ accounts, extra, onChanged, canManage, onUnlock, ca
                       aria-label={`Unlock ${a.username}`} title="Unlock" />
                   )}
                   {mine && a.active && <>
-                    {a.role !== 'moderator' && (
+                    {canReset && (
                       <Button variant="warning" icon="key" style={sq} disabled={busy === a.id} onClick={() => reset(a)}
                         aria-label={`Reset the password of ${a.username}`} title="Reset password" />
                     )}

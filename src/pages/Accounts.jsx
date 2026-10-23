@@ -23,9 +23,9 @@ import { useLive, useLiveTick } from '../api/live';
  * Accounts — the super admin's view of every account in the system (mock
  * defense 2026-10-21; the paper's "Account Management Supervision" and "Admin
  * Account Creation"):
- *   Staff     admins and moderators: make one (credential slip), reset an
- *             admin's password (never a moderator's: Forgot password), delete
- *             (to the archive), move a moderator, see each account's history.
+ *   Staff     admins and moderators: make one (credential slip), reset a
+ *             password, delete (to the archive), move a moderator, see each
+ *             account's history.
  *   Travelers every app account, paged and searchable, with when it joined, its
  *             standing, and an overview of one traveler.
  *   Locked    every account locked by wrong passwords: staff of any role, super
@@ -380,6 +380,7 @@ function StaffView({ accounts, all, title, canMake, loading, error, onDismissErr
               caption="Staff accounts"
               accounts={visible}
               canManage={(acc) => canMake.includes(acc.role)}
+              canReset
               onChanged={onChanged}
               onUnlock={onUnlock}
             />
