@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { bannedAccountsAPI, appealAPI, inactiveUsersAPI, userProgressAPI } from '../api/api';
 import { notify, confirmAction } from '../components/AppAlert';
 import {
@@ -672,7 +673,12 @@ const TAB_META = {
 };
 
 export default function UserManagement() {
-  const [tab, setTab] = useState(TAB.ALL);
+  // ?tab= opens a tab straight away (the dashboard's Leaderboard and Ban
+  // appeals links, and the old pages' addresses).
+  const [params, setParams] = useSearchParams();
+  const asked = params.get('tab');
+  const tab = Object.values(TAB).includes(asked) ? asked : TAB.ALL;
+  const setTab = (key) => setParams(key === TAB.ALL ? {} : { tab: key }, { replace: true });
   const meta = TAB_META[tab];
 
   return (

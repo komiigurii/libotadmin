@@ -136,14 +136,17 @@ export default function System() {
 
       {!state ? <Loading label="Loading the system’s state…" kind="panels" /> : (
         <>
+          {/* A tall card and a short one in each column, so neither column
+              ends far above the other (mock defense notes, 2026-10-23: the
+              notices card left empty space beside it). */}
           <div className="sa-grid sa-split-even">
             <div className="sa-col">
               <MaintenanceCard state={state} onChanged={load} />
-              <NoticesCard />
+              <ToolsCard />
             </div>
             <div className="sa-col">
               <AccessCard restricted={restricted} pauses={state.pauses || {}} maintenanceOn={on} onChanged={load} />
-              <ToolsCard />
+              <NoticesCard />
             </div>
           </div>
           <MaintenanceLog key={on ? 'on' : 'off'} />

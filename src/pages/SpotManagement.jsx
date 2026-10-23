@@ -52,7 +52,7 @@ export default function SpotManagement() {
       to:      '/spots',
       current: !onApprovals,
       value:   spotCount == null ? '…' : fmtNum(spotCount),
-      hint:    'every spot in the app; yours go live at once',
+      hint:    'live in the app',
     },
     {
       label:   'Approval Queue',
@@ -66,9 +66,13 @@ export default function SpotManagement() {
 
   return (
     <Page>
+      {/* The two tabs sit beside the title: the band takes one row (mock
+          defense notes, 2026-10-23: it took too much of the screen). */}
       <PageHeader
         title="Spot Management"
         stats={stats}
+        statsLabel="Spot Management tabs"
+        statsBeside
       />
       {onApprovals
         ? <ModRequests embedded onCount={onCount} />

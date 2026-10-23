@@ -9,7 +9,7 @@
  * is lost.
  */
 
-const FREE = /^(free|libre|walang bayad|no fee|none|0|₱\s*0|php\s*0)(\b|$)/i;
+const FREE = /^(free|libre|walang bayad|no fee|no entrance fee|none|0|₱\s*0|php\s*0)(\b|$)/i;
 
 /** "Free" | "₱50" | anything → { kind: 'free' | 'paid' | '', amount } */
 export function parseEntranceFee(value) {
@@ -30,14 +30,29 @@ export function formatEntranceFee(kind, amount) {
   return /^\d+(\.\d{1,2})?$/.test(a.replace(/,/g, '')) ? `₱${a.replace(/,/g, '')}` : a;
 }
 
-/** What's wrong with it, or ''. */
-export function entranceFeeProblem(kind, amount) {
+/**
+ * What can be typed in Paid's box: digits and one decimal point, two places
+ * at most. No minus sign, so no negative amount (mock defense notes,
+ * 2026-10-23: "tumatanggap ng 0 to negative values").
+ */
+export function cleanFeeAmount(value) {
+  const [whole, ...rest] = String(value ?? '').replace(/[^\d.]/g, '').split('.');
+  return rest.length ? `${whole}.${rest.join('').slice(0, 2)}` : whole;
+}
+
+/**
+ * What's wrong with it, or ''. Paid takes one amount over ₱0. `saved` is the
+ * fee the spot already has: an older spot's written-out prices ("₱20 for
+ * students…") can stay as they are, but anything typed is a number.
+ */
+export function entranceFeeProblem(kind, amount, saved = '') {
   if (!kind) return 'Choose whether the entrance is free or paid.';
   if (kind === 'paid') {
     const a = String(amount ?? '').trim();
     if (!a) return 'Enter how much the entrance costs.';
-    const n = Number(a.replace(/,/g, ''));
-    if (/^[\d,.]+$/.test(a) && !(n > 0)) return 'A paid entrance costs more than ₱0. Choose Free instead.';
+    if (a === String(saved ?? '').trim() && !/^[\d,.\s₱-]+$/.test(a)) return '';
+    if (!/^\d+(\.\d{1,2})?$/.test(a.replace(/,/g, ''))) return 'Enter the amount as a number of pesos, like 50.';
+    if (!(Number(a.replace(/,/g, '')) > 0)) return 'A paid entrance costs more than ₱0. If there is no fee, choose Free.';
   }
   return '';
 }

@@ -21,8 +21,9 @@ import { useLive } from '../api/live';
  * the app is used, what was done lately. Right: the server's health sampled
  * live, who on the staff signed in, and the everyday actions.
  *
- * Every figure is one the backend returns. The sparks in the strip are the
- * usage series (last 30 days); no other stat gets a trend it doesn't have.
+ * Every figure is one the backend returns. The day-by-day trend is in the
+ * usage charts below, not in the strip (no sparks since 2026-10-23: a quiet
+ * month drew them as a bare line that read as an underline).
  */
 
 async function load() {
@@ -57,7 +58,6 @@ async function load() {
 }
 
 const sum = (pts) => (pts || []).reduce((n, p) => n + p.count, 0);
-const counts = (pts) => (pts || []).map((p) => p.count);
 
 export default function SuperAdminDashboard() {
   const [data, setData] = useState(null);
@@ -104,11 +104,11 @@ export default function SuperAdminDashboard() {
     { label: 'Staff accounts', hue: 'blue', to: '/accounts', value: loading ? '…' : staff ? fmt(admins.length + mods.length) : '—',
       hint: staff ? `${plural(admins.length, 'admin')} · ${plural(mods.length, 'moderator')}` : null },
     { label: 'Travelers', hue: 'teal', to: '/accounts?view=travelers', value: loading ? '…' : fmt(data?.travelers?.total),
-      hint: activeToday != null ? `${fmt(activeToday)} using the app today` : 'every traveler account', spark: counts(series?.active) },
+      hint: activeToday != null ? `${fmt(activeToday)} using the app today` : 'every traveler account' },
     { label: 'Spot arrivals', hue: 'magenta', value: loading ? '…' : series ? fmt(sum(series.arrivals)) : '—',
-      hint: 'in the last 30 days', spark: counts(series?.arrivals) },
+      hint: 'in the last 30 days' },
     { label: 'Reviews', hue: 'orange', value: loading ? '…' : series ? fmt(sum(series.reviews)) : '—',
-      hint: 'in the last 30 days', spark: counts(series?.reviews) },
+      hint: 'in the last 30 days' },
   ];
 
   const lastPing = health.samples[health.samples.length - 1];

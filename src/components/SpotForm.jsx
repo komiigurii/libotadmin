@@ -10,7 +10,8 @@ import { Loading } from './Skeleton';
 import VisitingHoursField from './VisitingHoursField';
 import { spotHasAR } from '../utils/spotHasAR';
 import { insideBoundary } from '../utils/geo';
-import { parseEntranceFee, formatEntranceFee, entranceFeeProblem } from '../utils/entranceFee';
+import { parseEntranceFee, formatEntranceFee, entranceFeeProblem, cleanFeeAmount } from '../utils/entranceFee';
+import { BULACAN_MUNICIPALITIES } from '../utils/municipalities';
 
 // Fix default marker icons breaking under Vite/webpack bundling
 import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
@@ -27,6 +28,12 @@ L.Icon.Default.mergeOptions({
 // add or rename one without a code change. Kept so the form still works if that
 // call fails; a spot form with no category chips can't be submitted at all.
 const FALLBACK_CATEGORIES = ['Historical', 'Religious', 'Nature', 'Festivals'];
+
+// A spot's city as one of Bulacan's towns ("Malolos City" → "Malolos"), or ''
+// when it isn't one.
+const bare = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
+  .replace(/\bcity of\b|\bcity\b|\bmunicipality of\b|,?\s*bulacan$/g, '').replace(/[^a-z]/g, '');
+const matchTown = (city) => (city ? BULACAN_MUNICIPALITIES.find((m) => bare(m) === bare(city)) || '' : '');
 
 // Map pin colours. Leaflet divIcons are raw HTML strings, so they can't read
 // the theme object directly — this is the one place the three map colours are
@@ -612,7 +619,7 @@ function SpotMapPicker({
   const allowedAt = (lat, lng) => {
     const b = stateRef.current.boundary;
     if (insideBoundary(b, lat, lng)) return true;
-    notify(`That’s outside ${b.name}. Pins have to be in your own municipality.`, { tone: 'warning', title: 'Outside your town' });
+    notify(`That’s outside ${b.name}. Pins have to be inside the spot’s municipality.`, { tone: 'warning', title: 'Outside the town' });
     return false;
   };
   // A dragged pin dropped outside the town goes back to where the drag began.
@@ -747,14 +754,14 @@ function SpotMapPicker({
   }, [boundary]);
 
   // With no pin yet, open on the whole town — once the map can be measured
-  // (a hidden tab's map has no size).
-  const framedTownRef = useRef(false);
+  // (a hidden tab's map has no size). Again when an admin picks another town.
+  const framedTownRef = useRef('');
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !boundary?.bounds || !active || framedTownRef.current) return;
+    if (!map || !boundary?.bounds || !active || framedTownRef.current === boundary.name) return;
     const anyPin = [[spotLat, spotLng], [missionLat, missionLng], ...arModels.map((m) => [m.lat, m.lng])]
-      .some(([a, b]) => toNum(a) !== null && toNum(b) !== null);
-    if (anyPin) { framedTownRef.current = true; return undefined; }
+      .some(([a, b]) => toNum(a) !== null && toNum(b) !== null && insideBoundary(boundary, a, b));
+    if (anyPin) { framedTownRef.current = boundary.name; return undefined; }
     const [[w, s], [e, n]] = boundary.bounds;
     // Later, once the shown tab has its size; skipped if this map has been
     // removed meanwhile (closing the form, or React mounting twice in dev).
@@ -762,7 +769,7 @@ function SpotMapPicker({
       if (mapRef.current !== map) return;
       map.invalidateSize();
       map.fitBounds(L.latLngBounds([s, w], [n, e]), { padding: [16, 16] });
-      framedTownRef.current = true;
+      framedTownRef.current = boundary.name;
     }, 160);
     return () => clearTimeout(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1323,24 +1330,32 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
     }));
   });
 
-  // A moderator's town outline, for the maps and the checks below. null while
-  // loading or for an admin; false if it couldn't load (the server still
-  // checks, so a pin outside is refused when sent).
-  const [boundary, setBoundary] = useState(null);
+  // The spot's town outline, for the maps and the checks below: a moderator's
+  // own town, or the one an admin picks under City (mock defense notes,
+  // 2026-10-23: "kung saang municipality ka, yan lang nagrereflect sa maps,
+  // parang yung sa mod"). null while loading or before a town is picked;
+  // false if it couldn't load (for a moderator the server still checks, so a
+  // pin outside is refused when sent).
+  const mapTown = lockedCity || matchTown(form.city);
+  const [loadedOutline, setLoadedOutline] = useState({ town: '', outline: null });
+  const boundary = mapTown && loadedOutline.town === mapTown ? loadedOutline.outline : null;
   useEffect(() => {
-    if (!isModerator || !lockedCity) return undefined;
+    if (!mapTown) return undefined;
     let cancelled = false;
-    municipalityAPI.boundary(lockedCity)
-      .then((b) => { if (!cancelled) setBoundary(b); })
-      .catch(() => { if (!cancelled) setBoundary(false); });
+    municipalityAPI.boundary(mapTown)
+      .then((b) => { if (!cancelled) setLoadedOutline({ town: mapTown, outline: b }); })
+      .catch(() => { if (!cancelled) setLoadedOutline({ town: mapTown, outline: false }); });
     return () => { cancelled = true; };
-  }, [isModerator, lockedCity]);
+  }, [mapTown]);
   const outsideTown = (lat, lng) => boundary && !insideBoundary(boundary, lat, lng);
 
   // The entrance fee as Free / Paid and an amount (mock defense 2026-10-21),
   // saved as the same one line as before ("Free", "₱50").
   const [fee, setFee] = useState(() => parseEntranceFee(initial?.entranceFee));
-  const feeProblem = entranceFeeProblem(fee.kind, fee.amount);
+  const savedFeeText = parseEntranceFee(initial?.entranceFee).amount;
+  const feeProblem = entranceFeeProblem(fee.kind, fee.amount, savedFeeText);
+  // An older spot's written-out prices stay in the box until they're changed.
+  const feeWrittenOut = fee.kind === 'paid' && !!savedFeeText && fee.amount === savedFeeText && !/^\d+(\.\d{1,2})?$/.test(savedFeeText);
 
   // Categories now come from the database. Seeded with the fallback so the
   // chips render on first paint rather than popping in.
@@ -1705,7 +1720,7 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
   if (spotCoordErr) return fail('location', spotCoordErr);
   // A moderator's new or moved pins stay in their town; one an old spot
   // already had where it is can stay (the server checks the same way).
-  const townMsg = (what) => `${what} is outside ${boundary.name}. Pins have to be in your own municipality.`;
+  const townMsg = (what) => `${what} is outside ${boundary.name}. Pins have to be inside the spot’s municipality.`;
   if (spotMovedOut()) return fail('location', townMsg('The spot pin'));
   const arOut = arModels.findIndex((m) => arMovedOut(m));
   if (arOut !== -1 && spotHasAR(form.category)) return fail('ar', townMsg(`AR ${arOut + 1}`));
@@ -2099,7 +2114,14 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
                       style={{ ...styles.input, background: t.divider, cursor: 'not-allowed', color: t.textSecondary }}
                     />
                   ) : (
-                    <input name="city" value={form.city} onChange={handleChange} style={styles.input} className="modern-input" placeholder="e.g. Malolos City" />
+                    // One of Bulacan's towns, picked rather than typed; the
+                    // maps then show only that town. A spot saved earlier
+                    // under another spelling keeps it until a town is picked.
+                    <select name="city" value={matchTown(form.city) || form.city} onChange={handleChange} style={styles.input} className="modern-input">
+                      <option value="">Choose the municipality…</option>
+                      {form.city && !matchTown(form.city) && <option value={form.city}>{form.city} (as saved)</option>}
+                      {BULACAN_MUNICIPALITIES.map((m) => <option key={m} value={m}>{m}</option>)}
+                    </select>
                   )}
                 </div>
 
@@ -2143,18 +2165,21 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
                       <input
                         aria-label="How much"
                         value={fee.amount}
-                        onChange={(e) => setFeeParts({ amount: e.target.value })}
+                        // Written-out prices are replaced by what's typed
+                        // next, rather than having their digits kept.
+                        onChange={(e) => setFeeParts({ amount: cleanFeeAmount(feeWrittenOut ? e.nativeEvent?.data : e.target.value) })}
                         inputMode="decimal"
-                        style={{ ...styles.input, paddingLeft: 28 }}
+                        style={{ ...styles.input, paddingLeft: 28, ...(fee.amount && feeProblem ? styles.inputInvalid : null) }}
                         className="modern-input"
                         placeholder="50"
+                        aria-invalid={!!(fee.amount && feeProblem)}
                         autoFocus
                       />
                     </div>
                   )}
-                  <p style={styles.hint}>
+                  <p style={fee.kind === 'paid' && fee.amount && feeProblem ? styles.warningText : styles.hint}>
                     {fee.kind === 'paid'
-                      ? 'The amount in pesos. Different prices (adults, children) can be written out.'
+                      ? (fee.amount && feeProblem) || (feeWrittenOut ? 'Saved as written before. Typing replaces it with one amount.' : 'The amount in pesos, more than ₱0.')
                       : fee.kind === 'free' ? 'Travelers see “Free”.' : 'Choose Free or Paid.'}
                   </p>
                 </div>
@@ -2208,12 +2233,17 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
                 <MapLegend mode="spot" {...legendProps} />
                 {boundary && (
                   <p style={styles.mapHint}>
-                    <Icon name="map-pin" size={12} /> {boundary.name} is outlined; the rest of the map is greyed out. Pins go inside your municipality.
+                    <Icon name="map-pin" size={12} /> {boundary.name} is outlined; the rest of the map is greyed out. Pins go inside {boundary.name}.
+                  </p>
+                )}
+                {!boundary && !lockedCity && !mapTown && (
+                  <p style={styles.mapHint}>
+                    <Icon name="map-pin" size={12} /> Choose the municipality on the Details tab, and the map shows just that town.
                   </p>
                 )}
                 {boundary === false && (
                   <p style={styles.warningText}>
-                    <Icon name="alert-triangle" size={12} /> Couldn’t load {lockedCity}’s outline. Keep your pins inside {lockedCity}: the server refuses ones outside it.
+                    <Icon name="alert-triangle" size={12} /> Couldn’t load {mapTown}’s outline. Keep the pins inside {mapTown}.
                   </p>
                 )}
                 {spotPinned && <SpotOverlapNote neighbours={spotNeighbours} arrivalRadius={arrivalRing} />}
@@ -2501,6 +2531,8 @@ const styles = {
   hint:     { fontSize: 12, color: t.textMuted, margin: 0 },
 
   input:    { width: '100%', padding: '10px 12px', borderRadius: radius.md, border: `1px solid ${t.border}`, fontSize: 14, color: t.textPrimary, outline: 'none', background: t.sidebarBg, boxSizing: 'border-box' },
+  // Shorthand, like the input's border it replaces.
+  inputInvalid: { border: `1px solid ${t.danger}` },
   textarea: { width: '100%', padding: '10px 12px', borderRadius: radius.md, border: `1px solid ${t.border}`, fontSize: 14, color: t.textPrimary, outline: 'none', background: t.sidebarBg, resize: 'vertical', boxSizing: 'border-box', fontFamily: 'inherit' },
 
   // ── Editable coordinates ──

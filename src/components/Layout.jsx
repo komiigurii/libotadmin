@@ -59,14 +59,14 @@ export function Page({ children, wide = false }) {
    stat strip. Every console has worn it since 2026-10-23 (the super admin's
    first). No small label above the title: the heading carries the page on
    its own. */
-export function PageHeader({ title, subtitle, count, actions, live, stats, statsLabel, children }) {
+export function PageHeader({ title, subtitle, count, actions, live, stats, statsLabel, statsBeside, children }) {
   // The browser tab names the page and whose console it is (mock defense
   // 2026-10-21: "title sa tab ng mod dapat mod hindi admin").
   useEffect(() => {
     if (typeof title === 'string') document.title = `${title} · Libot ${roleLabel()}`;
   }, [title]);
   return (
-    <PageBand title={title} subtitle={subtitle} count={count} actions={actions} live={live} stats={stats} statsLabel={statsLabel}>
+    <PageBand title={title} subtitle={subtitle} count={count} actions={actions} live={live} stats={stats} statsLabel={statsLabel} statsBeside={statsBeside}>
       {children}
     </PageBand>
   );
