@@ -9,7 +9,7 @@ import { connectLive, disconnectLive, subscribeLive } from '../api/live';
  * "signing in somewhere else should sign the old session out").
  *
  * The server ends every other session of an account when it signs in again,
- * when its password changes or is reset, and when it's deactivated — but a
+ * when its password changes or is reset, and when it's deleted — but a
  * window only hears about it on its next request. So:
  *   - every 45 s while the window is visible, and whenever it comes back into
  *     view, it asks /api/auth/admin-session. A 401 there goes through the API's

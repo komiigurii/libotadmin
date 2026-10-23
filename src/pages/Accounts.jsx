@@ -23,8 +23,9 @@ import { useLive, useLiveTick } from '../api/live';
  * Accounts — the super admin's view of every account in the system (mock
  * defense 2026-10-21; the paper's "Account Management Supervision" and "Admin
  * Account Creation"):
- *   Staff     admins and moderators: make one (credential slip), reset a
- *             password, deactivate, move a moderator, see each account's history.
+ *   Staff     admins and moderators: make one (credential slip), reset an
+ *             admin's password (never a moderator's: Forgot password), delete
+ *             (to the archive), move a moderator, see each account's history.
  *   Travelers every app account, paged and searchable, with when it joined, its
  *             standing, and an overview of one traveler.
  *   Locked    every account locked by wrong passwords: staff of any role, super
@@ -35,6 +36,7 @@ import { useLive, useLiveTick } from '../api/live';
  *   Archived  banned, inactive and self-deleted accounts, kept and hidden from
  *             everyone else; any of them can be restored (user request
  *             2026-10-23). A deleted one gets a new sign-in for the same email.
+ *             Deleted staff too (user rule 2026-10-24), with Restore.
  *
  * Laid out from the user's reference (2026-10-23): the band counts both kinds,
  * a filter list on the left picks what the table shows. Links can open a view
@@ -51,9 +53,8 @@ const STAFF_ROLES = [
 // The filter list (the user's marked-up screenshot, 2026-10-23): no Locked
 // group of its own, a "Locked" line under Staff status and under Travelers
 // instead (every locked account at once is the band's Locked accounts box).
-// Deactivated staff are still in All staff, with their status; travelers'
-// "In good standing" and "Deactivated" are gone (Archived → Inactive is the
-// inactive ones).
+// Deleted staff leave the staff lists for Archived → Deleted staff; travelers'
+// "In good standing" is gone (Archived → Inactive is the inactive ones).
 const STAFF_STATUSES = [
   { value: 'active',      label: 'Active',             icon: 'check' },
   { value: 'firstSignIn', label: 'Temporary password', icon: 'key' },
@@ -78,6 +79,7 @@ const ARCHIVE_FILTERS = [
   { value: 'ban',        label: 'Banned',                  icon: 'slash' },
   { value: 'inactivity', label: 'Inactive',                icon: 'clock' },
   { value: 'deleted',    label: 'Deleted by the traveler', icon: 'user-minus' },
+  { value: 'staff',      label: 'Deleted staff',           icon: 'trash' },
 ];
 const ARCHIVED = {
   ban:        { tone: 'danger',  icon: 'slash',      label: 'Banned' },
@@ -131,8 +133,9 @@ export default function Accounts() {
   const [archiveReason, setArchiveReason] = useState('');
   const [adding, setAdding] = useState(params.get('add') === '1');
 
-  // Staff: one list, filtered here.
+  // Staff: one list, filtered here; the deleted ones are the archive's.
   const [accounts, setAccounts] = useState([]);
+  const [deletedStaff, setDeletedStaff] = useState([]);
   const [canMake, setCanMake] = useState([]);
   const [staffLoading, setStaffLoading] = useState(true);
   const [staffError, setStaffError] = useState('');
@@ -143,8 +146,9 @@ export default function Accounts() {
       setStaffError('');
     }
     try {
-      const data = await accountsAPI.getStaff();
+      const [data, deleted] = await Promise.all([accountsAPI.getStaff(), accountsAPI.getStaff({ archived: 1 })]);
       setAccounts(data.accounts || []);
+      setDeletedStaff(deleted.accounts || []);
       setCanMake(data.canMake || []);
     } catch {
       if (!quiet) setStaffError('Couldn’t load the accounts.');
@@ -208,11 +212,26 @@ export default function Accounts() {
       </button>
     );
   };
+  // The Archived lines: travelers from the archive's counts, plus deleted staff.
+  const archivedN = (value) => {
+    if (value === 'staff') return nList(staffLoading ? null : deletedStaff.length);
+    if (!archivedCounts) return '';
+    return n(value ? archivedCounts[value] : staffLoading ? null : archivedCounts.all + deletedStaff.length);
+  };
+  // A deleted or restored account moves between the staff list and the archive.
+  const placeStaff = (acc) => {
+    const put = (belongs) => (prev) => {
+      if (!belongs) return prev.filter((a) => a.id !== acc.id);
+      return prev.some((a) => a.id === acc.id) ? prev.map((a) => (a.id === acc.id ? acc : a)) : [...prev, acc];
+    };
+    setAccounts(put(acc.active));
+    setDeletedStaff(put(!acc.active));
+  };
   const onSlip = nStaff((a) => staffMatches(a, 'firstSignIn'));
   const inTrouble = travelerCounts && travelerCounts.suspended != null && travelerCounts.banned != null ? travelerCounts.suspended + travelerCounts.banned : null;
   const nLocked = locked?.accounts.length;
   // Six figures (the strip folds six to three on a tablet): Locked took
-  // Deactivated staff's place, whose count stays in the rail.
+  // the old Deactivated staff figure's place (deleted staff are in the archive).
   const stats = [
     { label: 'Admins', hue: 'blue', value: n(nStaff((a) => a.role === 'admin')), hint: 'run spots, reviews and travelers', onClick: () => showStaff('admin'), current: view === 'staff' && role === 'admin' && !staffStatus },
     { label: 'Moderators', hue: 'blue', value: n(nStaff((a) => a.role === 'moderator')), hint: 'one per town', onClick: () => showStaff('moderator'), current: view === 'staff' && role === 'moderator' && !staffStatus },
@@ -275,7 +294,7 @@ export default function Accounts() {
               <button key={o.value || 'all'} type="button" className="sa-filter"
                 aria-pressed={view === 'archived' && archiveReason === o.value} onClick={() => showArchived(o.value)}>
                 <Icon name={o.icon} size={15} /> {o.label}
-                <span className="sa-filter-n">{archivedCounts ? n(archivedCounts[o.value || 'all']) : ''}</span>
+                <span className="sa-filter-n">{archivedN(o.value)}</span>
               </button>
             ))}
           </div>
@@ -283,7 +302,15 @@ export default function Accounts() {
 
         <div className="sa-col">
           {view === 'archived' ? (
-            <ArchivedView reason={archiveReason} title={ARCHIVE_FILTERS.find((o) => o.value === archiveReason)?.label} />
+            <>
+              {(archiveReason === '' || archiveReason === 'staff') && (
+                <DeletedStaffView accounts={deletedStaff} loading={staffLoading} canMake={canMake} onChanged={placeStaff}
+                  hideWhenEmpty={archiveReason === ''} />
+              )}
+              {archiveReason !== 'staff' && (
+                <ArchivedView reason={archiveReason} title={archiveReason ? ARCHIVE_FILTERS.find((o) => o.value === archiveReason)?.label : 'Archived travelers'} />
+              )}
+            </>
           ) : view === 'locked' ? (
             <LockedView
               locked={locked}
@@ -306,7 +333,7 @@ export default function Accounts() {
               adding={adding}
               setAdding={setAdding}
               onMade={loadStaff}
-              onChanged={(acc) => setAccounts((prev) => prev.map((a) => (a.id === acc.id ? acc : a)))}
+              onChanged={placeStaff}
               onUnlock={async (acc) => { await systemAPI.unlock({ kind: 'staff', id: acc.id }); await Promise.all([loadStaff({ quiet: true }), loadLocked({ quiet: true })]); }}
             />
           ) : (
@@ -362,6 +389,32 @@ function StaffView({ accounts, all, title, canMake, loading, error, onDismissErr
         <CredentialSlip kind="new" account={slip.account} tempPassword={slip.tempPassword}
           expiresAt={slip.tempPasswordExpiresAt} onClose={() => setSlip(null)} />
       )}
+    </>
+  );
+}
+
+/*
+ * Deleted admin and moderator accounts (user rule 2026-10-24): Delete moves a
+ * staff account here, kept with its history, and Restore lets it sign in
+ * again. Under All archived it shows only when there are some.
+ */
+function DeletedStaffView({ accounts, loading, canMake, onChanged, hideWhenEmpty }) {
+  if (hideWhenEmpty && (loading || !accounts.length)) return null;
+  return (
+    <>
+      <Toolbar>
+        <span style={a.scope}>Deleted staff · {loading ? <Bone inline w={20} h={12} /> : fmtNum(accounts.length)}</span>
+      </Toolbar>
+      {loading ? <Loading label="Loading deleted staff…" cols={5} media="avatar" />
+        : accounts.length === 0 ? <EmptyState icon="archive" title="No deleted staff" subtitle="An admin or moderator account that’s deleted shows here, kept with its history, until it’s restored." />
+          : (
+            <StaffTable
+              caption="Deleted staff accounts"
+              accounts={accounts}
+              canManage={(acc) => canMake.includes(acc.role)}
+              onChanged={onChanged}
+            />
+          )}
     </>
   );
 }

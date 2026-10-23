@@ -24,7 +24,7 @@ const STANDING = {
   muted:     { tone: 'warning', icon: 'pause',  label: 'Muted' },
   suspended: { tone: 'danger',  icon: 'pause',  label: 'Suspended' },
   banned:    { tone: 'danger',  icon: 'slash',  label: 'Banned' },
-  inactive:  { tone: 'neutral', icon: 'clock',  label: 'Deactivated (inactive)' },
+  inactive:  { tone: 'neutral', icon: 'clock',  label: 'Inactive (archived)' },
 };
 export const Standing = ({ status }) => {
   const st = STANDING[status] || STANDING.active;

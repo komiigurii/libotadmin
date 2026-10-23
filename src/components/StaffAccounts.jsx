@@ -24,7 +24,8 @@ const sq = { width: 34, minHeight: 34, padding: 0 };
  *     admin. No name and no password: the server makes a temporary password,
  *     shown once on the credential slip.
  *   - StaffTable: each account's status, last sign-in and "Last changed by …",
- *     with Reset password (a new slip), Deactivate/Reactivate, Move town,
+ *     with Reset password (a new slip; admins only, never a moderator),
+ *     Delete (to the archive) or Restore, Move town,
  *     and Unlock on a locked row (the super admin's page only). A row (or its
  *     History button) opens the account's details and history. Ten a page.
  * Usernames are permanent and a moderator's name comes from the town, so
@@ -184,12 +185,16 @@ export function AddAccountForm({ roles, accounts, onCancel, onMade }) {
 
 /**
  * accounts: staffView rows. extra: an optional { head, cell(account) } column
- * (the Moderators page adds "Requests sent"). onChanged(account) replaces a row.
+ * (the Moderators page adds "Requests sent"). onChanged(account) replaces a row,
+ * or moves it out of the list once it's deleted or restored.
  * canManage(account): whether this person may act on that row.
  * onUnlock(account): given only to the super admin, who unlocks a locked row
  * of any role (user rule 2026-10-23).
+ * A moderator's password is never reset here: they use Forgot password on the
+ * sign-in page (user rule 2026-10-24). Delete moves an account to the archive;
+ * a deleted row (the super admin's Archived → Deleted staff) has Restore.
  */
-export function StaffTable({ accounts, extra, onChanged, canManage, canResetPassword, onUnlock, caption = 'Staff accounts', townInName = false }) {
+export function StaffTable({ accounts, extra, onChanged, canManage, onUnlock, caption = 'Staff accounts', townInName = false }) {
   const [slip, setSlip] = useState(null);
   const [moving, setMoving] = useState(null);
   const [openId, setOpenId] = useState(null);
@@ -225,12 +230,14 @@ export function StaffTable({ accounts, extra, onChanged, canManage, canResetPass
     const off = a.active;
     const ok = await confirmAction(
       off
-        ? `Deactivate ${a.username}? They’re signed out and can’t sign in until the account is reactivated. The account and its history are kept.`
-        : `Reactivate ${a.username}? They can sign in again with their password.`,
-      { title: off ? 'Deactivate this account?' : 'Reactivate this account?', confirmText: off ? 'Deactivate' : 'Reactivate', danger: off },
+        ? `Delete ${a.username}? They’re signed out and can’t sign in. The account moves to the archive with its history, where the super admin can restore it.`
+        : `Restore ${a.username}? It comes out of the archive and they can sign in again with their password.`,
+      { title: off ? 'Delete this account?' : 'Restore this account?', confirmText: off ? 'Delete' : 'Restore', danger: off, tone: off ? undefined : 'success' },
     );
     if (!ok) return;
-    onChanged(await accountsAPI.setActive(a.id, !off));
+    const acc = await accountsAPI.setActive(a.id, !off);
+    onChanged(acc);
+    notify(off ? `${a.username} was moved to the archive.` : `${a.username} is back and can sign in.`, { tone: 'success', title: off ? 'Deleted' : 'Restored' });
   });
 
   const unlock = (a) => act(a.id, async () => {
@@ -290,19 +297,24 @@ export function StaffTable({ accounts, extra, onChanged, canManage, canResetPass
                     <Button variant="success" icon="unlock" style={sq} disabled={busy === a.id} onClick={() => unlock(a)}
                       aria-label={`Unlock ${a.username}`} title="Unlock" />
                   )}
-                  {mine && <>
-                    {canResetPassword !== false && (
-                      <Button variant="warning" icon="key" style={sq} disabled={busy === a.id || !a.active} onClick={() => reset(a)}
+                  {mine && a.active && <>
+                    {a.role !== 'moderator' && (
+                      <Button variant="warning" icon="key" style={sq} disabled={busy === a.id} onClick={() => reset(a)}
                         aria-label={`Reset the password of ${a.username}`} title="Reset password" />
                     )}
                     {a.role === 'moderator' && (
-                      <Button variant="subtle" icon="move" style={sq} disabled={busy === a.id || !a.active} onClick={() => setMoving(a)}
+                      <Button variant="subtle" icon="move" style={sq} disabled={busy === a.id} onClick={() => setMoving(a)}
                         aria-label={`Move ${a.username} to another town`} title="Move to another town" />
-                      )}
-                    <Button variant={a.active ? 'danger' : 'success'} icon={a.active ? 'user-minus' : 'user-check'} style={sq}
-                      disabled={busy === a.id} onClick={() => toggle(a)}
-                      aria-label={`${a.active ? 'Deactivate' : 'Reactivate'} ${a.username}`} title={a.active ? 'Deactivate' : 'Reactivate'} />
+                    )}
+                    <Button variant="danger" icon="trash" style={sq} disabled={busy === a.id} onClick={() => toggle(a)}
+                      aria-label={`Delete ${a.username}`} title="Delete" />
                   </>}
+                  {mine && !a.active && (
+                    <Button size="sm" variant="success" icon="rotate-ccw" style={{ whiteSpace: 'nowrap' }} disabled={busy === a.id} onClick={() => toggle(a)}
+                      aria-label={`Restore ${a.username}`}>
+                      {busy === a.id ? 'Restoring…' : 'Restore'}
+                    </Button>
+                  )}
                 </div>
               </Td>
             </Row>

@@ -47,7 +47,7 @@ const SUPER_ADMIN_NAV = [
     { label: 'Tickets', path: '/tickets', icon: 'flag', badge: 'tickets', hint: 'Problems and password requests from staff', keys: 'report problem password forgot slip' },
   ] },
   { group: 'Accounts', items: [
-    { label: 'Accounts Management', path: '/accounts', icon: 'shield', hint: 'Admins, moderators and travelers', keys: 'staff admin moderator traveler user reset deactivate slip move town unlock locked' },
+    { label: 'Accounts Management', path: '/accounts', icon: 'shield', hint: 'Admins, moderators and travelers', keys: 'staff admin moderator traveler user reset delete archive restore slip move town unlock locked' },
     { label: 'Activity Log', path: '/activity', icon: 'history', hint: 'Who did what in the console', keys: 'audit log sign-in login history' },
   ] },
 ];

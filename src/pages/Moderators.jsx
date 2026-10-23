@@ -51,8 +51,11 @@ export default function Moderators() {
   }, [mods, search]);
 
   const towns = new Set(mods.filter((m) => m.active).map((m) => m.municipality).filter(Boolean)).size;
-  // A changed row keeps the request counts the list already had.
-  const replace = (acc) => setMods((prev) => prev.map((m) => (m.id === acc.id ? { ...m, ...acc } : m)));
+  // A changed row keeps the request counts the list already had; a deleted
+  // one leaves for the super admin's archive.
+  const replace = (acc) => setMods((prev) => (acc.active
+    ? prev.map((m) => (m.id === acc.id ? { ...m, ...acc } : m))
+    : prev.filter((m) => m.id !== acc.id)));
 
   return (
     <Page>
@@ -97,7 +100,6 @@ export default function Moderators() {
           townInName
           accounts={visible}
           canManage={() => true}
-          canResetPassword={false}
           onChanged={replace}
           extra={{
             head: 'Requests',

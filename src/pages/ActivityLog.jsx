@@ -15,7 +15,7 @@ import { actionLabel, ACTION_GROUPS, GROUP_HUE, MIX_ORDER, groupOf } from '../ut
 /*
  * Activity Log — the super admin's record of what happened in the panel (mock
  * defense 2026-10-21; the paper's "monitor account activity logs"): sign-ins
- * and failed ones, accounts made, reset, deactivated or moved, and actions on
+ * and failed ones, accounts made, reset, deleted, restored or moved, and actions on
  * travelers. Newest first. Never holds a password.
  *
  * The band (2026-10-23) counts each kind and filters by it; the bar under the
