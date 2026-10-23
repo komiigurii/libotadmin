@@ -6,31 +6,6 @@ import { theme as t, radius, fonts, type, shadow } from '../theme';
 import Icon from '../components/Icon';
 import logo from '../assets/logo.png';
 
-/*
- * Superadmin — system maintenance screen.
- *
- * Deliberately outside the shared Navbar/shell: the superadmin is a system
- * operator, not a content manager. The screen has its own minimal chrome —
- * just the wordmark and a sign-out link in the header — so it reads as a
- * separate control surface, not a page bolted onto the admin panel.
- *
- * Controls:
- *   Maintenance mode   — locks out ALL admin + moderator sign-ins. A banner
- *                        on the login page explains why (set via message).
- *   Disable admins     — locks out admins only (moderators keep working).
- *   Disable moderators — locks out moderators only (admins keep working).
- *   Maintenance message — the text shown to locked-out users.
- *
- * The backend routes these call are listed in api.js → superadminAPI. They
- * don't exist yet; this screen degrades gracefully (shows an offline notice)
- * until they're wired up.
- */
-
-/* ── Palette ─────────────────────────────────────────────────────────────
-   The superadmin surface uses the same CSS variables as the rest of the panel
-   but leans into the warning/danger register — amber and red — to signal that
-   these controls have real consequences. No teal accents here. */
-
 const SIGN_OUT_CONFIRM = 'Sign out of the system console?';
 
 export default function SuperAdmin() {
