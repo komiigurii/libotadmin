@@ -5,16 +5,19 @@ import { isSuperAdmin } from '../auth/roles';
 import { theme as t, radius } from '../theme';
 import { fmtDateTime } from '../utils/format';
 import Icon from './Icon';
+import SignOutPopup from './SignOutPopup';
+import { clockText, useCountdown, SIGN_OUT_TEXT } from '../utils/signOut';
 
 /*
  * The strip above every page that says what the system is doing (mock defense
  * 2026-10-21: "magkakaroon dapat ng notif ang admin kapag under maintenance"):
- *   - maintenance on: staff can look but not save; the super admin is reminded
- *     to end it (travelers are never affected);
- *   - this role paused by the super admin;
+ *   - an admin or moderator about to be signed out by maintenance or a pause:
+ *     the countdown, under the pop-up that first tells them (SignOutPopup);
+ *   - maintenance on, for the super admin: when staff are signed out, and a
+ *     reminder to end it (travelers are never affected);
  *   - the newest update notice, which each person can put away.
  * It reads the heartbeat (auth/heartbeat.js), so it appears and disappears on
- * its own within a minute, or at once when the window comes back into view.
+ * its own: at once with the live connection, or within a minute without it.
  */
 
 const DISMISSED_KEY = 'dismissedNotice';
@@ -24,36 +27,43 @@ export default function MaintenanceBanner() {
   const beat = useHeartbeat();
   const [dismissed, setDismissed] = useState(readDismissed);
   const sys = beat?.system;
-  if (!sys) return null;
   const superAdmin = isSuperAdmin();
-  const m = sys.maintenance || {};
+  const m = sys?.maintenance || {};
+  const signOut = sys?.signOut || null;
+  // Staff: their own countdown. The super admin: when maintenance signs staff out.
+  const left = useCountdown(signOut?.at || (superAdmin && m.on && m.signOutAt ? new Date(m.signOutAt).getTime() : null));
+  if (!sys) return null;
   const notice = sys.notice;
   const back = m.expectedEndAt ? ` Expected back ${fmtDateTime(m.expectedEndAt)}.` : '';
 
   const strips = [];
-  if (sys.restricted) {
+  if (signOut) {
+    const text = SIGN_OUT_TEXT[signOut.code] || SIGN_OUT_TEXT.maintenance;
     strips.push(
-      <div key="restricted" role="alert" style={{ ...b.strip, ...b.warning }}>
-        <Icon name="pause" size={15} weight="bold" />
-        <span><strong>Your access is paused.</strong> The super admin paused the console for your role for now. You’ll be told in the bell when it’s back.</span>
+      // No live region: the clock would be read out every second. The pop-up
+      // is the announcement.
+      <div key="signout" style={{ ...b.strip, ...b.warning }}>
+        <Icon name={text.icon} size={15} weight="bold" />
+        <span>
+          <strong>{text.title}.</strong>{' '}
+          {left ? <>You’ll be signed out in <span className="sa-mono" style={b.clock}>{clockText(left)}</span>. Save what you’re working on.</> : 'Signing you out…'}
+          {signOut.message ? ` “${signOut.message}”` : ''}
+        </span>
       </div>,
     );
   }
-  if (m.on) {
+  if (superAdmin && m.on) {
     strips.push(
-      <div key="maintenance" role="status" style={{ ...b.strip, ...b.warning }}>
+      <div key="maintenance" style={{ ...b.strip, ...b.warning }}>
         <Icon name="tool" size={15} weight="bold" />
-        {superAdmin ? (
-          <span>
-            <strong>Maintenance is on.</strong> Admins and moderators can’t save; travelers aren’t affected.{back}{' '}
-            <Link to="/system" style={b.link}>End it on the System page</Link>
-          </span>
-        ) : (
-          <span>
-            <strong>The system is under maintenance.</strong> You can look around, but changes can’t be saved until it ends.{back}
-            {m.message ? ` “${m.message}”` : ''}
-          </span>
-        )}
+        <span>
+          <strong>Maintenance is on.</strong>{' '}
+          {left
+            ? <>Admins and moderators are signed out in <span className="sa-mono" style={b.clock}>{clockText(left)}</span>; travelers aren’t affected.</>
+            : 'Admins and moderators are signed out until you end it; travelers aren’t affected.'}
+          {back}{' '}
+          <Link to="/system" style={b.link}>End it on the System page</Link>
+        </span>
       </div>,
     );
   }
@@ -76,9 +86,10 @@ export default function MaintenanceBanner() {
       </div>,
     );
   }
-  if (!strips.length) return null;
+  const popup = signOut && <SignOutPopup signOut={signOut} />;
+  if (!strips.length) return popup || null;
   // `admin-banner`: App.css narrows the gutter with the page's.
-  return <div className="admin-banner" style={b.wrap}>{strips}</div>;
+  return <>{popup}<div className="admin-banner" style={b.wrap}>{strips}</div></>;
 }
 
 const b = {
@@ -87,5 +98,6 @@ const b = {
   warning: { background: t.warningBg, color: t.textPrimary, borderColor: t.warning },
   info:    { background: t.infoBg, color: t.textPrimary, borderColor: 'transparent' },
   link:    { color: t.brand, fontWeight: 700 },
+  clock:   { fontWeight: 700, color: t.textPrimary },
   close:   { marginLeft: 'auto', background: 'none', border: 'none', color: t.textSecondary, cursor: 'pointer', padding: 2, display: 'flex' },
 };

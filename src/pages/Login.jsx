@@ -1,7 +1,8 @@
 import { useEffect, useId, useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { authAPI, systemAPI } from '../api/api';
-import { saveSession, hasValidSession, mustChangePassword } from '../auth/session';
+import { saveSession, hasValidSession, mustChangePassword, readSignOutNote, clearSignOutNote } from '../auth/session';
+import { fmtDateTime } from '../utils/format';
 import { theme as t, radius, fonts, type } from '../theme';
 import { Button } from '../components/Layout';
 import Icon from '../components/Icon';
@@ -33,6 +34,9 @@ const ENDED = {
   passwordChanged:   'Your password was changed. Sign in with the new one.',
   passwordReset:     'Your password was reset. Sign in with the temporary password on your new slip.',
   deactivated:       'This account has been deactivated. Ask the super admin if you need it back.',
+  // The countdown in the console's pop-up ran out (components/SignOutPopup.jsx).
+  maintenance:       'You were signed out for maintenance. You can sign in again when it’s over.',
+  restricted:        'The super admin paused your role’s access to the console, so you were signed out. You can sign in again once it’s back.',
 };
 
 const lockLabel = (s) => {
@@ -62,17 +66,20 @@ function SignInForm() {
   const [error, setError]       = useState('');
   // Arriving from an expired or ended session (see auth/session.js) says why.
   // It's information, not a mistake, so it isn't styled as an error.
-  const [notice, setNotice]     = useState(() => ENDED[new URLSearchParams(window.location.search).get('reason')] || '');
+  const [reason] = useState(() => new URLSearchParams(window.location.search).get('reason') || '');
+  const [notice, setNotice]     = useState(() => ENDED[reason] || '');
+  // Signed out by a pause: the super admin's own message.
+  const [pauseNote] = useState(() => (reason === 'restricted' ? readSignOutNote()?.note || '' : ''));
   // Seconds left on a server-side account lockout (HTTP 423). Purely a UX
   // affordance — the backend enforces the lock regardless of what this says.
   const [lockedFor, setLockedFor] = useState(0);
   // "Forgot your password?" swaps the form for the request to the super admin.
   const [forgot, setForgot] = useState(false);
-  // Said before signing in, so nobody is surprised that saving is paused.
-  const [maintenanceOn, setMaintenanceOn] = useState(false);
+  // Said before signing in, so nobody tries while admins and moderators can't.
+  const [maintenance, setMaintenance] = useState(null);
   useEffect(() => {
     let live = true;
-    systemAPI.status().then((d) => { if (live) setMaintenanceOn(!!d.maintenance?.on); }).catch(() => {});
+    systemAPI.status().then((d) => { if (live) setMaintenance(d.maintenance?.on ? d.maintenance : null); }).catch(() => {});
     return () => { live = false; };
   }, []);
   // A sign-in still waiting after a few seconds is almost always the API's
@@ -116,6 +123,7 @@ function SignInForm() {
       const data = await authAPI.login(username.trim(), password);
       if (data.success && data.token) {
         saveSession({ token: data.token, role: data.role, city: data.city, mustChangePassword: data.mustChangePassword });
+        clearSignOutNote();
         // Every role starts on the dashboard: it shows what's waiting on them.
         // A temporary password from a slip is replaced first.
         navigate(data.mustChangePassword ? '/set-password' : '/dashboard', { replace: true });
@@ -127,8 +135,10 @@ function SignInForm() {
       // 423 Locked — the account hit the failed-attempt threshold. Count it
       // down so the button doesn't sit there rejecting every press.
       if (res?.status === 423 && res.data?.retryAfterSeconds) setLockedFor(res.data.retryAfterSeconds);
+      // Maintenance or a paused role (503) carries the super admin's message.
+      const note = res?.data?.note ? ` “${res.data.note}”` : '';
       setError(
-        res?.data?.message
+        (res?.data?.message && `${res.data.message}${note}`)
           || (res ? "Couldn't sign you in. Check your username and password."
                   : "Couldn't reach the server. Check your connection and try again.")
       );
@@ -168,17 +178,25 @@ function SignInForm() {
           <h1 id="login-title" style={s.title}>Sign in</h1>
           <p style={s.subtitle}>For admins and moderators. Use the username and password you were given.</p>
 
-          {maintenanceOn && (
+          {maintenance && (
             <div role="status" style={{ ...s.banner, ...s.bannerWarning }}>
               <Icon name="tool" size={15} />
-              <span>The system is under maintenance. You can sign in and look around, but changes can’t be saved until it ends.</span>
+              <span>
+                <strong>The console is under maintenance.</strong> Admins and moderators can sign in again when it’s over.
+                {maintenance.expectedEndAt && <> Expected back {fmtDateTime(maintenance.expectedEndAt)}.</>}
+                {maintenance.message && <span style={s.bannerQuote}>“{maintenance.message}”</span>}
+              </span>
             </div>
           )}
 
-          {notice && (
+          {/* Signed out for maintenance that's still on: the strip above says it. */}
+          {notice && !(reason === 'maintenance' && maintenance) && (
             <div role="status" style={{ ...s.banner, ...s.bannerInfo }}>
-              <Icon name="clock" size={15} />
-              <span>{notice}</span>
+              <Icon name={reason === 'restricted' ? 'pause' : reason === 'maintenance' ? 'tool' : 'clock'} size={15} />
+              <span>
+                {notice}
+                {pauseNote && <span style={s.bannerQuote}>“{pauseNote}”</span>}
+              </span>
             </div>
           )}
 
@@ -499,6 +517,8 @@ const s = {
   },
   bannerInfo:  { background: t.infoBg,   color: t.info,   borderColor: 'transparent' },
   bannerWarning: { background: t.warningBg, color: t.textPrimary, borderColor: t.warning },
+  // The super admin's own words, on a line of their own.
+  bannerQuote: { display: 'block', marginTop: 4, overflowWrap: 'anywhere' },
   linkBtn: {
     background: 'none', border: 'none', padding: 0, color: t.brand, fontFamily: 'inherit', fontSize: 'inherit',
     fontWeight: 600, cursor: 'pointer', textDecoration: 'underline', textUnderlineOffset: 3,
