@@ -72,7 +72,6 @@ export default function Comments() {
       <PageHeader
         title="Rate and Review"
         count={data?.counts?.all}
-        subtitle="Every review travelers have left, across all spots. Bad words are masked with *** automatically; warn, suspend or ban the writer, or delete the review."
       />
 
       <Toolbar>

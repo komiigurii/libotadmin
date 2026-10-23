@@ -169,9 +169,6 @@ export default function Spots({ embedded = false, onCount }) {
       {!embedded && (
         <PageHeader
           title="Spot Management"
-          subtitle={isModerator
-            ? `The spots${lockedCity ? ` in ${lockedCity}` : ''} you look after. Add one or propose changes — an admin approves each before it goes live.`
-            : 'Every spot in the app. What you add, edit or delete goes live at once.'}
           actions={headerActions}
           stats={stats}
         />

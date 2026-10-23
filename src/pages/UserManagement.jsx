@@ -640,22 +640,18 @@ const TAB_META = {
   [TAB.ALL]: {
     label:    'All Users',
     title:    'All Users',
-    subtitle: 'Every traveler with an account, with their points, spots visited and last activity.',
   },
   [TAB.BANS]: {
     label:    'Suspended & Banned',
     title:    'Suspensions & Bans',
-    subtitle: "Accounts suspended or permanently banned for breaking the rules, and any appeals they've sent.",
   },
   [TAB.INACTIVE]: {
     label:    'Inactive',
     title:    'Inactive Accounts',
-    subtitle: "Travelers who haven't opened the app in 30 days or more. Archiving keeps their record for good; it is never deleted.",
   },
   [TAB.PROGRESS]: {
     label:    'Leaderboard',
     title:    'Traveler Progress',
-    subtitle: 'The traveler leaderboard, ranked by points (visits and missions); equal points share a rank.',
   },
 };
 

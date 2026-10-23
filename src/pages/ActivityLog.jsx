@@ -106,7 +106,6 @@ export default function ActivityLog() {
     <Page>
       <PageHeader
         title="Activity Log"
-        subtitle="Who did what in the console, newest first: sign-ins, account changes, tickets, the system, and actions on travelers."
         stats={stats}
       >
         {mix}

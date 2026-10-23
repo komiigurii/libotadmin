@@ -110,7 +110,6 @@ export default function System() {
     <Page>
       <PageHeader
         title="System"
-        subtitle="Maintenance, who can use the console, update notices and the server’s tools."
         stats={stats || undefined}
       />
       {error && <ErrorBanner onDismiss={() => setError('')}>{error}</ErrorBanner>}

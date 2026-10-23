@@ -26,13 +26,12 @@ import { fmtDateTime, fmtNum, timeAgo } from '../utils/format';
 
 export const CATEGORY = {
   bug:           { label: 'Something isn’t working', icon: 'alert-triangle' },
-  spot:          { label: 'Spot details or the map', icon: 'map-pin' },
   account:       { label: 'My account',              icon: 'shield' },
   request:       { label: 'A request or approval',   icon: 'inbox' },
   other:         { label: 'Something else',          icon: 'message-square' },
   passwordReset: { label: 'Forgot password',         icon: 'key' },
 };
-const SENDER_CATEGORIES = ['bug', 'spot', 'account', 'request', 'other'];
+const SENDER_CATEGORIES = ['bug', 'account', 'request', 'other'];
 
 export const TICKET_STATUS = {
   open:       { tone: 'warning', icon: 'clock',        label: 'Open' },
@@ -106,7 +105,6 @@ function TicketQueue() {
     <Page>
       <PageHeader
         title="Tickets"
-        subtitle="Problems admins and moderators reported, and password requests from the sign-in page. Newest activity first."
         stats={stats}
       />
       {error && <ErrorBanner onDismiss={() => setError('')}>{error}</ErrorBanner>}
@@ -123,12 +121,12 @@ function TicketQueue() {
               </button>
             ))}
           </div>
-          <div className="sa-filter-group" role="group" aria-label="What it’s about">
-            <div className="sa-filter-label">What it’s about</div>
+          <div className="sa-filter-group" role="group" aria-label="Technical Problems">
+            <div className="sa-filter-label">Technical Problems</div>
             {['', ...Object.keys(CATEGORY)].map((c) => (
               <button key={c || 'any'} type="button" className="sa-filter" aria-pressed={category === c} onClick={() => pick(status, c)}>
                 <Icon name={c ? CATEGORY[c].icon : 'message-square'} size={15} />
-                {c ? CATEGORY[c].label : 'Anything'}
+                {c ? CATEGORY[c].label : 'All'}
               </button>
             ))}
           </div>
@@ -229,7 +227,6 @@ function ReportProblem() {
     <Page>
       <PageHeader
         title="Report a Problem"
-        subtitle="Tell the super admin about a problem with the console. You’re told in the bell when they answer."
         stats={stats}
         statsLabel="Your tickets by status"
         actions={!writing && <Button variant="primary" icon="plus" onClick={() => setWriting(true)}>New ticket</Button>}

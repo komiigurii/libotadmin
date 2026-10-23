@@ -187,7 +187,6 @@ export default function Accounts() {
     <Page>
       <PageHeader
         title="Accounts"
-        subtitle="Make admin and moderator accounts, reset their passwords or turn them off, look up any traveler, and restore archived accounts. Nothing is ever deleted."
         stats={stats}
         actions={canMake.length > 0 && <Button variant="primary" icon="user-plus" onClick={() => { showStaff(''); setAdding(true); }}>Add account</Button>}
       />

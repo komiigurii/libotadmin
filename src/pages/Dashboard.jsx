@@ -216,9 +216,6 @@ function StaffDashboard() {
     <Page>
       <PageHeader
         title="Dashboard"
-        subtitle={`${greeting()}. ${isModerator
-          ? `Here are the spots you look after${city ? ` in ${city}` : ''}, and where each request you’ve sent for approval stands.`
-          : 'Here’s what’s live in the app, what’s waiting on you, and how travelers are using it.'}`}
         live={live}
         stats={stats}
       />

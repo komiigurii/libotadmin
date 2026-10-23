@@ -74,7 +74,6 @@ export default function MyTravelers() {
       <PageHeader
         title="Travelers"
         count={rows.length}
-        subtitle={`Travelers who have visited the ${spotsWord} in ${town || 'your municipality'}, most recent visit first. View only: warnings, suspensions and bans are handled by the administrators.`}
       />
 
       {error && <ErrorBanner onDismiss={() => setError('')}>{error}</ErrorBanner>}

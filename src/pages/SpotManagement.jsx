@@ -51,10 +51,6 @@ export default function SpotManagement() {
     <Page>
       <PageHeader
         title="Spot Management"
-        subtitle={onApprovals
-          ? 'New spots, edits, deletions and food spots from moderators. Nothing of theirs goes live until you approve it; a rejection needs its reason.'
-          : 'Every spot in the app. What you add, edit or delete goes live at once; moderators’ changes wait in the Approval Queue.'}
-        stats={stats}
         statsLabel="Spot Management"
       />
       {onApprovals ? <ModRequests embedded onCount={onCount} /> : <Spots embedded onCount={setSpotCount} />}
