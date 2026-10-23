@@ -325,7 +325,7 @@ function SystemNotes({ sys, loading }) {
           <span className="sa-swatch" style={{ background: 'var(--s-violet)' }} aria-hidden="true" />
           From the System page
         </h2>
-        <Link to="/system" className="sa-panel-link">System <Icon name="chevron-right" size={13} /></Link>
+        <Link to="/system" className="sa-panel-link">System Maintenance <Icon name="chevron-right" size={13} /></Link>
       </div>
       {loading ? <p style={d.pad}>Loading…</p> : !sys ? <p style={d.pad}>Couldn’t load the system’s state.</p> : (
         <dl style={d.facts}>
@@ -362,7 +362,7 @@ function StaffPanel({ staff, loading }) {
     <section className="sa-panel" aria-labelledby="dash-staff">
       <div className="sa-panel-head dark">
         <h2 id="dash-staff" className="sa-panel-title">Staff sign-ins</h2>
-        <Link to="/accounts">Accounts <Icon name="chevron-right" size={13} /></Link>
+        <Link to="/accounts">Account Management <Icon name="chevron-right" size={13} /></Link>
       </div>
       {loading ? <p style={d.pad}>Loading…</p>
         : !staff ? <p style={d.pad}>Couldn’t load the staff accounts.</p>
