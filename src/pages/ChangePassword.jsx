@@ -11,6 +11,7 @@ import { Page, PageHeader, Button } from '../components/Layout';
 import { notify } from '../components/AppAlert';
 import Icon from '../components/Icon';
 import logo from '../assets/logo.png';
+import loginBg from '../assets/login-bg.jpg';
 import { passwordChecks, passwordProblem, PASSWORD_MAX } from '../utils/passwordRule';
 import './Login.css';
 
@@ -128,7 +129,7 @@ export function SetPassword() {
     navigate('/login', { replace: true });
   };
   return (
-    <div className="signin">
+    <div className="signin" style={{ backgroundImage: `url(${loginBg})` }}>
       <aside className="signin-rail" aria-label="Libot Bulacan">
         <div style={f.brand}>
           <img src={logo} alt="" style={f.logo} />
@@ -269,8 +270,9 @@ const f = {
   recentText: { color: t.textSecondary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   brand:   { display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', gap: 12 },
   logo:     { width: 64, height: 64, objectFit: 'contain', borderRadius: 18, display: 'block' },
-  wordmark: { fontFamily: fonts.brand, color: t.onBrandSolid, fontWeight: 400, fontSize: 'clamp(24px, 2.4vw, 32px)', lineHeight: 1.1 },
-  console:  { color: t.onBrandSolid, fontSize: 13, fontWeight: 500 },
+  // Ink comes from .signin-rail (the brand sits on the sign-in artwork).
+  wordmark: { fontFamily: fonts.brand, fontWeight: 400, fontSize: 'clamp(24px, 2.4vw, 32px)', lineHeight: 1.1 },
+  console:  { fontSize: 13, fontWeight: 600 },
   card: {
     width: '100%', maxWidth: 440, boxSizing: 'border-box',
     background: t.cardBg, border: `1px solid ${t.border}`, borderRadius: radius.xl,

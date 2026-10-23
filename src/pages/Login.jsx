@@ -16,16 +16,10 @@ import './Login.css';
  * and every role lands on the dashboard (the super admin's System pages are in
  * the same sidebar).
  *
- * Built from the console's own frame, so signing in already looks like the
- * panel you land in: the teal rail with the emblem in its dark well, LIBOT BULACAN in
- * tracked capitals and the console name; the app's sign-in artwork (bg.png)
- * framed on the rail the way the church print sits at the foot of the
- * sidebar; the app slogan in the sidebar tagline's italic with its yellow
- * misregistration; and a cream panel with the rail's one oversized top-left
- * corner, holding the form in a dashboard-style card.
- *
- * No text sits on the picture: the slogan is on solid teal (white, ≥ 5:1 in
- * both themes), so the artwork needs no scrim.
+ * The app's sign-in artwork (bg.png) is the whole page background, nothing
+ * behind or around it, the way the phone's sign-in shows it. The emblem,
+ * wordmark, console name and app slogan sit on it in dark ink (Login.css);
+ * the form is a dashboard-style card.
  */
 
 const SLOGAN = ['Discover,', 'Explore,', 'Experience', 'Bulacan.'];
@@ -150,7 +144,7 @@ function SignInForm() {
   const locked = lockedFor > 0;
 
   return (
-    <div className="signin">
+    <div className="signin" style={{ backgroundImage: `url(${loginBg})` }}>
       <aside className="signin-rail" aria-label="Libot Bulacan">
         {/* The sidebar's brand block, larger. */}
         <div className="signin-brand" style={s.brand}>
@@ -162,10 +156,6 @@ function SignInForm() {
             <div style={s.console}>Admin and moderator console</div>
           </div>
         </div>
-
-        {/* The app's sign-in artwork, framed like the church print at the foot
-            of the sidebar. Decorative: the slogan below carries the words. */}
-        <div className="signin-art" style={{ backgroundImage: `url(${loginBg})` }} aria-hidden="true" />
 
         <p className="signin-slogan" style={s.slogan}>
           {SLOGAN.map((line, i) => <span key={line} style={s.sloganLine}>{line}{i < SLOGAN.length - 1 ? ' ' : ''}</span>)}
@@ -364,7 +354,8 @@ function ForgotPassword({ initialUsername, onBack }) {
 }
 
 const s = {
-  // ── Rail (the sidebar's brand block, scaled up) ──
+  // ── Brand on the picture (the sidebar's brand block, scaled up). Colour
+  // comes from .signin-rail: one fixed ink, since the artwork doesn't theme. ──
   brand: {
     display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', gap: 14,
   },
@@ -373,19 +364,15 @@ const s = {
   brandText: { display: 'flex', flexDirection: 'column', alignItems: 'center' },
   // The wordmark in Knewave, as the sidebar sets it.
   wordmark: {
-    fontFamily: fonts.brand, color: t.onBrandSolid, fontWeight: 400, fontSize: 'clamp(24px, 2.4vw, 32px)',
+    fontFamily: fonts.brand, fontWeight: 400, fontSize: 'clamp(24px, 2.4vw, 32px)',
     lineHeight: 1.1, whiteSpace: 'nowrap',
   },
-  // Full white, not onBrandSolidMuted: 86% white is 4.2:1 on the dark theme's
-  // teal (white: 5.1, light theme 5.9).
-  console: { marginTop: 6, color: t.onBrandSolid, fontSize: 13, fontWeight: 500 },
-  // White on teal, without the yellow off-register shadow it used to carry.
+  console: { marginTop: 6, fontSize: 13, fontWeight: 600 },
   // Upright: Dongle has no italic.
   slogan: {
     width: '100%', maxWidth: 400, margin: 0,
     fontFamily: fonts.display, fontWeight: 700,
     fontSize: 'clamp(22px, 2.1vw, 28px)', lineHeight: 1.12,
-    color: t.onBrandSolid,
   },
   sloganLine: { display: 'block' },
 
