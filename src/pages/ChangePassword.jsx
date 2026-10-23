@@ -123,6 +123,8 @@ function PasswordForm({ forced, onDone }) {
 /** /set-password — the step after signing in with a temporary password. */
 export function SetPassword() {
   const navigate = useNavigate();
+  // No console around this page, so no PageHeader to name the tab.
+  useEffect(() => { document.title = `Set your password · Libot ${roleLabel()}`; }, []);
   const signOut = () => {
     const token = getToken();
     if (token) authAPI.logout(token).catch(() => {});

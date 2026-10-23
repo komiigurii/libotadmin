@@ -75,6 +75,12 @@ function SignInForm() {
   const [lockedFor, setLockedFor] = useState(0);
   // "Forgot your password?" swaps the form for the request to the super admin.
   const [forgot, setForgot] = useState(false);
+  // The tab says where you are. After signing out it kept the last console
+  // page's title ("Spot Management · Libot Admin"), since the console pages
+  // set it and nothing here did (mock defense notes, 2026-10-23).
+  useEffect(() => {
+    document.title = `${forgot ? 'Forgot password' : 'Sign in'} · Libot Bulacan Console`;
+  }, [forgot]);
   // Said before signing in, so nobody tries while admins and moderators can't.
   const [maintenance, setMaintenance] = useState(null);
   useEffect(() => {
