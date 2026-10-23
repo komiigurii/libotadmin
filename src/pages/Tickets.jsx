@@ -137,29 +137,33 @@ function TicketQueue() {
             <span style={x.scope}>{statusLabel}{category ? ` · ${CATEGORY[category].label}` : ''}{data ? ` · ${fmtNum(data.total)}` : ''}</span>
             <SearchInput value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search by title, username or ticket number…" />
           </Toolbar>
-          {!data ? <Loading label="Loading tickets…" />
+          {!data ? <Loading label="Loading tickets…" cols={7} />
             : data.tickets.length === 0 ? (
               <EmptyState icon="inbox" title={status === 'open' ? 'Nothing open' : 'No tickets here'}
                 subtitle="New ones show here, and in your bell." />
             ) : (
               <>
-                <Table caption="Tickets" head={<><Th width={64}>No.</Th><Th>Ticket</Th><Th>About</Th><Th>From</Th><Th align="right">Replies</Th><Th>Updated</Th><Th>Status</Th></>}>
+                {/* Beside the filter list there's no room for seven columns,
+                    so the replies and the last update sit under the title. */}
+                <Table caption="Tickets" head={<><Th width={64}>No.</Th><Th width="36%">Ticket</Th><Th>About</Th><Th>From</Th><Th>Status</Th></>}>
                   {data.tickets.map((tk) => {
                     const cat = CATEGORY[tk.category] || CATEGORY.other;
                     const st = TICKET_STATUS[tk.status] || TICKET_STATUS.open;
                     return (
                       <tr key={tk._id} style={{ cursor: 'pointer' }} onClick={() => navigate(`/tickets/${tk._id}`)}>
                         <Td><span className="sa-mono" style={{ color: t.textMuted }}>#{tk.number}</span></Td>
-                        <Td>
+                        <Td style={x.subjectCell}>
                           <Link to={`/tickets/${tk._id}`} style={x.subjectLink} onClick={(e) => e.stopPropagation()}>{tk.subject}</Link>
+                          <div style={x.subjectMeta}>
+                            {tk.replyCount ? `${fmtNum(tk.replyCount)} repl${tk.replyCount === 1 ? 'y' : 'ies'}` : 'No replies'}
+                            {' · updated '}<span className="sa-mono" title={fmtDateTime(tk.updatedAt)}>{timeAgo(tk.updatedAt)}</span>
+                          </div>
                         </Td>
                         <Td><Tag icon={cat.icon}>{cat.label}</Tag></Td>
                         <Td>
                           <div style={s.personName}>{tk.from?.username || '—'}</div>
                           <div style={s.personSub}>{tk.from?.city || (tk.from?.role === 'admin' ? 'Admin' : '')}</div>
                         </Td>
-                        <Td align="right">{fmtNum(tk.replyCount || 0)}</Td>
-                        <Td muted style={{ whiteSpace: 'nowrap' }}><span className="sa-mono" title={fmtDateTime(tk.updatedAt)}>{timeAgo(tk.updatedAt)}</span></Td>
                         <Td><StatusPill tone={st.tone} icon={st.icon}>{st.label}</StatusPill></Td>
                       </tr>
                     );
@@ -239,20 +243,20 @@ function ReportProblem() {
         <SearchInput value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search your tickets by title or number…" />
       </Toolbar>
 
-      {!data ? <Loading label="Loading tickets…" />
+      {!data ? <Loading label="Loading tickets…" cols={6} />
         : data.tickets.length === 0 ? (
           <EmptyState icon="inbox" title={status === 'open' ? 'Nothing open' : 'No tickets here'}
             subtitle="Use New ticket to report a problem." />
         ) : (
           <>
-            <Table caption="Your tickets" head={<><Th width={64}>No.</Th><Th>Ticket</Th><Th>About</Th><Th align="right">Replies</Th><Th>Updated</Th><Th>Status</Th></>}>
+            <Table caption="Your tickets" head={<><Th width={64}>No.</Th><Th width="38%">Ticket</Th><Th>About</Th><Th align="right">Replies</Th><Th>Updated</Th><Th>Status</Th></>}>
               {data.tickets.map((tk) => {
                 const cat = CATEGORY[tk.category] || CATEGORY.other;
                 const st = TICKET_STATUS[tk.status] || TICKET_STATUS.open;
                 return (
                   <tr key={tk._id} style={{ cursor: 'pointer' }} onClick={() => navigate(`/tickets/${tk._id}`)}>
                     <Td><span className="sa-mono" style={{ color: t.textMuted }}>#{tk.number}</span></Td>
-                    <Td>
+                    <Td style={x.subjectCell}>
                       <Link to={`/tickets/${tk._id}`} style={x.subjectLink} onClick={(e) => e.stopPropagation()}>{tk.subject}</Link>
                     </Td>
                     <Td><Tag icon={cat.icon}>{cat.label}</Tag></Td>
@@ -395,7 +399,7 @@ export function TicketDetail() {
       </Page>
     );
   }
-  if (!ticket) return <Page><Loading label="Loading the ticket…" /></Page>;
+  if (!ticket) return <Page><Loading label="Loading the ticket…" kind="thread" /></Page>;
 
   const cat = CATEGORY[ticket.category] || CATEGORY.other;
   const st = TICKET_STATUS[ticket.status] || TICKET_STATUS.open;
@@ -440,24 +444,14 @@ export function TicketDetail() {
           {superAdmin && passwordRequest && (
             <section className="sa-panel" aria-label="About password requests">
               <div className="sa-panel-head"><h2 className="sa-panel-title"><Icon name="key" size={16} /> A password request</h2></div>
-              {ticket.contactEmail ? (
-                <div style={{ padding: '12px 16px 14px' }}>
-                  <div style={x.slipTo}>
-                    <Icon name="mail" size={15} color={t.brand} />
-                    <span>Slip goes to <strong style={{ color: t.textPrimary }}>{ticket.contactEmail}</strong></span>
-                  </div>
-                  <p style={{ ...x.note, margin: '8px 0 0' }}>
-                    They confirmed this address with a code, so it’s theirs to read, but anyone who knows a username can ask. Check
-                    it really belongs to {ticket.from?.username} (for example, call their office), then make a new slip: it’s emailed
-                    there and shown to you once. They choose their own password at the next sign-in.
-                  </p>
-                </div>
-              ) : (
-                <p style={{ ...x.note, margin: 0, padding: '12px 16px 14px' }}>
-                  {ticket.from?.username} can’t sign in, so they won’t see replies here. Make a new slip and hand it to them; they
-                  choose their own password at the next sign-in. The slip shows the new temporary password once.
-                </p>
-              )}
+              {/* Just where the slip goes; the explanation under it read like
+                  advice (mock defense notes, 2026-10-23). */}
+              <div style={{ ...x.slipTo, padding: '12px 16px 14px' }}>
+                <Icon name="mail" size={15} color={t.brand} />
+                {ticket.contactEmail
+                  ? <span>Slip goes to <strong style={{ color: t.textPrimary }}>{ticket.contactEmail}</strong></span>
+                  : <span>No email given: hand {ticket.from?.username || 'them'} the slip yourself.</span>}
+              </div>
             </section>
           )}
         </div>
@@ -516,7 +510,12 @@ function Message({ who, at, text, first }) {
 
 const x = {
   scope:   { fontSize: 15, fontWeight: 700, color: t.textPrimary, whiteSpace: 'nowrap' },
-  subjectLink: { fontSize: 14, fontWeight: 700, color: t.textPrimary, textDecoration: 'none', overflowWrap: 'anywhere' },
+  // The title gets the room: it wrapped a letter at a time when the other
+  // columns took the width (mock defense notes, 2026-10-23). Words break only
+  // when one alone is wider than the column.
+  subjectCell: { minWidth: 220 },
+  subjectMeta: { fontSize: 13, color: t.textMuted, marginTop: 2, whiteSpace: 'nowrap' },
+  subjectLink: { fontSize: 14, fontWeight: 700, color: t.textPrimary, textDecoration: 'none', overflowWrap: 'break-word' },
   formGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '12px 16px' },
   // Shorthand, like the s.select / s.textarea it's spread over.
   invalid: { border: `1px solid ${t.danger}` },

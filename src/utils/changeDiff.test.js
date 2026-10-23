@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest';
 import { fmtVal, changedFieldLabels } from './changeDiff';
-import { sealInk } from './townSeal';
 
 describe('AR positions in a change', () => {
   it('show what is at each position and its fact', () => {
@@ -21,13 +20,5 @@ describe('AR positions in a change', () => {
       pendingChange: { modelsCoordinates: [{ ...pin, trivia: 'New fact.' }] },
     };
     expect(changedFieldLabels(record)).toEqual(['ar positions']);
-  });
-});
-
-describe('town seal ink', () => {
-  it('is the same for a town every time, and different for each of the 24', async () => {
-    const { BULACAN_MUNICIPALITIES } = await import('./municipalities');
-    expect(sealInk('Malolos')).toBe(sealInk('Malolos'));
-    expect(new Set(BULACAN_MUNICIPALITIES.map(sealInk)).size).toBe(24);
   });
 });

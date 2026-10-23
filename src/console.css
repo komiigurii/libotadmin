@@ -201,7 +201,9 @@
   color: var(--sa-shell-muted); white-space: nowrap;
 }
 
-.sa-nav { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; padding: 4px 10px 12px; border-top: 1px solid var(--sa-shell-line); }
+/* The links never scroll (the user, 2026-10-24): on a shorter window they
+   close up instead (see "Short windows" below). */
+.sa-nav { flex: 1; min-height: 0; overflow: hidden; padding: 4px 10px 12px; border-top: 1px solid var(--sa-shell-line); }
 .sa-group + .sa-group { margin-top: 6px; }
 .sa-group-label {
   padding: 12px 10px 4px; font-size: 14px; font-weight: 700; color: var(--sa-shell-faint);
@@ -365,15 +367,47 @@ button.sa-bell-item:hover, button.sa-bell-item:focus-visible { background: var(-
 .sa-shell[data-rail='collapsed'] .sa-account-btn { justify-content: center; padding: 7px 0; }
 .sa-shell[data-rail='collapsed'] .sa-account .sa-menu { left: 8px; }
 
+/* Short windows: the rail closes up so every link fits without scrolling.
+   Sized for the longest rail (the admin's: six groups, seven links). First
+   the spacing tightens (a 1080p laptop at 125% is about 730px tall)... */
+@media (max-height: 800px) {
+  .sa-brand { padding-top: 12px; padding-bottom: 10px; }
+  .sa-jump { margin-bottom: 8px; }
+  .sa-nav { padding-bottom: 8px; }
+  .sa-group + .sa-group { margin-top: 2px; }
+  .sa-group-label { padding-top: 8px; padding-bottom: 2px; line-height: 1.2; }
+  .sa-link { min-height: 36px; padding-top: 5px; padding-bottom: 5px; }
+  .sa-account { padding-top: 6px; padding-bottom: 6px; }
+}
+/* ...then the group names give way to thin rules between the groups (still
+   read out by screen readers, as on the folded rail)... */
+@media (max-height: 640px) {
+  .sa-group-label {
+    position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden;
+    clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+  }
+  .sa-group + .sa-group { margin-top: 5px; padding-top: 5px; border-top: 1px solid var(--sa-shell-line); }
+  .sa-nav { padding-top: 6px; }
+}
+/* ...then Jump to page goes (Ctrl K still opens it). Only a window shorter
+   than the links themselves (a phone held sideways) lets them scroll, rather
+   than cut one off. */
+@media (max-height: 520px) {
+  .sa-jump { display: none; }
+  .sa-nav { overflow-y: auto; }
+}
+
 /* ── Page band (the hero) ───────────────────────────────────────────────── */
+/* Kept short (mock defense notes, 2026-10-23: the bands took too much of the
+   screen), so the page's own content starts high. */
 .sa-band {
   background: var(--sa-band); color: var(--sa-shell-text);
-  border-radius: 14px; padding: 22px 24px 20px;
-  display: flex; flex-direction: column; gap: 16px;
+  border-radius: 12px; padding: 14px 18px 14px;
+  display: flex; flex-direction: column; gap: 10px;
 }
-.sa-band-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px 24px; flex-wrap: wrap; }
+.sa-band-top { display: flex; align-items: center; justify-content: space-between; gap: 10px 24px; flex-wrap: wrap; }
 .sa-band-title {
-  font-family: var(--font-display); font-size: 36px; line-height: 1.02; font-weight: 700;
+  font-family: var(--font-display); font-size: 30px; line-height: 1.02; font-weight: 700;
   text-transform: uppercase; margin: 0; color: var(--sa-shell-text); letter-spacing: 0.01em; overflow-wrap: anywhere;
 }
 .sa-band-count {
@@ -386,6 +420,7 @@ button.sa-bell-item:hover, button.sa-bell-item:focus-visible { background: var(-
 .sa-band-live b { color: var(--sa-shell-text); font-weight: 700; }
 .sa-band-live .sa-mono { font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace; font-size: 13px; color: var(--sa-shell-text); }
 .sa-band-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.sa-band-beside { flex: 1 1 420px; min-width: 0; max-width: 720px; }
 .sa-band-actions .modern-btn[data-variant='secondary'],
 .sa-band-actions .modern-btn[data-variant='subtle'] {
   background: transparent !important; color: var(--sa-shell-text) !important;
@@ -408,8 +443,8 @@ button.sa-bell-item:hover, button.sa-bell-item:focus-visible { background: var(-
   border: 1px solid var(--sa-shell-line); border-radius: 10px; overflow: hidden;
 }
 .sa-cell {
-  position: relative; display: flex; flex-direction: column; gap: 4px; min-width: 0;
-  padding: 13px 15px 12px; background: var(--sa-band); color: inherit; text-decoration: none;
+  position: relative; display: flex; flex-direction: column; gap: 2px; min-width: 0;
+  padding: 9px 13px 9px; background: var(--sa-band); color: inherit; text-decoration: none;
   transition: background 0.15s ease;
 }
 a.sa-cell:hover { background: var(--sa-shell-raised); }
@@ -419,19 +454,18 @@ a.sa-cell:hover { background: var(--sa-shell-raised); }
 .sa-cell-label .sa-swatch { margin-top: 3px; }
 .sa-cell-row { display: flex; align-items: flex-end; justify-content: space-between; gap: 10px; min-width: 0; }
 .sa-cell-value {
-  font-family: var(--font-display); font-weight: 700; font-size: 34px; line-height: 1; color: var(--sa-shell-text);
+  font-family: var(--font-display); font-weight: 700; font-size: 28px; line-height: 1; color: var(--sa-shell-text);
   white-space: nowrap; letter-spacing: 0.01em;
 }
 /* A word, not a number ("Paused", a username): smaller, and allowed to wrap. */
 .sa-cell-value.small {
-  font-family: var(--font-sans); font-weight: 700; font-size: 25px; line-height: 1.05; letter-spacing: 0;
-  padding-top: 4px; white-space: normal; overflow-wrap: anywhere;
+  font-family: var(--font-sans); font-weight: 700; font-size: 21px; line-height: 1.05; letter-spacing: 0;
+  padding-top: 2px; white-space: normal; overflow-wrap: anywhere;
 }
 .sa-cell.warn .sa-cell-value { color: var(--sa-band-warning); }
 .sa-cell.good .sa-cell-value { color: var(--sa-band-success); }
 .sa-cell-hint { font-size: 14px; line-height: 1.25; color: var(--sa-shell-faint); overflow-wrap: anywhere; }
 .sa-cell-flag { display: inline-flex; align-items: center; gap: 4px; color: var(--sa-band-warning); font-size: 14px; font-weight: 700; }
-.sa-spark { display: block; flex-shrink: 0; }
 
 /* The activity mix bar in a band: each kind's share, in its hue. */
 .sa-mix { display: flex; height: 10px; border-radius: 5px; overflow: hidden; gap: 2px; }
@@ -635,13 +669,12 @@ a.sa-cell:hover { background: var(--sa-shell-raised); }
   .sa-bell { position: fixed; top: 58px; left: 12px; right: 12px; width: auto; }
   .sa-backdrop { position: fixed; inset: 0; z-index: 65; background: var(--overlay); }
   [data-console] .admin-page { padding: 12px 12px 28px !important; gap: 12px !important; }
-  .sa-band { padding: 18px 16px 16px; border-radius: 12px; }
-  .sa-band-title { font-size: 29px; }
+  .sa-band { padding: 12px 14px 12px; border-radius: 12px; }
+  .sa-band-title { font-size: 26px; }
   .sa-strip, .sa-strip[data-n='6'] { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   /* An odd one out takes the whole last row rather than leaving a hole. */
   .sa-strip > :last-child:nth-child(odd) { grid-column: 1 / -1; }
-  .sa-cell-value { font-size: 28px; }
-  .sa-spark { display: none; }
+  .sa-cell-value { font-size: 25px; }
   .sa-usage .usage-grid { grid-template-columns: minmax(0, 1fr) !important; }
 }
 

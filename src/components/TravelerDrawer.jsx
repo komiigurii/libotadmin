@@ -74,7 +74,7 @@ export default function TravelerDrawer({ traveler, onClose, archivedAction, chil
         )}
         {/* The opening page's own part shows at once, from its row. */}
         {children}
-        {error ? <p style={{ color: t.danger, margin: 0 }}>{error}</p> : !u ? <Loading label="Loading…" /> : (
+        {error ? <p style={{ color: t.danger, margin: 0 }}>{error}</p> : !u ? <Loading label="Loading the traveler…" kind="facts" rows={10} /> : (
           <>
             <Facts items={[
               ['Joined', fmtDay(u.createdAt)],

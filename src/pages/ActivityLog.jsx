@@ -121,7 +121,7 @@ export default function ActivityLog() {
 
       {error && <ErrorBanner onDismiss={() => setError('')}>{error}</ErrorBanner>}
 
-      {!data ? <Loading label="Loading the activity log…" />
+      {!data ? <Loading label="Loading the activity log…" cols={4} />
         : data.entries.length === 0 ? <EmptyState icon="history" title="Nothing here yet" subtitle="Activity shows up as people use the console." />
           : (
             <>

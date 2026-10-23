@@ -3,19 +3,17 @@ import { townBadgeAPI, uploadAPI } from '../api/api';
 import { theme as t, radius, fonts } from '../theme';
 import { Page, PageHeader, Toolbar, FilterTabs, Button, Loading, ErrorBanner, EmptyState, pageStyles } from '../components/Layout';
 import Icon from '../components/Icon';
-import TownSeal from '../components/TownSeal';
 import { notify } from '../components/AppAlert';
 import { useLive } from '../api/live';
 
 // Town Badges — a traveler earns a town's badge by finishing every mission at
 // every spot in it, and finishing towns earns titles (LibotBackend
-// utils/achievements.js). Here the admin sets each town's badge: its image,
-// name and description. A town with no image shows the seal the app draws.
-// Admins only, like the backend route.
-
-// LibotBackend routes/municipalityBadges.js TOWN_BADGE_LIMITS.
-const NAME_MAX = 60;
-const DESCRIPTION_MAX = 200;
+// utils/achievements.js). Here the admin sets each town's badge image, and that
+// image is the badge — no drawn stand-in. The name and wording are the
+// same pattern for every town and can't be edited (mock defense notes,
+// 2026-10-23: edited wording would make the achievements inconsistent), so a
+// save also puts back any wording changed before. Admins only, like the
+// backend route.
 
 // Badge art keeps its transparency: resized as PNG, never re-encoded to JPEG.
 function shrinkBadge(file, max = 512) {
@@ -39,17 +37,32 @@ function shrinkBadge(file, max = 512) {
   });
 }
 
+// Every town's badge says the same thing about its own town.
+const badgeName = (town) => town;
+const badgeWording = (town) => `Finished every mission in ${town}`;
+
 function TownCard({ town, onSaved }) {
-  const [name, setName] = useState(town.saved.name);
-  const [description, setDescription] = useState(town.saved.description);
-  const [image, setImage] = useState(town.saved.image);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const fileRef = useRef(null);
+  const image = town.saved.image;
 
-  const changed = name !== town.saved.name || description !== town.saved.description || image !== town.saved.image;
-  const defaultName = town.municipality;
-  const defaultDescription = `Finished every mission in ${town.municipality}`;
+  // An image is saved as soon as it's picked (or taken off): there is
+  // nothing else on the card to change.
+  const saveImage = async (url) => {
+    setBusy(true);
+    setError('');
+    try {
+      const badge = await townBadgeAPI.save(town.municipality, { name: '', description: '', image: url });
+      onSaved(town.municipality, badge);
+      notify(url
+        ? `${town.municipality}'s badge image is saved. Travelers see it next time they open their achievements.`
+        : `${town.municipality}'s badge image is removed.`, { tone: 'success', title: 'Saved' });
+    } catch (err) {
+      setError(err?.response?.data?.message || err.message || 'Could not save');
+    }
+    setBusy(false);
+  };
 
   const pick = async (e) => {
     const file = e.target.files?.[0];
@@ -59,78 +72,44 @@ function TownCard({ town, onSaved }) {
     setBusy(true);
     try {
       const { url } = await uploadAPI.spotMedia(await shrinkBadge(file), 'badge');
-      setImage(url);
+      await saveImage(url);
     } catch (err) {
       setError(err?.response?.data?.message || err.message || 'Upload failed');
+      setBusy(false);
     }
-    setBusy(false);
-  };
-
-  const save = async () => {
-    setBusy(true);
-    setError('');
-    try {
-      const badge = await townBadgeAPI.save(town.municipality, { name: name.trim(), description: description.trim(), image });
-      onSaved(town.municipality, badge);
-      notify(`${town.municipality}'s badge is saved. Travelers see it next time they open their achievements.`, { tone: 'success', title: 'Saved' });
-    } catch (err) {
-      setError(err?.response?.data?.message || err.message || 'Could not save');
-    }
-    setBusy(false);
   };
 
   return (
     <article style={s.card} aria-label={`${town.municipality} badge`}>
       <div style={s.art}>
-        {image
-          ? <img src={image} alt="" style={s.artImg} onError={() => setError('That image link is broken — upload it again.')} />
-          : <TownSeal town={town.municipality} size={112} />}
+        {image ? (
+          <img src={image} alt="" style={s.artImg} onError={() => setError('That image link is broken — upload it again.')} />
+        ) : (
+          <button type="button" style={s.emptyArt} onClick={() => fileRef.current?.click()} disabled={busy}
+            aria-label={`Upload ${town.municipality}'s badge image`}>
+            <Icon name="image" size={22} />
+            <span>No image</span>
+          </button>
+        )}
       </div>
 
       <div style={s.cardBody}>
         <div style={s.cardHead}>
-          <h2 style={s.townName}>{town.municipality}</h2>
+          <h2 style={s.townName}>{badgeName(town.municipality)}</h2>
           <span style={s.meta}>
             {town.spots ? `${town.spots} spot${town.spots === 1 ? '' : 's'}` : 'No spots yet'}
             {' · '}
             {town.earnedBy} earned
           </span>
         </div>
-
-        <label style={s.label} htmlFor={`tb-name-${town.municipality}`}>Badge name</label>
-        <input
-          id={`tb-name-${town.municipality}`}
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          maxLength={NAME_MAX}
-          placeholder={defaultName}
-          disabled={busy}
-          style={s.input}
-          className="modern-input"
-        />
-
-        <label style={s.label} htmlFor={`tb-desc-${town.municipality}`}>Description</label>
-        <textarea
-          id={`tb-desc-${town.municipality}`}
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          maxLength={DESCRIPTION_MAX}
-          rows={2}
-          placeholder={defaultDescription}
-          disabled={busy}
-          style={s.textarea}
-          className="modern-input"
-        />
+        <p style={s.wording}>{badgeWording(town.municipality)}</p>
 
         <div style={s.actions}>
           <Button size="sm" icon="image" onClick={() => fileRef.current?.click()} disabled={busy}>
-            {image ? 'Replace image' : 'Upload image'}
+            {busy ? 'Saving…' : image ? 'Replace image' : 'Upload image'}
           </Button>
-          {image && <Button size="sm" variant="danger" onClick={() => setImage('')} disabled={busy}>Use the seal</Button>}
+          {image && <Button size="sm" variant="danger" onClick={() => saveImage('')} disabled={busy}>Remove image</Button>}
           <input ref={fileRef} type="file" accept="image/png,image/webp,image/jpeg" onChange={pick} style={{ display: 'none' }} />
-          <Button size="sm" variant="primary" onClick={save} disabled={busy || !changed} style={{ marginLeft: 'auto' }}>
-            {busy ? 'Saving…' : 'Save'}
-          </Button>
         </div>
         {error && <p style={s.error} role="alert"><Icon name="alert-triangle" size={12} /> {error}</p>}
       </div>
@@ -173,7 +152,7 @@ export default function TownBadges() {
     <Page>
       <PageHeader
         title="Town Badges"
-        count={withSpots.length}
+        count={loading ? '…' : withSpots.length}
       />
 
       {error && <ErrorBanner onDismiss={() => setError(null)}>{error}</ErrorBanner>}
@@ -182,8 +161,7 @@ export default function TownBadges() {
         <div style={s.note}>
           <Icon name="info" size={14} />
           <span>
-            {missingArt} of {withSpots.length} towns with spots have no badge image yet. Until they do, the app shows
-            the drawn seal you see here — with the town's name and the Libot star.
+            {missingArt} of {withSpots.length} towns with spots have no badge image yet.
           </span>
         </div>
       )}
@@ -191,6 +169,7 @@ export default function TownBadges() {
       <Toolbar>
         <FilterTabs
           label="Show"
+          pending={loading}
           value={show}
           onChange={setShow}
           options={[
@@ -201,7 +180,7 @@ export default function TownBadges() {
       </Toolbar>
 
       {loading ? (
-        <Loading label="Loading the town badges…" />
+        <Loading label="Loading the town badges…" kind="tiles" />
       ) : visible.length === 0 ? (
         <EmptyState icon="map-pin" title="No town has spots yet" subtitle="A town's badge can be earned once it has at least one spot." />
       ) : (
@@ -224,19 +203,16 @@ const s = {
     width: 112, height: 112, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
   },
   artImg: { width: 112, height: 112, objectFit: 'contain', borderRadius: radius.md },
+  emptyArt: {
+    width: 112, height: 112, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4,
+    border: `1.5px dashed ${t.border}`, borderRadius: radius.md, background: t.bg, color: t.textMuted,
+    fontFamily: 'inherit', fontSize: 14, cursor: 'pointer',
+  },
   cardBody: { flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 6 },
   cardHead: { display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap', marginBottom: 4 },
   townName: { fontFamily: fonts.display, fontSize: 20, fontWeight: 600, letterSpacing: '-0.01em', margin: 0, color: t.textPrimary },
   meta: { fontSize: 12, color: t.textMuted, fontVariantNumeric: 'tabular-nums' },
-  label: { fontSize: 11.5, fontWeight: 600, color: t.textMuted, letterSpacing: '0.02em' },
-  input: {
-    width: '100%', padding: '8px 10px', borderRadius: radius.md, border: `1px solid ${t.border}`, fontSize: 13.5,
-    color: t.textPrimary, outline: 'none', background: t.sidebarBg, boxSizing: 'border-box', fontFamily: 'inherit',
-  },
-  textarea: {
-    width: '100%', padding: '8px 10px', borderRadius: radius.md, border: `1px solid ${t.border}`, fontSize: 13.5,
-    color: t.textPrimary, outline: 'none', background: t.sidebarBg, resize: 'vertical', boxSizing: 'border-box', fontFamily: 'inherit',
-  },
+  wording: { fontSize: 14, color: t.textSecondary, lineHeight: 1.4, margin: 0 },
   actions: { display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginTop: 6 },
   error: { display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: t.danger, margin: 0 },
   note: {

@@ -27,12 +27,19 @@ const System           = lazy(() => import('./pages/System'));
 import SessionWatcher from './components/SessionWatcher';
 import MaintenanceBanner from './components/MaintenanceBanner';
 import { AppAlertProvider } from './components/AppAlert';
+import { Page, Loading } from './components/Layout';
 import { theme as t } from './theme';
 import { hasValidSession, getToken, clearSession, mustChangePassword } from './auth/session';
 import { isAdminOnly, isModeratorRole, isSuperAdmin } from './auth/roles';
 import './App.css';
 
+// While a page's code downloads: the outline of a page, in the console.
 function PageFallback() {
+  return <Page><Loading label="Opening the page…" kind="page" /></Page>;
+}
+
+// Set password has no console around it, so no band to sketch.
+function PlainFallback() {
   return <div style={shell.fallback}>Loading…</div>;
 }
 
@@ -108,7 +115,7 @@ export default function App() {
           element={
             <SignedIn>
               <SessionWatcher />
-              <Suspense fallback={<PageFallback />}>
+              <Suspense fallback={<PlainFallback />}>
                 <SetPasswordRoute />
               </Suspense>
             </SignedIn>
@@ -135,6 +142,12 @@ export default function App() {
                           (the automatic filter masks bad words instead). */}
                       <Route path="/mod-requests"       element={<Navigate to="/spots/approvals" replace />} />
                       <Route path="/reported-comments"  element={<Navigate to="/comments" replace />} />
+                      {/* Traveler Progress, Suspensions & Bans and Inactive
+                          Accounts are tabs of User Management now; older links
+                          (and notifications) still point at their own pages. */}
+                      <Route path="/user-progress"      element={<Navigate to="/user-management?tab=progress" replace />} />
+                      <Route path="/banned-accounts"    element={<Navigate to="/user-management?tab=bans" replace />} />
+                      <Route path="/inactive-users"     element={<Navigate to="/user-management?tab=inactive" replace />} />
                       {/* Admin-only, like the backend: moderators work only on
                           attractions and their own requests. */}
                       <Route path="/user-management"     element={<AdminRoute><UserManagement /></AdminRoute>} />

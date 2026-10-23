@@ -97,7 +97,7 @@ export default function Comments() {
 
       {error && <ErrorBanner>{error}</ErrorBanner>}
       {!data ? (
-        <Loading label="Loading reviews…" />
+        <Loading label="Loading reviews…" kind="list" media="avatar" />
       ) : reviews.length === 0 ? (
         <EmptyState
           icon="message-square"

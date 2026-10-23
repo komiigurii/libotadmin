@@ -83,7 +83,7 @@ export default function Notifications() {
         actions={data?.unread > 0 && <Button icon="check" onClick={readAll}>Mark all read</Button>}
       />
       {error && <ErrorBanner onDismiss={() => setError('')}>{error}</ErrorBanner>}
-      {!data ? <Loading label="Loading notifications…" />
+      {!data ? <Loading label="Loading notifications…" cols={4} />
         : data.notifications.length === 0 ? <EmptyState icon="bell" title="Nothing yet" subtitle="You’ll be told here when something needs you." />
           : (
             // One dense table, a row per notice.

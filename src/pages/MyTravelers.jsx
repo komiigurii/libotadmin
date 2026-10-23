@@ -77,7 +77,7 @@ export default function MyTravelers() {
     <Page>
       <PageHeader
         title="Travelers"
-        count={rows.length}
+        count={loading ? '…' : rows.length}
       />
 
       {error && <ErrorBanner onDismiss={() => setError('')}>{error}</ErrorBanner>}
@@ -86,6 +86,7 @@ export default function MyTravelers() {
         <Toolbar>
           <FilterTabs
             label="Show"
+            pending={loading}
             value={filter}
             onChange={setFilter}
             options={[
@@ -100,7 +101,7 @@ export default function MyTravelers() {
       )}
 
       {loading ? (
-        <Loading label="Loading travelers…" />
+        <Loading label="Loading travelers…" cols={4} media="avatar" />
       ) : rows.length === 0 ? (
         <EmptyState
           icon="users"

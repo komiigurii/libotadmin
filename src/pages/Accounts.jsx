@@ -9,6 +9,7 @@ import { AddAccountForm, StaffTable } from '../components/StaffAccounts';
 import { notify, confirmAction, promptAction } from '../components/AppAlert';
 import CredentialSlip from '../components/CredentialSlip';
 import Pagination from '../components/Pagination';
+import { Bone } from '../components/Skeleton';
 import Drawer from '../components/Drawer';
 import TravelerDrawer, { Standing } from '../components/TravelerDrawer';
 import { Facts, DetailSection, DetailText, detailStyles as d } from '../components/Details';
@@ -29,7 +30,8 @@ import { useLive, useLiveTick } from '../api/live';
  *   Locked    every account locked by wrong passwords: staff of any role, super
  *             admins too, and travelers (Clerk's lock). Unlock one or all (user
  *             rule 2026-10-23; moved here from the System page's tools, user
- *             2026-10-23).
+ *             2026-10-23). A "Locked" line under Staff status and under
+ *             Travelers; all of them from the band's Locked accounts box.
  *   Archived  banned, inactive and self-deleted accounts, kept and hidden from
  *             everyone else; any of them can be restored (user request
  *             2026-10-23). A deleted one gets a new sign-in for the same email.
@@ -46,25 +48,28 @@ const STAFF_ROLES = [
   { value: 'admin',     label: 'Admins',       icon: 'shield' },
   { value: 'moderator', label: 'Moderators',   icon: 'map-pin' },
 ];
+// The filter list (the user's marked-up screenshot, 2026-10-23): no Locked
+// group of its own, a "Locked" line under Staff status and under Travelers
+// instead (every locked account at once is the band's Locked accounts box).
+// Deactivated staff are still in All staff, with their status; travelers'
+// "In good standing" and "Deactivated" are gone (Archived → Inactive is the
+// inactive ones).
 const STAFF_STATUSES = [
   { value: 'active',      label: 'Active',             icon: 'check' },
   { value: 'firstSignIn', label: 'Temporary password', icon: 'key' },
-  { value: 'deactivated', label: 'Deactivated',        icon: 'slash' },
 ];
 const TRAVELER_STATUSES = [
   { value: '',          label: 'All travelers',    icon: 'users' },
-  { value: 'active',    label: 'In good standing', icon: 'check' },
   { value: 'muted',     label: 'Muted',            icon: 'pause' },
   { value: 'suspended', label: 'Suspended',        icon: 'pause' },
   { value: 'banned',    label: 'Banned',           icon: 'slash' },
-  { value: 'inactive',  label: 'Deactivated',      icon: 'clock' },
 ];
 // A temporary password whose slip ran out still counts as "Temporary password".
 const staffMatches = (a, status) => !status || a.status === status || (status === 'firstSignIn' && a.status === 'slipExpired');
 const LOCKED_FILTERS = [
-  { value: '',         label: 'All locked', icon: 'lock' },
-  { value: 'staff',    label: 'Staff',      icon: 'shield' },
-  { value: 'traveler', label: 'Travelers',  icon: 'users' },
+  { value: '',         label: 'Locked accounts' },
+  { value: 'staff',    label: 'Locked staff' },
+  { value: 'traveler', label: 'Locked travelers' },
 ];
 const lockedMatches = (acc, kind) => !kind || acc.kind === kind;
 const LOCKED_ROLE = { superadmin: 'Super admin', admin: 'Admin', moderator: 'Moderator', traveler: 'Traveler' };
@@ -188,6 +193,21 @@ export default function Accounts() {
 
   const nStaff = (fn) => (staffLoading ? null : accounts.filter(fn).length);
   const n = (v) => (v == null ? '…' : fmtNum(v));
+  // The filter list's counts: a bone until they load (the strip draws its '…' as one).
+  const nList = (v) => (v == null ? <Bone inline w={18} h={11} /> : fmtNum(v));
+  // The "Locked" line under Staff status or Travelers. Flagged while any are
+  // locked; "—" when Clerk didn't say which travelers are.
+  const lockedLine = (kind) => {
+    const c = locked ? locked.accounts.filter((acc) => lockedMatches(acc, kind)).length : null;
+    const unknown = kind === 'traveler' && locked?.travelersUnavailable;
+    return (
+      <button type="button" className="sa-filter"
+        aria-pressed={view === 'locked' && lockedKind === kind} onClick={() => showLocked(kind)}>
+        <Icon name="lock" size={15} /> Locked
+        <span className={`sa-filter-n${c && !unknown ? ' flag' : ''}`}>{unknown ? '—' : nList(c)}</span>
+      </button>
+    );
+  };
   const onSlip = nStaff((a) => staffMatches(a, 'firstSignIn'));
   const inTrouble = travelerCounts && travelerCounts.suspended != null && travelerCounts.banned != null ? travelerCounts.suspended + travelerCounts.banned : null;
   const nLocked = locked?.accounts.length;
@@ -219,7 +239,7 @@ export default function Accounts() {
               <button key={o.value || 'all'} type="button" className="sa-filter"
                 aria-pressed={view === 'staff' && role === o.value && !staffStatus} onClick={() => showStaff(o.value)}>
                 <Icon name={o.icon} size={15} /> {o.label}
-                <span className="sa-filter-n">{n(nStaff((a) => !o.value || a.role === o.value))}</span>
+                <span className="sa-filter-n">{nList(nStaff((a) => !o.value || a.role === o.value))}</span>
               </button>
             ))}
           </div>
@@ -232,10 +252,11 @@ export default function Accounts() {
                 <button key={o.value} type="button" className="sa-filter"
                   aria-pressed={view === 'staff' && staffStatus === o.value} onClick={() => showStaff('', o.value)}>
                   <Icon name={o.icon} size={15} /> {o.label}
-                  <span className={`sa-filter-n${flag ? ' flag' : ''}`}>{n(c)}</span>
+                  <span className={`sa-filter-n${flag ? ' flag' : ''}`}>{nList(c)}</span>
                 </button>
               );
             })}
+            {lockedLine('staff')}
           </div>
           <div className="sa-filter-group" role="group" aria-label="Travelers">
             <div className="sa-filter-label">Travelers</div>
@@ -246,21 +267,7 @@ export default function Accounts() {
                 <span className="sa-filter-n">{travelerCounts ? n(travelerCounts[o.value]) : ''}</span>
               </button>
             ))}
-          </div>
-          <div className="sa-filter-group" role="group" aria-label="Locked accounts">
-            <div className="sa-filter-label">Locked</div>
-            {LOCKED_FILTERS.map((o) => {
-              const c = locked ? locked.accounts.filter((acc) => lockedMatches(acc, o.value)).length : null;
-              // Clerk didn't answer: the travelers' number isn't known.
-              const unknown = o.value === 'traveler' && locked?.travelersUnavailable;
-              return (
-                <button key={o.value || 'all'} type="button" className="sa-filter"
-                  aria-pressed={view === 'locked' && lockedKind === o.value} onClick={() => showLocked(o.value)}>
-                  <Icon name={o.icon} size={15} /> {o.label}
-                  <span className={`sa-filter-n${c && !unknown ? ' flag' : ''}`}>{!locked ? '' : unknown ? '—' : n(c)}</span>
-                </button>
-              );
-            })}
+            {lockedLine('traveler')}
           </div>
           <div className="sa-filter-group" role="group" aria-label="Archived accounts">
             <div className="sa-filter-label">Archived</div>
@@ -335,11 +342,11 @@ function StaffView({ accounts, all, title, canMake, loading, error, onDismissErr
       )}
 
       <Toolbar>
-        <span style={a.scope}>{title || 'All staff'} · {fmtNum(visible.length)}</span>
+        <span style={a.scope}>{title || 'All staff'} · {loading ? <Bone inline w={20} h={12} /> : fmtNum(visible.length)}</span>
         <SearchInput value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search by username or municipality…" />
       </Toolbar>
 
-      {loading ? <Loading label="Loading accounts…" />
+      {loading ? <Loading label="Loading accounts…" cols={5} media="avatar" />
         : visible.length === 0 ? <EmptyState icon="users" title="No accounts match" subtitle="Try another filter or search." />
           : (
             <StaffTable
@@ -401,7 +408,7 @@ function TravelersView({ status, title, onShowDeleted }) {
 
       {error && <ErrorBanner onDismiss={() => setError('')}>{error}</ErrorBanner>}
 
-      {!data ? <Loading label="Loading travelers…" />
+      {!data ? <Loading label="Loading travelers…" cols={7} media="avatar" />
         : data.travelers.length === 0 ? <EmptyState icon="users" title="No travelers match" subtitle="Try another filter or search." />
           : (
             <>
@@ -507,7 +514,7 @@ function LockedView({ locked, kind, title, error, onDismissError, reload, onUnlo
   return (
     <>
       <Toolbar>
-        <span style={a.scope}>{title || 'All locked'}{locked ? ` · ${fmtNum(shown.length)}` : ''}</span>
+        <span style={a.scope}>{title || 'Locked accounts'}{locked ? ` · ${fmtNum(shown.length)}` : ''}</span>
         <div style={a.toolbarEnd}>
           {/* Unlock all frees every locked account, so it sits on the whole list only. */}
           {!kind && all.length > 1 && (
@@ -528,7 +535,7 @@ function LockedView({ locked, kind, title, error, onDismissError, reload, onUnlo
         </p>
       )}
 
-      {!locked ? (!error && <Loading label="Loading locked accounts…" />)
+      {!locked ? (!error && <Loading label="Loading locked accounts…" cols={4} media="avatar" />)
         : shown.length === 0 ? <EmptyState icon="unlock" title={nobody} subtitle="Accounts locked by wrong passwords show here until they’re unlocked or their lock runs out." />
           : (
             <Table
@@ -622,7 +629,7 @@ function ArchivedView({ reason, title }) {
 
       {error && <ErrorBanner onDismiss={() => setError('')}>{error}</ErrorBanner>}
 
-      {!data ? <Loading label="Loading archived accounts…" />
+      {!data ? <Loading label="Loading archived accounts…" cols={5} media="avatar" />
         : data.archived.length === 0 ? <EmptyState icon="archive" title="Nothing archived here" subtitle="Banned, inactive and deleted accounts show here, kept and hidden." />
           : (
             <>

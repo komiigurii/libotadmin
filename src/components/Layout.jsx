@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { theme as t, radius, type } from '../theme';
 import Icon from './Icon';
 import PageBand from './PageBand';
+import { Bone } from './Skeleton';
 import { roleLabel } from '../auth/roles';
 
 /*
@@ -58,14 +59,14 @@ export function Page({ children, wide = false }) {
    stat strip. Every console has worn it since 2026-10-23 (the super admin's
    first). No small label above the title: the heading carries the page on
    its own. */
-export function PageHeader({ title, subtitle, count, actions, live, stats, statsLabel, children }) {
+export function PageHeader({ title, subtitle, count, actions, live, stats, statsLabel, statsBeside, children }) {
   // The browser tab names the page and whose console it is (mock defense
   // 2026-10-21: "title sa tab ng mod dapat mod hindi admin").
   useEffect(() => {
     if (typeof title === 'string') document.title = `${title} · Libot ${roleLabel()}`;
   }, [title]);
   return (
-    <PageBand title={title} subtitle={subtitle} count={count} actions={actions} live={live} stats={stats} statsLabel={statsLabel}>
+    <PageBand title={title} subtitle={subtitle} count={count} actions={actions} live={live} stats={stats} statsLabel={statsLabel} statsBeside={statsBeside}>
       {children}
     </PageBand>
   );
@@ -101,25 +102,10 @@ export function Card({ children, pad = true, style }) {
 }
 
 /* ── States ───────────────────────────────────────────────────────
-   Loading, error and empty all render at the same size in the same place, so
-   a page doesn't jump as it settles. */
-// The API's server sleeps when idle and takes 30–60 s to answer the first
-// request, so after a few seconds the loading state says why it's slow.
-const WAKING_AFTER_MS = 4000;
-
-export function Loading({ label = 'Loading…' }) {
-  const [slow, setSlow] = useState(false);
-  useEffect(() => {
-    const timer = setTimeout(() => setSlow(true), WAKING_AFTER_MS);
-    return () => clearTimeout(timer);
-  }, []);
-  return (
-    <div style={s.state} role="status" aria-live="polite">
-      {label}
-      {slow && <div style={s.stateHint}>Waking up the server. The first load can take up to a minute.</div>}
-    </div>
-  );
-}
+   Loading is a skeleton in the shape of what's coming (components/
+   Skeleton.jsx); error and empty render in the same place, so a page
+   doesn't jump as it settles. */
+export { Loading } from './Skeleton';
 
 export function ErrorBanner({ children, onDismiss }) {
   return (
@@ -384,8 +370,9 @@ export function Button({ variant = 'secondary', size = 'md', icon, children, sty
 /* ── Filter tabs ──────────────────────────────────────────────────
    Status filters were <select> dropdowns, sized differently on each page.
    A segmented row shows every option and its count at once, and switching is
-   one click. aria-pressed tells a screen reader which one is on. */
-export function FilterTabs({ options, value, onChange, label = 'Filter' }) {
+   one click. aria-pressed tells a screen reader which one is on. While the
+   counts load (`pending`), each is a bone rather than a 0. */
+export function FilterTabs({ options, value, onChange, label = 'Filter', pending = false }) {
   return (
     <div role="group" aria-label={label} style={s.filterTabs}>
       {options.map((o) => {
@@ -399,7 +386,9 @@ export function FilterTabs({ options, value, onChange, label = 'Filter' }) {
             style={{ ...s.filterTab, ...(on ? s.filterTabOn : null) }}
           >
             {o.label}
-            {o.count != null && <span style={{ ...s.filterCount, ...(on ? s.filterCountOn : null) }}>{o.count}</span>}
+            {o.count != null && (pending
+              ? <Bone inline w={18} h={11} r={999} />
+              : <span style={{ ...s.filterCount, ...(on ? s.filterCountOn : null) }}>{o.count}</span>)}
           </button>
         );
       })}
@@ -472,12 +461,6 @@ const base = {
   card: {
     background: t.cardBg, border: `1px solid ${t.border}`, borderRadius: radius.lg,
   },
-
-  state: {
-    background: t.cardBg, border: `1px solid ${t.border}`, borderRadius: radius.lg,
-    padding: 48, textAlign: 'center', color: t.textSecondary, fontSize: 14,
-  },
-  stateHint: { marginTop: 8, fontSize: 12.5, color: t.textMuted },
 
   errorBanner: {
     display: 'flex', alignItems: 'center', gap: 9,

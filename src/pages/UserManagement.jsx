@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { bannedAccountsAPI, appealAPI, inactiveUsersAPI, userProgressAPI } from '../api/api';
 import { notify, confirmAction } from '../components/AppAlert';
 import {
@@ -129,7 +130,7 @@ function AllUsersPanel() {
       </Toolbar>
 
       {loading ? (
-        <Loading label="Loading all users…" />
+        <Loading label="Loading all users…" cols={6} media="avatar" />
       ) : filtered.length === 0 ? (
         <EmptyState
           icon="users"
@@ -258,7 +259,7 @@ function BannedAccountsPanel() {
       )}
 
       {loading ? (
-        <Loading label="Loading suspended and banned accounts…" />
+        <Loading label="Loading suspended and banned accounts…" cols={5} media="avatar" />
       ) : users.length === 0 ? (
         <EmptyState
           icon="check"
@@ -431,7 +432,7 @@ function InactiveUsersPanel() {
       {error && <ErrorBanner onDismiss={() => setError(null)}>{error}</ErrorBanner>}
 
       {loading ? (
-        <Loading label="Loading inactive accounts…" />
+        <Loading label="Loading inactive accounts…" cols={6} media="avatar" />
       ) : users.length === 0 ? (
         <EmptyState
           icon="check"
@@ -571,6 +572,7 @@ function TravelerProgressPanel() {
       <Toolbar>
         <FilterTabs
           label="Show"
+          pending={loading}
           value={onlyExplorers ? 'explorers' : ''}
           onChange={val => setOnlyExplorers(val === 'explorers')}
           options={[
@@ -586,7 +588,7 @@ function TravelerProgressPanel() {
       </Toolbar>
 
       {loading ? (
-        <Loading label="Loading the traveler leaderboard…" />
+        <Loading label="Loading the traveler leaderboard…" cols={9} media="avatar" />
       ) : visible.length === 0 ? (
         <EmptyState
           icon="users"
@@ -652,31 +654,26 @@ function TravelerProgressPanel() {
 // ─── Default export ───────────────────────────────────────────────────────────
 
 const TAB_META = {
-  [TAB.ALL]: {
-    label:    'All Users',
-    title:    'All Users',
-  },
-  [TAB.BANS]: {
-    label:    'Suspended & Banned',
-    title:    'Suspensions & Bans',
-  },
-  [TAB.INACTIVE]: {
-    label:    'Inactive',
-    title:    'Inactive Accounts',
-  },
-  [TAB.PROGRESS]: {
-    label:    'Leaderboard',
-    title:    'Traveler Progress',
-  },
+  [TAB.ALL]:      { label: 'All Users' },
+  [TAB.BANS]:     { label: 'Suspended & Banned' },
+  [TAB.INACTIVE]: { label: 'Inactive' },
+  [TAB.PROGRESS]: { label: 'Leaderboard' },
 };
 
 export default function UserManagement() {
-  const [tab, setTab] = useState(TAB.ALL);
-  const meta = TAB_META[tab];
+  // ?tab= opens a tab straight away (the dashboard's Leaderboard and Ban
+  // appeals links, and the old pages' addresses).
+  const [params, setParams] = useSearchParams();
+  const asked = params.get('tab');
+  const tab = Object.values(TAB).includes(asked) ? asked : TAB.ALL;
+  const setTab = (key) => setParams(key === TAB.ALL ? {} : { tab: key }, { replace: true });
 
+  // One name for the page whichever tab is open, like the rail's link: the
+  // heading and the browser tab used to change with every tab (mock defense
+  // notes, 2026-10-23: "tab name … changing … but still in the same page").
   return (
     <Page>
-      <PageHeader title={meta.title} subtitle={meta.subtitle} />
+      <PageHeader title="User Management" />
 
       <div style={tabBarStyle}>
         {Object.values(TAB).map(key => (

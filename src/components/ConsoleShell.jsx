@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import Icon from './Icon';
+import { Bone, Loading } from './Skeleton';
 import logo from '../assets/logo.png';
 import { useThemePref } from '../theme';
 import { publishHeartbeat, useHeartbeat } from '../auth/heartbeat';
@@ -60,7 +61,7 @@ const ADMIN_NAV = [
     { label: 'Dashboard', path: '/dashboard', icon: 'grid', hint: 'What’s live, what’s waiting on you and how the app is used', keys: 'home overview usage charts' },
   ] },
   { group: 'Content', items: [
-    { label: 'Spot Management/Requests', path: '/spots', icon: 'map-pin', badge: 'approvals', hint: 'Every spot, and the moderators’ requests in the Approval Queue', keys: 'spots add edit delete approval queue requests map ar food' },
+    { label: 'Spot Management', path: '/spots', icon: 'map-pin', badge: 'approvals', hint: 'Every spot, and the moderators’ requests in the Approval Queue', keys: 'spots add edit delete approval queue requests map ar food' },
   ] },
   { group: 'Community', items: [
     { label: 'Rate and Review', path: '/comments', icon: 'message-square', hint: 'Every review travelers have left', keys: 'reviews comments filter warn suspend ban delete' },
@@ -76,14 +77,14 @@ const ADMIN_NAV = [
 
 // A moderator's job is attractions in their municipality and the requests
 // they've sent, plus a read-only list of the travelers who visited their
-// municipality's spots (QA 2026-10-16).
+// municipality's spots (QA 2026-10-16). My Submissions is off the rail (mock
+// defense notes, 2026-10-23); the dashboard and Jump to page still open it.
 const MODERATOR_NAV = [
   { group: 'Overview', items: [
     { label: 'Dashboard', path: '/dashboard', icon: 'grid', hint: 'Your town’s spots and where your requests stand', keys: 'home overview' },
   ] },
   { group: 'Content', items: [
     { label: 'Spot Management', path: '/spots', icon: 'map-pin', hint: 'Your town’s spots: add one or propose changes', keys: 'spots add edit delete map ar food' },
-    { label: 'My Submissions', path: '/my-review-requests', icon: 'send', hint: 'Where each request you sent stands', keys: 'requests submissions approval pending approved rejected' },
   ] },
   { group: 'Travelers', items: [
     { label: 'Travelers', path: '/my-travelers', icon: 'users', hint: 'Who visited your town’s spots', keys: 'travelers visitors' },
@@ -96,17 +97,19 @@ const HELP_NAV = { group: 'Help', items: [
   { label: 'Report a Problem', path: '/tickets', icon: 'flag', hint: 'Tell the super admin about a problem', keys: 'ticket report problem bug help' },
 ] };
 
-const CONSOLES = {
-  superadmin: { nav: SUPER_ADMIN_NAV, name: 'Super admin console', role: 'Super admin', jump: 'maintenance, tickets, accounts' },
-  admin:      { nav: [...ADMIN_NAV, HELP_NAV],     name: 'Admin Console',     role: 'Admin',     jump: 'spots, approvals, reviews' },
-  moderator:  { nav: [...MODERATOR_NAV, HELP_NAV], name: 'Moderator Console', role: 'Moderator', jump: 'spots, submissions, travelers' },
-};
-
-// Pages outside the rail that Jump to page still finds.
+// Pages outside the rail that Jump to page still finds: every role's, then
+// each console's own (`extra`).
 const EXTRA = [
   { label: 'Notifications', path: '/notifications', icon: 'bell', hint: 'Everything in your bell', keys: 'bell inbox unread' },
   { label: 'Change password', path: '/change-password', icon: 'key', hint: 'Your own password', keys: 'password security' },
 ];
+const MY_SUBMISSIONS = { label: 'My Submissions', path: '/my-review-requests', icon: 'send', hint: 'Where each request you sent stands', keys: 'requests submissions approval pending approved rejected' };
+
+const CONSOLES = {
+  superadmin: { nav: SUPER_ADMIN_NAV, extra: [], name: 'Super admin console', role: 'Super admin', jump: 'maintenance, tickets, accounts' },
+  admin:      { nav: [...ADMIN_NAV, HELP_NAV],     extra: [], name: 'Admin Console',     role: 'Admin',     jump: 'spots, approvals, reviews' },
+  moderator:  { nav: [...MODERATOR_NAV, HELP_NAV], extra: [MY_SUBMISSIONS], name: 'Moderator Console', role: 'Moderator', jump: 'spots, submissions, travelers' },
+};
 
 // How many of the newest the bell's dropdown shows.
 const BELL_SHOWS = 8;
@@ -187,7 +190,8 @@ export default function ConsoleShell({ children }) {
   const { nav } = kind;
   const counts = { unread: beat?.unread || 0, tickets: beat?.openTickets || 0, approvals: beat?.pendingApprovals || 0 };
   const all = nav.flatMap((g) => g.items);
-  const current = [...all, ...EXTRA].find((i) => isHere(i.path, location.pathname));
+  const offRail = [...EXTRA, ...kind.extra];
+  const current = [...all, ...offRail].find((i) => isHere(i.path, location.pathname));
   const username = beat?.username || '';
   const account = { username, role: kind.role, scope, superAdmin };
 
@@ -269,7 +273,7 @@ export default function ConsoleShell({ children }) {
         {children}
       </div>
 
-      {jumpOpen && <JumpDialog items={[...all, ...EXTRA]} placeholder={kind.jump} onClose={() => setJumpOpen(false)} onGo={(p) => { setJumpOpen(false); navigate(p); }} />}
+      {jumpOpen && <JumpDialog items={[...all, ...offRail]} placeholder={kind.jump} onClose={() => setJumpOpen(false)} onGo={(p) => { setJumpOpen(false); navigate(p); }} />}
       {profileOpen && <ProfileDialog account={account} onClose={() => setProfileOpen(false)} onPassword={() => { setProfileOpen(false); navigate('/change-password'); }} />}
     </div>
   );
@@ -386,7 +390,7 @@ function BellMenu({ unread }) {
             )}
           </div>
           {error && <p className="sa-bell-note danger" role="alert">{error}</p>}
-          {!data ? (!error && <p className="sa-bell-note">Loading…</p>)
+          {!data ? (!error && <Loading label="Loading notifications…" kind="rows" rows={4} />)
             : data.notifications.length === 0 ? (
               <div className="sa-bell-empty">
                 <Icon name="bell" size={24} />
@@ -502,7 +506,6 @@ function AccountMenu({ account, onProfile, onPassword, onSignOut }) {
           <span className="sa-account-name">{username || account.role}</span>
           <span className="sa-account-role">{roleLine(account)}</span>
         </span>
-        <span className="sa-hide-collapsed" style={{ color: 'var(--sa-shell-muted)', display: 'inline-flex' }}><Icon name="chevrons-up-down" size={15} /></span>
       </button>
     </div>
   );
@@ -628,8 +631,8 @@ function ProfileDialog({ account, onClose, onPassword }) {
     ['Role', account.role],
     ['Looks after', account.scope],
     ...(superAdmin ? [
-      ['Account made', me ? <span className="sa-mono">{fmtDay(me.createdAt)}</span> : me === undefined ? '…' : '—'],
-      ['Last signed in', me?.lastLoginAt ? <span className="sa-mono">{timeAgo(me.lastLoginAt)}</span> : me === undefined ? '…' : '—'],
+      ['Account made', me ? <span className="sa-mono">{fmtDay(me.createdAt)}</span> : me === undefined ? <Bone inline w={88} h={13} /> : '—'],
+      ['Last signed in', me?.lastLoginAt ? <span className="sa-mono">{timeAgo(me.lastLoginAt)}</span> : me === undefined ? <Bone inline w={72} h={13} /> : '—'],
     ] : []),
   ];
   return (

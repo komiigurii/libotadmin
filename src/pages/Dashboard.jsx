@@ -5,8 +5,9 @@ import {
 } from '../api/api';
 import { theme as t } from '../theme';
 import {
-  Page, PageHeader, Avatar, ErrorBanner, ApprovalPill,
+  Page, PageHeader, Avatar, ErrorBanner, ApprovalPill, Loading,
 } from '../components/Layout';
+import { Bone } from '../components/Skeleton';
 import { fmtNum as fmt, plural, timeAgo, fmtDateTime } from '../utils/format';
 import { loadUsage } from '../utils/usage';
 import Icon from '../components/Icon';
@@ -24,8 +25,10 @@ import { useLive } from '../api/live';
  * ink heads and charts under plain ones.
  *
  * Every figure here is a real count from an existing endpoint. The day-by-day
- * charts (components/UsageCharts.jsx) and the sparks in an admin's strip come
- * from GET /api/admin/stats/usage; nothing else here claims a trend.
+ * charts (components/UsageCharts.jsx) and an admin's 30-day review count come
+ * from GET /api/admin/stats/usage; nothing else here claims a trend. The strip
+ * has no sparks: a quiet month drew them as a bare line that read as an
+ * underline (mock defense notes, 2026-10-23).
  *
  * Each source loads independently (allSettled): one failing call blanks the
  * figure it feeds and says so, instead of blanking the dashboard.
@@ -38,10 +41,9 @@ const listOf = (data, key) =>
   : Array.isArray(data?.[key]) ? data[key]
   : Array.isArray(data?.data) ? data.data
   : [];
-const greeting = () => {
-  const h = new Date().getHours();
-  return h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening';
-};
+// The leaderboard is User Management's Leaderboard tab (it was its own page,
+// /user-progress, whose address now lands there too).
+const LEADERBOARD = '/user-management?tab=progress';
 
 // ── Data ─────────────────────────────────────────────────────────────
 
@@ -158,9 +160,9 @@ function StaffDashboard() {
   // most every 5 s.
   useLive(isModerator ? ['spots', 'approvals'] : ['spots', 'approvals', 'missions', 'progress', 'travelers'], load, { gap: 5000 });
 
-  // The usage figures behind an admin's sparks: the same 30 days the charts
-  // below read, shared through utils/usage.js. Asked again after every load,
-  // so a live update brings them along.
+  // The usage figures behind an admin's review count: the same 30 days the
+  // charts below read, shared through utils/usage.js. Asked again after every
+  // load, so a live update brings them along.
   const [usage, setUsage] = useState(null);
   useEffect(() => {
     if (isModerator || !data) return undefined;
@@ -195,19 +197,19 @@ function StaffDashboard() {
   ] : [
     { label: 'Needs attention', value: v(waiting), tone: loading || waiting == null ? undefined : waiting ? 'warn' : 'good',
       hint: loading ? null : waiting ? 'approvals and ban appeals' : 'Nothing waiting on you' },
-    { label: 'Travelers', hue: 'teal', to: '/user-progress', value: v(figures?.totalUsers),
-      hint: figures ? `${fmt(figures.activeLast7)} active this week` : null, spark: counts(series?.active) },
-    { label: 'Spot visits', hue: 'magenta', to: '/user-progress', value: v(figures?.totalVisits),
-      hint: figures ? `by ${plural(figures.explorers, 'traveler')}` : null, spark: counts(series?.arrivals) },
+    { label: 'Travelers', hue: 'teal', to: '/user-management', value: v(figures?.totalUsers),
+      hint: figures ? `${fmt(figures.activeLast7)} active this week` : null },
+    { label: 'Spot visits', hue: 'magenta', to: LEADERBOARD, value: v(figures?.totalVisits),
+      hint: figures ? `by ${plural(figures.explorers, 'traveler')}` : null },
     { label: 'Reviews', hue: 'orange', to: '/comments', value: series ? fmt(sum(series.reviews)) : loading ? '…' : '—',
-      hint: 'in the last 30 days', spark: counts(series?.reviews) },
+      hint: 'in the last 30 days' },
     { label: 'Published spots', to: '/spots', value: v(spots?.length),
       hint: spots ? `across ${plural(new Set(spots.map((x) => (x.city || '').trim().toLowerCase()).filter(Boolean)).size, 'city', 'cities')}` : null },
   ];
 
   const live = (
     <>
-      <span>Refreshed <b className="sa-mono">{data ? fmtDateTime(data.at) : '…'}</b></span>
+      <span>Refreshed <b className="sa-mono">{data ? fmtDateTime(data.at) : <Bone inline w={104} h={13} />}</b></span>
       <span>{isModerator ? <>Looking after <b>{city || 'no town yet'}</b></> : <>Looking after <b>all of Bulacan</b></>}</span>
     </>
   );
@@ -257,8 +259,7 @@ function StaffDashboard() {
 }
 
 const sum = (pts) => (pts || []).reduce((n, p) => n + p.count, 0);
-const counts = (pts) => (pts || []).map((p) => p.count);
-const pick = (obj = {}, keys) => Object.fromEntries(keys.map((k) => [k, obj[k]]));
+const pick =(obj = {}, keys) => Object.fromEntries(keys.map((k) => [k, obj[k]]));
 // A sum that says "unknown" rather than 0 when nothing loaded.
 const sumKnown = (vals) => {
   const known = vals.filter((v) => v != null);
@@ -283,7 +284,7 @@ function Panel({ id, title, dark, meta, to, linkLabel, className = '', children 
 }
 
 function Count({ count, loading }) {
-  if (loading) return <span style={d.muted}>…</span>;
+  if (loading) return <Bone w={34} h={26} r={8} />;
   if (count == null) return <span style={d.muted}>Couldn&rsquo;t load</span>;
   if (count === 0) return <span style={d.clear}><Icon name="check" size={12} weight="bold" /> Clear</span>;
   return <span style={d.badge}>{fmt(count)}</span>;
@@ -293,13 +294,13 @@ function AttentionPanel({ attention, loading }) {
   const rows = [
     { icon: 'inbox', label: 'Approval Queue', to: '/spots/approvals', count: attention?.approvals,
       detail: 'New spots, edits, deletions and food spot locations from moderators' },
-    { icon: 'slash', label: 'Ban appeals', to: '/banned-accounts', count: attention?.appeals,
+    { icon: 'slash', label: 'Ban appeals', to: '/user-management?tab=bans', count: attention?.appeals,
       detail: 'Suspended or banned travelers asking to come back' },
   ];
   const total = sumKnown(rows.map((r) => r.count));
   return (
     <Panel id="dash-attention" title="Needs your attention" dark className="sa-o-attention"
-      meta={loading ? '…' : total ? `${fmt(total)} waiting` : total === 0 ? 'All clear' : null}>
+      meta={loading ? <Bone inline w={72} h={11} /> : total ? `${fmt(total)} waiting` : total === 0 ? 'All clear' : null}>
       <ul style={d.list}>
         {rows.map((r) => (
           <li key={r.to} style={d.li}>
@@ -331,7 +332,7 @@ function SubmissionsPanel({ submissions, loading }) {
   return (
     <Panel id="dash-submissions" title="Your recent submissions" dark className="sa-o-attention" to="/my-review-requests" linkLabel="My Submissions">
       {loading ? (
-        <p style={d.pad}>Loading…</p>
+        <Loading label="Loading your submissions…" kind="rows" media="icon" rows={5} />
       ) : submissions == null ? (
         <p style={d.pad}>Couldn&rsquo;t load your submissions.</p>
       ) : recent.length === 0 ? (
@@ -367,7 +368,7 @@ function VisitorsPanel({ travelers, loading }) {
   return (
     <Panel id="dash-visitors" title="Recent visitors" dark className="sa-o-health" to="/my-travelers" linkLabel="Travelers">
       {loading ? (
-        <p style={d.pad}>Loading…</p>
+        <Loading label="Loading recent visitors…" kind="rows" media="avatar" rows={5} />
       ) : travelers == null ? (
         <p style={d.pad}>Couldn&rsquo;t load your town&rsquo;s travelers.</p>
       ) : rows.length === 0 ? (
@@ -402,7 +403,7 @@ function QuickActions({ isModerator = false }) {
         { icon: 'inbox', label: 'Review approvals', to: '/spots/approvals' },
         { icon: 'plus', label: 'Add a spot', to: '/spots?new=1' },
         { icon: 'message-square', label: 'Rate and Review', to: '/comments' },
-        { icon: 'award', label: 'Leaderboard', to: '/user-progress' },
+        { icon: 'award', label: 'Leaderboard', to: LEADERBOARD },
       ];
   return (
     <Panel id="dash-actions" title="Quick actions">
@@ -442,7 +443,7 @@ function CoveragePanel({ spots, loading, scope }) {
   return (
     <Panel id="dash-coverage" title={`Content coverage${scope ? ` · ${scope}` : ''}`} to="/spots" linkLabel="Spot Management">
       {loading ? (
-        <p style={d.pad}>Loading…</p>
+        <Loading label="Loading content coverage…" kind="meters" />
       ) : spots == null ? (
         <p style={d.pad}>Couldn&rsquo;t load spots.</p>
       ) : total === 0 ? (
@@ -494,9 +495,9 @@ function CoveragePanel({ spots, loading, scope }) {
 function TopTravelers({ rows, loading, failed }) {
   const top = rows.slice(0, 5);
   return (
-    <Panel id="dash-travelers" title="Top travelers" dark className="sa-o-activity" to="/user-progress" linkLabel="Leaderboard">
+    <Panel id="dash-travelers" title="Top travelers" dark className="sa-o-activity" to={LEADERBOARD} linkLabel="Leaderboard">
       {loading ? (
-        <p style={d.pad}>Loading…</p>
+        <Loading label="Loading the top travelers…" kind="rows" media="avatar" rows={5} />
       ) : failed ? (
         <p style={d.pad}>Couldn&rsquo;t load the leaderboard.</p>
       ) : top.length === 0 ? (

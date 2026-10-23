@@ -4,6 +4,7 @@ import { Button, StatusPill, Table, Th, Td, Row, Avatar, Loading, EmptyState, pa
 import { notify, confirmAction } from './AppAlert';
 import CredentialSlip from './CredentialSlip';
 import Drawer from './Drawer';
+import Pagination from './Pagination';
 import { Facts, DetailSection, detailStyles as d } from './Details';
 import Icon from './Icon';
 import { theme as t, radius, shadow, type } from '../theme';
@@ -18,13 +19,14 @@ const sq = { width: 34, minHeight: 34, padding: 0 };
 /*
  * Admin and moderator accounts, shared by the super admin's Accounts page and
  * the admin's Moderators page (mock defense 2026-10-21):
- *   - AddAccountForm: role (when there's a choice), municipality, username.
- *     No name and no password: the server makes a temporary password, shown
- *     once on the credential slip.
+ *   - AddAccountForm: role (when there's a choice), then the municipality for
+ *     a moderator (whose username is made from it) or the username for an
+ *     admin. No name and no password: the server makes a temporary password,
+ *     shown once on the credential slip.
  *   - StaffTable: each account's status, last sign-in and "Last changed by …",
  *     with Reset password (a new slip), Deactivate/Reactivate, Move town,
  *     and Unlock on a locked row (the super admin's page only). A row (or its
- *     History button) opens the account's details and history.
+ *     History button) opens the account's details and history. Ten a page.
  * Usernames are permanent and a moderator's name comes from the town, so
  * neither can be edited anywhere.
  */
@@ -42,8 +44,19 @@ const ownName = (a) => (
   a.name && ![`${a.municipality} Moderator`, 'Administrator', 'Super Admin'].includes(a.name) ? a.name : ''
 );
 
-// The pattern the existing accounts use: "malolosmod", "sanjosedelmontemod".
-const suggestUsername = (town) => `${town.normalize('NFD').replace(/[^A-Za-z0-9]/g, '').toLowerCase()}mod`;
+// A moderator's username is made from the town, the pattern the existing
+// accounts use ("malolosmod", "sanjosedelmontemod"), and can't be typed over
+// (mock defense notes, 2026-10-23). If an older account already holds it, the
+// next free number goes on the end ("bustosmod2").
+const townUsername = (town, accounts) => {
+  const base = `${town.normalize('NFD').replace(/[^A-Za-z0-9]/g, '').toLowerCase()}mod`;
+  const taken = new Set(accounts.map((a) => a.username));
+  let name = base;
+  for (let n = 2; taken.has(name); n += 1) name = `${base}${n}`;
+  return name;
+};
+
+const STAFF_PAGE = 10;
 
 /**
  * roles: which kinds this person may make (['admin','moderator'] for the super
@@ -53,22 +66,24 @@ const suggestUsername = (town) => `${town.normalize('NFD').replace(/[^A-Za-z0-9]
 export function AddAccountForm({ roles, accounts, onCancel, onMade }) {
   const [role, setRole] = useState(roles.includes('moderator') ? 'moderator' : roles[0]);
   const [municipality, setMunicipality] = useState('');
+  // Typed for an admin only; a moderator's comes from the town.
   const [username, setUsername] = useState('');
-  const [edited, setEdited] = useState(false);
   const [tried, setTried] = useState(false);
   const [serverError, setServerError] = useState({});
   const [saving, setSaving] = useState(false);
 
-  const name = username.trim().toLowerCase();
+  const fromTown = role === 'moderator';
+  const name = fromTown ? (municipality ? townUsername(municipality, accounts) : '') : username.trim().toLowerCase();
   const takenTowns = new Set(accounts.filter((a) => a.role === 'moderator' && a.active).map((a) => a.municipality.toLowerCase()));
   const errors = {};
   if (role === 'moderator') {
     if (!municipality) errors.municipality = 'Choose the municipality this moderator looks after.';
     else if (takenTowns.has(municipality.toLowerCase())) errors.municipality = `${municipality} already has a moderator account.`;
   }
-  const uProblem = usernameProblem(name);
+  // A moderator's username follows the town, so only the town can be wrong.
+  const uProblem = fromTown ? '' : usernameProblem(name);
   if (uProblem) errors.username = uProblem;
-  else if (accounts.some((a) => a.username === name)) errors.username = `The username “${name}” is taken.`;
+  else if (!fromTown && accounts.some((a) => a.username === name)) errors.username = `The username “${name}” is taken.`;
   const shown = { ...(tried ? errors : {}), ...serverError };
 
   const submit = async (e) => {
@@ -104,8 +119,9 @@ export function AddAccountForm({ roles, accounts, onCancel, onMade }) {
     <form style={f.card} onSubmit={submit} noValidate aria-labelledby="add-acct-title">
       <h2 id="add-acct-title" style={f.title}>New {roles.length > 1 ? 'account' : 'moderator account'}</h2>
       <p style={f.lead}>
-        No name or password to type: a moderator is named after their town, and the server makes a temporary password
-        for you to hand over on a slip. They choose their own at the first sign-in.
+        {fromTown
+          ? 'Pick the town: it names the account and its username. The server makes a temporary password for you to hand over on a slip.'
+          : 'The server makes a temporary password for you to hand over on a slip.'}
       </p>
       <div style={f.grid}>
         {roles.length > 1 && (
@@ -126,11 +142,7 @@ export function AddAccountForm({ roles, accounts, onCancel, onMade }) {
           <div>
             <label htmlFor="acct-municipality" style={s.panelLabel}>Municipality</label>
             <select id="acct-municipality" value={municipality}
-              onChange={(e) => {
-                setMunicipality(e.target.value);
-                setServerError({});
-                if (!edited) setUsername(e.target.value ? suggestUsername(e.target.value) : '');
-              }}
+              onChange={(e) => { setMunicipality(e.target.value); setServerError({}); }}
               style={{ ...s.select, ...invalid('municipality') }}
               aria-invalid={!!shown.municipality} aria-describedby={shown.municipality ? 'acct-municipality-err' : undefined}>
               <option value="">Choose…</option>
@@ -144,12 +156,22 @@ export function AddAccountForm({ roles, accounts, onCancel, onMade }) {
         )}
         <div>
           <label htmlFor="acct-username" style={s.panelLabel}>Username</label>
-          <input id="acct-username" className="modern-input" value={username} maxLength={30}
-            autoCapitalize="none" spellCheck={false} placeholder={role === 'moderator' ? 'e.g. malolosmod' : 'e.g. phactoadmin'}
-            onChange={(e) => { setUsername(e.target.value); setEdited(true); setServerError({}); }}
-            style={{ ...s.select, cursor: 'text', ...invalid('username') }}
-            aria-invalid={!!shown.username} aria-describedby={shown.username ? 'acct-username-err' : undefined} />
-          {fieldError('username') || <p style={f.hint}>What they type to sign in. It can’t be changed later.</p>}
+          {fromTown ? (
+            <input id="acct-username" value={name} readOnly placeholder="Pick the town first"
+              style={{ ...s.select, ...f.fixed, ...invalid('username') }}
+              aria-invalid={!!shown.username} aria-describedby={shown.username ? 'acct-username-err' : 'acct-username-hint'} />
+          ) : (
+            <input id="acct-username" className="modern-input" value={username} maxLength={30}
+              autoCapitalize="none" spellCheck={false} placeholder="e.g. phactoadmin"
+              onChange={(e) => { setUsername(e.target.value); setServerError({}); }}
+              style={{ ...s.select, cursor: 'text', ...invalid('username') }}
+              aria-invalid={!!shown.username} aria-describedby={shown.username ? 'acct-username-err' : 'acct-username-hint'} />
+          )}
+          {fieldError('username') || (
+            <p id="acct-username-hint" style={f.hint}>
+              {fromTown ? 'Made from the town. What they type to sign in; it can’t be changed.' : 'What they type to sign in. It can’t be changed later.'}
+            </p>
+          )}
         </div>
       </div>
       <div style={{ ...s.buttonRow, justifyContent: 'flex-end' }}>
@@ -174,7 +196,13 @@ export function StaffTable({ accounts, extra, onChanged, canManage, onUnlock, ca
   const [moving, setMoving] = useState(null);
   const [openId, setOpenId] = useState(null);
   const [busy, setBusy] = useState('');
+  const [page, setPage] = useState(1);
   const opened = openId && accounts.find((a) => a.id === openId);
+  // Ten a page (mock defense notes, 2026-10-23). A filter or search that
+  // shortens the list keeps the page in range.
+  const pages = Math.max(1, Math.ceil(accounts.length / STAFF_PAGE));
+  const at = Math.min(page, pages);
+  const rows = accounts.slice((at - 1) * STAFF_PAGE, at * STAFF_PAGE);
 
   const act = async (id, fn) => {
     setBusy(id);
@@ -226,7 +254,7 @@ export function StaffTable({ accounts, extra, onChanged, canManage, onUnlock, ca
           <Th align="right">Actions</Th>
         </>}
       >
-        {accounts.map((a) => {
+        {rows.map((a) => {
           const mine = canManage(a);
           return (
             <Row key={a.id} onOpen={() => setOpenId(a.id)} label={`Details of ${a.username}`}>
@@ -281,6 +309,12 @@ export function StaffTable({ accounts, extra, onChanged, canManage, onUnlock, ca
           );
         })}
       </Table>
+      {pages > 1 && (
+        <div style={f.pageFoot}>
+          <span style={s.itemDate}>{(at - 1) * STAFF_PAGE + 1}–{(at - 1) * STAFF_PAGE + rows.length} of {accounts.length}</span>
+          <Pagination page={at} pages={pages} onChange={setPage} label={`${caption} pages`} />
+        </div>
+      )}
 
       {slip && (
         <CredentialSlip kind={slip.kind} account={slip.account} tempPassword={slip.tempPassword}
@@ -393,7 +427,7 @@ function AccountDrawer({ account: a, onClose }) {
           ['Requests sent', a.requests ? `${a.requests.total ?? 0}${a.requests.pending ? ` · ${a.requests.pending} waiting` : ''}` : null],
         ]} />
         <DetailSection title="History">
-          {error ? <p style={f.error}>{error}</p> : entries ? <HistoryList entries={entries} /> : <Loading label="Loading history…" />}
+          {error ? <p style={f.error}>{error}</p> : entries ? <HistoryList entries={entries} /> : <Loading label="Loading history…" kind="rows" media="avatar" rows={4} flush />}
         </DetailSection>
       </div>
     </Drawer>
@@ -408,7 +442,10 @@ const f = {
   hint:     { fontSize: 12, color: t.textMuted, margin: '5px 0 0' },
   error:    { fontSize: 12, color: t.danger, margin: '5px 0 0', display: 'flex', alignItems: 'center', gap: 4 },
   invalid:  { border: `1px solid ${t.danger}` },
-  segment:  { display: 'flex', gap: 2, padding: 3, border: `1px solid ${t.border}`, borderRadius: radius.md, background: t.cardBg },
+  pageFoot: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginTop: 12 },
+  // Shown, not typed: a moderator's username.
+  fixed:    { background: t.divider, color: t.textSecondary, cursor: 'not-allowed', fontWeight: 600 },
+  segment: { display: 'flex', gap: 2, padding: 3, border: `1px solid ${t.border}`, borderRadius: radius.md, background: t.cardBg },
   segBtn:   { flex: 1, padding: '7px 12px', border: 'none', borderRadius: radius.sm, background: 'transparent', color: t.textSecondary, fontFamily: 'inherit', fontSize: 13, fontWeight: 600, cursor: 'pointer' },
   segOn:    { background: t.brandSoft, color: t.brand },
   overlay:  { position: 'fixed', inset: 0, background: t.overlay, zIndex: 1600, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 },

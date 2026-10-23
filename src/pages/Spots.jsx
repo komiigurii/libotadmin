@@ -9,6 +9,7 @@ import {
 } from '../components/Layout';
 import { fmtNum, plural } from '../utils/format';
 import Icon from '../components/Icon';
+import Pagination from '../components/Pagination';
 import { useLive } from '../api/live';
 
 const role = () => localStorage.getItem('role');
@@ -32,6 +33,9 @@ export default function Spots({ embedded = false, onCount }) {
   const [error,    setError]    = useState('');
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleteReason, setDeleteReason] = useState('');
+  const [town,     setTown]     = useState('');
+  const [category, setCategory] = useState('');
+  const [page,     setPage]     = useState(1);
 
   const isModerator = role() === 'moderator';
   const lockedCity = isModerator ? modCity() : '';
@@ -136,14 +140,23 @@ export default function Spots({ embedded = false, onCount }) {
     }
   };
 
+  // Narrowed by town (admins; a moderator's list is one town already) and by
+  // category, then searched, then shown a page at a time (mock defense notes,
+  // 2026-10-23). The choices are the ones the spots actually have.
+  const townsHere = [...new Set(spots.map(x => (x.city || '').trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+  const categoriesHere = [...new Set(spots.flatMap(categoriesOf))].sort((a, b) => a.localeCompare(b));
   const filtered = spots.filter(x => {
+    if (town && (x.city || '').trim() !== town) return false;
+    if (category && !categoriesOf(x).includes(category)) return false;
     const name = x.name?.toLowerCase() || '';
-    const cat  = Array.isArray(x.category)
-      ? x.category.join(' ').toLowerCase()
-      : (x.category || '').toLowerCase();
+    const cat  = categoriesOf(x).join(' ').toLowerCase();
     const q = search.toLowerCase();
     return name.includes(q) || cat.includes(q);
   });
+  const pages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const at = Math.min(page, pages);
+  const shown = filtered.slice((at - 1) * PAGE_SIZE, at * PAGE_SIZE);
+  const narrowed = !!(town || category || search.trim());
 
   const headerActions = (
     <Button variant="primary" icon="plus" onClick={() => { setEditing(null); setShowForm(true); }}>
@@ -160,7 +173,7 @@ export default function Spots({ embedded = false, onCount }) {
     { label: lockedCity ? `Spots in ${lockedCity}` : 'Your spots', value: figure(spots.length), hint: 'live in the app' },
     { label: 'Waiting for approval', to: '/my-review-requests', value: figure(waitingCount), tone: waitingCount ? 'warn' : undefined,
       hint: 'edits and deletions an admin hasn’t decided yet' },
-    { label: 'With an AR model', value: figure(spots.filter((x) => x.AR3DModelURL).length), hint: `of ${plural(spots.length, 'spot')}` },
+    { label: 'With an AR model', value: figure(spots.filter((x) => x.AR3DModelURL).length), hint: loading ? null : `of ${plural(spots.length, 'spot')}` },
     { label: 'Visits', hue: 'magenta', value: figure(spots.reduce((n, x) => n + (x.visitCount || 0), 0)), hint: 'travelers’ arrivals at these spots' },
   ];
 
@@ -218,25 +231,36 @@ export default function Spots({ embedded = false, onCount }) {
       <Toolbar>
         <SearchInput
           value={search}
-          onChange={e => setSearch(e.target.value)}
+          onChange={e => { setSearch(e.target.value); setPage(1); }}
           placeholder="Search spots by name or category…"
         />
+        {!isModerator && (
+          <select aria-label="Municipality" value={town} onChange={e => { setTown(e.target.value); setPage(1); }} style={s.filterSelect}>
+            <option value="">Every municipality</option>
+            {townsHere.map(c => <option key={c} value={c}>{c}</option>)}
+          </select>
+        )}
+        <select aria-label="Category" value={category} onChange={e => { setCategory(e.target.value); setPage(1); }} style={s.filterSelect}>
+          <option value="">Every category</option>
+          {categoriesHere.map(c => <option key={c} value={c}>{c}</option>)}
+        </select>
         {embedded && headerActions}
       </Toolbar>
 
       {loading ? (
-        <Loading label="Loading spots…" />
+        <Loading label="Loading spots…" kind="cards" />
       ) : filtered.length === 0 ? (
         <EmptyState
           icon="map-pin"
           title={spots.length === 0 ? 'No spots yet' : 'No spots match'}
           subtitle={spots.length === 0
             ? (isModerator ? 'Spots you add will appear here once an admin approves them.' : 'Published spots will appear here.')
-            : 'Try a different name or category.'}
+            : 'Try a different name, municipality or category.'}
         />
       ) : (
+        <>
         <div style={s.grid}>
-          {filtered.map(spot => {
+          {shown.map(spot => {
             const locked = !!spot.pendingChange || !!spot.pendingDelete;
             return (
               <div key={spot._id} style={s.spotCard}>
@@ -288,12 +312,25 @@ export default function Spots({ embedded = false, onCount }) {
             );
           })}
         </div>
+        <div style={s.pageFoot}>
+          <span style={s.itemDate}>
+            {filtered.length > PAGE_SIZE
+              ? `${fmtNum((at - 1) * PAGE_SIZE + 1)}–${fmtNum((at - 1) * PAGE_SIZE + shown.length)} of ${plural(filtered.length, 'spot')}`
+              : plural(filtered.length, 'spot')}
+            {narrowed && ` · ${fmtNum(spots.length)} in all`}
+          </span>
+          <Pagination page={at} pages={pages} onChange={(n) => { setPage(n); window.scrollTo?.(0, 0); }} label="Spot pages" />
+        </div>
+        </>
       )}
     </Shell>
   );
 }
 
 const EmbeddedShell = ({ children }) => <>{children}</>;
+
+const PAGE_SIZE = 10;
+const categoriesOf = (x) => (Array.isArray(x.category) ? x.category : x.category ? [x.category] : []);
 
 const s = {
   // Page shell, header, toolbar, states, facts and buttons come from
@@ -306,6 +343,8 @@ const s = {
   formWrap:     { marginBottom: 18 },
 
   grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 16 },
+  filterSelect: { ...pageStyles.select, width: 'auto', minWidth: 170, flex: '0 1 auto' },
+  pageFoot: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' },
 
   spotCard:    { ...pageStyles.item, display: 'flex', flexDirection: 'column' },
   cardImgWrap: { position: 'relative', width: '100%', height: 140, background: t.sidebarBg },

@@ -1,7 +1,7 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { loadUsage, forgetUsage } from '../utils/usage';
 import { useLive } from '../api/live';
-import { Card, FilterTabs, Button, pageStyles as s } from './Layout';
+import { Card, FilterTabs, Button, Loading, pageStyles as s } from './Layout';
 import { theme as t, radius, type } from '../theme';
 import { fmtNum } from '../utils/format';
 
@@ -165,7 +165,7 @@ export default function UsageCharts() {
         </div>
       </div>
       {error && <p style={c.muted}>{error}</p>}
-      {!data && !error && <p style={c.muted}>Loading…</p>}
+      {!data && !error && <Loading label="Loading the usage figures…" kind="charts" />}
       {data && (
         // The previous figures stay, dimmed, while another range loads.
         <div style={{ opacity: loading ? 0.55 : 1, transition: 'opacity 0.2s' }}>

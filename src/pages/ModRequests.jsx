@@ -194,7 +194,7 @@ export default function ModRequests({ embedded = false, onCount }) {
       {!embedded && (
         <PageHeader
           title="Approval Queue"
-          count={pendingCount}
+          count={loading ? '…' : pendingCount}
           subtitle="New spots, spot edits and deletions, and food spot locations from moderators — nothing goes live until you approve it."
         />
       )}
@@ -204,6 +204,7 @@ export default function ModRequests({ embedded = false, onCount }) {
             what kind of request it is rather than by status. */}
         <FilterTabs
           label="Filter by request type"
+          pending={loading}
           value={kindFilter}
           onChange={setKindFilter}
           options={[
@@ -219,7 +220,7 @@ export default function ModRequests({ embedded = false, onCount }) {
       {error && <ErrorBanner>{error}</ErrorBanner>}
 
       {loading ? (
-        <Loading label="Loading the approval queue…" />
+        <Loading label="Loading the approval queue…" kind="list" />
       ) : visible.length === 0 ? (
         <EmptyState
           icon="check"

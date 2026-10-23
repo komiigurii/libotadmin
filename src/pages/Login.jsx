@@ -75,6 +75,12 @@ function SignInForm() {
   const [lockedFor, setLockedFor] = useState(0);
   // "Forgot your password?" swaps the form for the request to the super admin.
   const [forgot, setForgot] = useState(false);
+  // The tab says where you are. After signing out it kept the last console
+  // page's title ("Spot Management · Libot Admin"), since the console pages
+  // set it and nothing here did (mock defense notes, 2026-10-23).
+  useEffect(() => {
+    document.title = `${forgot ? 'Forgot password' : 'Sign in'} · Libot Bulacan Console`;
+  }, [forgot]);
   // Said before signing in, so nobody tries while admins and moderators can't.
   const [maintenance, setMaintenance] = useState(null);
   useEffect(() => {
@@ -135,10 +141,14 @@ function SignInForm() {
       // 423 Locked — the account hit the failed-attempt threshold. Count it
       // down so the button doesn't sit there rejecting every press.
       if (res?.status === 423 && res.data?.retryAfterSeconds) setLockedFor(res.data.retryAfterSeconds);
-      // Maintenance or a paused role (503) carries the super admin's message.
+      // Maintenance: the strip above already gives the details and the super
+      // admin's message, so this says only that (mock defense notes,
+      // 2026-10-23: the two boxes said the same thing). A paused role carries
+      // the super admin's message.
       const note = res?.data?.note ? ` “${res.data.note}”` : '';
       setError(
-        (res?.data?.message && `${res.data.message}${note}`)
+        (res?.data?.code === 'maintenance' && 'The console is under maintenance.')
+          || (res?.data?.message && `${res.data.message}${note}`)
           || (res ? "Couldn't sign you in. Check your username and password."
                   : "Couldn't reach the server. Check your connection and try again.")
       );
