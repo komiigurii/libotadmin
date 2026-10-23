@@ -12,9 +12,12 @@ export const ACTION_LABELS = {
   'account.create':          { label: 'Account made',       icon: 'plus',       tone: 'success' },
   'account.resetPassword':   { label: 'Password reset',     icon: 'key',        tone: 'warning' },
   'account.passwordChanged': { label: 'Password changed',   icon: 'key',        tone: 'info' },
-  'account.deactivate':      { label: 'Deactivated',        icon: 'user-minus', tone: 'danger' },
-  'account.reactivate':      { label: 'Reactivated',        icon: 'user-check', tone: 'success' },
-  'account.municipality':    { label: 'Moved town',         icon: 'move',       tone: 'info' },
+  'account.delete':          { label: 'Deleted (archived)', icon: 'trash',      tone: 'danger' },
+  'account.restore':         { label: 'Restored from the archive', icon: 'rotate-ccw', tone: 'success' },
+  // Older entries, from before Delete (2026-10-24): the same actions.
+  'account.deactivate':      { label: 'Deleted (archived)', icon: 'trash',      tone: 'danger' },
+  'account.reactivate':      { label: 'Restored from the archive', icon: 'rotate-ccw', tone: 'success' },
+  'account.municipality':    { label: 'Moved municipality', icon: 'move',       tone: 'info' },
   'traveler.suspend':        { label: 'Suspended',          icon: 'pause',      tone: 'warning' },
   'traveler.ban':            { label: 'Banned',             icon: 'slash',      tone: 'danger' },
   'traveler.unban':          { label: 'Ban lifted',         icon: 'check',      tone: 'success' },
@@ -62,5 +65,5 @@ export const STAFF_STATUS = {
   firstSignIn: { label: 'Temporary password',      tone: 'warning', icon: 'key' },
   slipExpired: { label: 'Slip expired',            tone: 'danger',  icon: 'clock' },
   locked:      { label: 'Locked',                  tone: 'danger',  icon: 'lock' },
-  deactivated: { label: 'Deactivated',             tone: 'neutral', icon: 'slash' },
+  deleted:     { label: 'Deleted',                 tone: 'neutral', icon: 'trash' },
 };

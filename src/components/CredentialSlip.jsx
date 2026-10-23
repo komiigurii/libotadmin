@@ -46,7 +46,7 @@ export default function CredentialSlip({ kind = 'new', account, tempPassword, ex
 
   const close = async () => {
     const ok = await confirmAction(
-      'The temporary password can’t be shown again. If it’s lost, use Reset password to make a new slip.',
+      'The temporary password can’t be shown again. If it’s lost, they use Forgot password on the sign-in page to get a new slip.',
       { title: 'Close the slip?', confirmText: 'Close', cancelText: 'Keep it open', tone: 'warning' },
     );
     if (ok) onClose();

@@ -510,7 +510,7 @@ function MapSearch({ mapRef, bounds = null }) {
             if (e.key === 'Enter' && results.length > 0) goTo(results[0]);
             if (e.key === 'Escape') setOpen(false);
           }}
-          placeholder={bounds ? 'Search a place in your town to jump the map there…' : 'Search a place to jump the map there…'}
+          placeholder={bounds ? 'Search a place in your municipality to jump the map there…' : 'Search a place to jump the map there…'}
           style={styles.searchInput}
         />
         {loading && <span style={styles.searchSpinner}>…</span>}
@@ -619,7 +619,7 @@ function SpotMapPicker({
   const allowedAt = (lat, lng) => {
     const b = stateRef.current.boundary;
     if (insideBoundary(b, lat, lng)) return true;
-    notify(`That’s outside ${b.name}. Pins have to be inside the spot’s municipality.`, { tone: 'warning', title: 'Outside the town' });
+    notify(`That’s outside ${b.name}. Pins have to be inside the spot’s municipality.`, { tone: 'warning', title: 'Outside the municipality' });
     return false;
   };
   // A dragged pin dropped outside the town goes back to where the drag began.
@@ -2238,7 +2238,7 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
                 )}
                 {!boundary && !lockedCity && !mapTown && (
                   <p style={styles.mapHint}>
-                    <Icon name="map-pin" size={12} /> Choose the municipality on the Details tab, and the map shows just that town.
+                    <Icon name="map-pin" size={12} /> Choose the municipality on the Details tab, and the map shows just that municipality.
                   </p>
                 )}
                 {boundary === false && (

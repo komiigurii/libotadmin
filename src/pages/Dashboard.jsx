@@ -132,7 +132,7 @@ async function loadModerator() {
     failed: [
       !ok(mySpots) && 'your spots',
       !sources.every(ok) && 'some of your submissions',
-      !ok(myTravelers) && 'your town’s travelers',
+      !ok(myTravelers) && 'your municipality’s travelers',
     ].filter(Boolean),
   };
 }
@@ -210,7 +210,7 @@ function StaffDashboard() {
   const live = (
     <>
       <span>Refreshed <b className="sa-mono">{data ? fmtDateTime(data.at) : <Bone inline w={104} h={13} />}</b></span>
-      <span>{isModerator ? <>Looking after <b>{city || 'no town yet'}</b></> : <>Looking after <b>all of Bulacan</b></>}</span>
+      <span>{isModerator ? <>Looking after <b>{city || 'no municipality yet'}</b></> : <>Looking after <b>all of Bulacan</b></>}</span>
     </>
   );
 
@@ -370,7 +370,7 @@ function VisitorsPanel({ travelers, loading }) {
       {loading ? (
         <Loading label="Loading recent visitors…" kind="rows" media="avatar" rows={5} />
       ) : travelers == null ? (
-        <p style={d.pad}>Couldn&rsquo;t load your town&rsquo;s travelers.</p>
+        <p style={d.pad}>Couldn&rsquo;t load your municipality&rsquo;s travelers.</p>
       ) : rows.length === 0 ? (
         <p style={d.pad}>No visits yet. Travelers show here once the app records their arrival at one of your spots.</p>
       ) : (

@@ -24,7 +24,8 @@ const sq = { width: 34, minHeight: 34, padding: 0 };
  *     admin. No name and no password: the server makes a temporary password,
  *     shown once on the credential slip.
  *   - StaffTable: each account's status, last sign-in and "Last changed by …",
- *     with Reset password (a new slip), Deactivate/Reactivate, Move town,
+ *     with Reset password (a new slip; the super admin's page only),
+ *     Delete (to the archive) or Restore, Move town,
  *     and Unlock on a locked row (the super admin's page only). A row (or its
  *     History button) opens the account's details and history. Ten a page.
  * Usernames are permanent and a moderator's name comes from the town, so
@@ -118,7 +119,7 @@ export function AddAccountForm({ roles, accounts, onCancel, onMade }) {
       <h2 id="add-acct-title" style={f.title}>New {roles.length > 1 ? 'account' : 'moderator account'}</h2>
       <p style={f.lead}>
         {fromTown
-          ? 'Pick the town: it names the account and its username. The server makes a temporary password for you to hand over on a slip.'
+          ? 'Pick the municipality: it names the account and its username. The server makes a temporary password for you to hand over on a slip.'
           : 'The server makes a temporary password for you to hand over on a slip.'}
       </p>
       <div style={f.grid}>
@@ -155,7 +156,7 @@ export function AddAccountForm({ roles, accounts, onCancel, onMade }) {
         <div>
           <label htmlFor="acct-username" style={s.panelLabel}>Username</label>
           {fromTown ? (
-            <input id="acct-username" value={name} readOnly placeholder="Pick the town first"
+            <input id="acct-username" value={name} readOnly placeholder="Pick the municipality first"
               style={{ ...s.select, ...f.fixed, ...invalid('username') }}
               aria-invalid={!!shown.username} aria-describedby={shown.username ? 'acct-username-err' : 'acct-username-hint'} />
           ) : (
@@ -167,7 +168,7 @@ export function AddAccountForm({ roles, accounts, onCancel, onMade }) {
           )}
           {fieldError('username') || (
             <p id="acct-username-hint" style={f.hint}>
-              {fromTown ? 'Made from the town. What they type to sign in; it can’t be changed.' : 'What they type to sign in. It can’t be changed later.'}
+              {fromTown ? 'Made from the municipality. What they type to sign in; it can’t be changed.' : 'What they type to sign in. It can’t be changed later.'}
             </p>
           )}
         </div>
@@ -184,12 +185,16 @@ export function AddAccountForm({ roles, accounts, onCancel, onMade }) {
 
 /**
  * accounts: staffView rows. extra: an optional { head, cell(account) } column
- * (the Moderators page adds "Requests sent"). onChanged(account) replaces a row.
+ * (the Moderators page adds "Requests sent"). onChanged(account) replaces a row,
+ * or moves it out of the list once it's deleted or restored.
  * canManage(account): whether this person may act on that row.
  * onUnlock(account): given only to the super admin, who unlocks a locked row
  * of any role (user rule 2026-10-23).
+ * canReset: Reset password on the rows, the super admin's only; the admin's
+ * Moderators page has none (user rule 2026-10-24). Delete moves an account to
+ * the archive; a deleted row (Archived → Deleted staff) has Restore.
  */
-export function StaffTable({ accounts, extra, onChanged, canManage, canResetPassword, onUnlock, caption = 'Staff accounts', townInName = false }) {
+export function StaffTable({ accounts, extra, onChanged, canManage, canReset = false, onUnlock, caption = 'Staff accounts', townInName = false }) {
   const [slip, setSlip] = useState(null);
   const [moving, setMoving] = useState(null);
   const [openId, setOpenId] = useState(null);
@@ -225,12 +230,14 @@ export function StaffTable({ accounts, extra, onChanged, canManage, canResetPass
     const off = a.active;
     const ok = await confirmAction(
       off
-        ? `Deactivate ${a.username}? They’re signed out and can’t sign in until the account is reactivated. The account and its history are kept.`
-        : `Reactivate ${a.username}? They can sign in again with their password.`,
-      { title: off ? 'Deactivate this account?' : 'Reactivate this account?', confirmText: off ? 'Deactivate' : 'Reactivate', danger: off },
+        ? `Delete ${a.username}? They’re signed out and can’t sign in. The account moves to the archive with its history, where the super admin can restore it.`
+        : `Restore ${a.username}? It comes out of the archive and they can sign in again with their password.`,
+      { title: off ? 'Delete this account?' : 'Restore this account?', confirmText: off ? 'Delete' : 'Restore', danger: off, tone: off ? undefined : 'success' },
     );
     if (!ok) return;
-    onChanged(await accountsAPI.setActive(a.id, !off));
+    const acc = await accountsAPI.setActive(a.id, !off);
+    onChanged(acc);
+    notify(off ? `${a.username} was moved to the archive.` : `${a.username} is back and can sign in.`, { tone: 'success', title: off ? 'Deleted' : 'Restored' });
   });
 
   const unlock = (a) => act(a.id, async () => {
@@ -262,7 +269,7 @@ export function StaffTable({ accounts, extra, onChanged, canManage, canResetPass
                   <div style={{ minWidth: 0 }}>
                     <div style={s.personName}>{a.username}</div>
                     <div style={s.personSub}>
-                      {townInName ? (a.municipality || 'No town') : ROLE_NAME[a.role]}{ownName(a) ? ` · ${ownName(a)}` : ''}
+                      {townInName ? (a.municipality || 'No municipality') : ROLE_NAME[a.role]}{ownName(a) ? ` · ${ownName(a)}` : ''}
                     </div>
                   </div>
                 </div>
@@ -290,19 +297,24 @@ export function StaffTable({ accounts, extra, onChanged, canManage, canResetPass
                     <Button variant="success" icon="unlock" style={sq} disabled={busy === a.id} onClick={() => unlock(a)}
                       aria-label={`Unlock ${a.username}`} title="Unlock" />
                   )}
-                  {mine && <>
-                    {canResetPassword !== false && (
-                      <Button variant="warning" icon="key" style={sq} disabled={busy === a.id || !a.active} onClick={() => reset(a)}
+                  {mine && a.active && <>
+                    {canReset && (
+                      <Button variant="warning" icon="key" style={sq} disabled={busy === a.id} onClick={() => reset(a)}
                         aria-label={`Reset the password of ${a.username}`} title="Reset password" />
                     )}
                     {a.role === 'moderator' && (
-                      <Button variant="subtle" icon="move" style={sq} disabled={busy === a.id || !a.active} onClick={() => setMoving(a)}
-                        aria-label={`Move ${a.username} to another town`} title="Move to another town" />
-                      )}
-                    <Button variant={a.active ? 'danger' : 'success'} icon={a.active ? 'user-minus' : 'user-check'} style={sq}
-                      disabled={busy === a.id} onClick={() => toggle(a)}
-                      aria-label={`${a.active ? 'Deactivate' : 'Reactivate'} ${a.username}`} title={a.active ? 'Deactivate' : 'Reactivate'} />
+                      <Button variant="subtle" icon="move" style={sq} disabled={busy === a.id} onClick={() => setMoving(a)}
+                        aria-label={`Move ${a.username} to another municipality`} title="Move to another municipality" />
+                    )}
+                    <Button variant="danger" icon="trash" style={sq} disabled={busy === a.id} onClick={() => toggle(a)}
+                      aria-label={`Delete ${a.username}`} title="Delete" />
                   </>}
+                  {mine && !a.active && (
+                    <Button size="sm" variant="success" icon="rotate-ccw" style={{ whiteSpace: 'nowrap' }} disabled={busy === a.id} onClick={() => toggle(a)}
+                      aria-label={`Restore ${a.username}`}>
+                      {busy === a.id ? 'Restoring…' : 'Restore'}
+                    </Button>
+                  )}
                 </div>
               </Td>
             </Row>
@@ -350,9 +362,9 @@ function MoveDialog({ account, accounts, onClose, onMoved }) {
   return (
     <div style={f.overlay} onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div style={f.dialog} role="dialog" aria-modal="true" aria-labelledby="move-title">
-        <h2 id="move-title" style={f.dialogTitle}>Move {account.username} to another town</h2>
+        <h2 id="move-title" style={f.dialogTitle}>Move {account.username} to another municipality</h2>
         <p style={f.lead}>
-          They look after {account.municipality || 'no town'} now. A moderator with requests still waiting can’t move until
+          They look after {account.municipality || 'no municipality'} now. A moderator with requests still waiting can’t move until
           those are decided. The username stays the same.
         </p>
         <label htmlFor="move-town" style={s.panelLabel}>New municipality</label>

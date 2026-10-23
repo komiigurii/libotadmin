@@ -373,7 +373,7 @@ function StaffPanel({ staff, loading }) {
                     </span>
                     <span className="sa-role">
                       <Icon name={a.role === 'moderator' ? 'map-pin' : 'shield'} size={13} />
-                      {a.role === 'moderator' ? (a.municipality || 'No town') : 'Admin'}
+                      {a.role === 'moderator' ? (a.municipality || 'No municipality') : 'Admin'}
                     </span>
                   </li>
                 ))}

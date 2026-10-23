@@ -24,7 +24,7 @@ const STANDING = {
   muted:     { tone: 'warning', icon: 'pause',  label: 'Muted' },
   suspended: { tone: 'danger',  icon: 'pause',  label: 'Suspended' },
   banned:    { tone: 'danger',  icon: 'slash',  label: 'Banned' },
-  inactive:  { tone: 'neutral', icon: 'clock',  label: 'Deactivated (inactive)' },
+  inactive:  { tone: 'neutral', icon: 'clock',  label: 'Inactive (archived)' },
 };
 export const Standing = ({ status }) => {
   const st = STANDING[status] || STANDING.active;
@@ -83,7 +83,7 @@ export default function TravelerDrawer({ traveler, onClose, archivedAction, chil
               ['Points', fmtNum(u.points)],
               ['Spots visited', fmtNum(u.counts.visits)],
               ['Spot badges', fmtNum(u.counts.badges)],
-              ['Towns finished', u.counts.towns != null ? fmtNum(u.counts.towns) : null],
+              ['Municipalities finished', u.counts.towns != null ? fmtNum(u.counts.towns) : null],
               ['Missions done', u.counts.missions != null ? fmtNum(u.counts.missions) : null],
               ['Reviews', fmtNum(u.counts.reviews)],
               ['Days active', fmtNum(u.counts.activeDays)],

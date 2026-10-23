@@ -47,7 +47,7 @@ const SUPER_ADMIN_NAV = [
     { label: 'Tickets', path: '/tickets', icon: 'flag', badge: 'tickets', hint: 'Problems and password requests from staff', keys: 'report problem password forgot slip' },
   ] },
   { group: 'Accounts', items: [
-    { label: 'Accounts Management', path: '/accounts', icon: 'shield', hint: 'Admins, moderators and travelers', keys: 'staff admin moderator traveler user reset deactivate slip move town unlock locked' },
+    { label: 'Accounts Management', path: '/accounts', icon: 'shield', hint: 'Admins, moderators and travelers', keys: 'staff admin moderator traveler user reset delete archive restore slip move municipality town unlock locked' },
     { label: 'Activity Log', path: '/activity', icon: 'history', hint: 'Who did what in the console', keys: 'audit log sign-in login history' },
   ] },
 ];
@@ -68,10 +68,10 @@ const ADMIN_NAV = [
   ] },
   { group: 'Travelers', items: [
     { label: 'User Management', path: '/user-management', icon: 'user', hint: 'Manage user accounts and permissions', keys: 'user management accounts permissions' },
-    { label: 'Town & District Badges', path: '/town-badges', icon: 'star', hint: 'The towns and districts travelers have finished, and their badge images', keys: 'badge town district title bronze silver gold goat' },
+    { label: 'Municipality & District Badges', path: '/town-badges', icon: 'star', hint: 'The municipalities and districts travelers have finished, and their badge images', keys: 'badge municipality town district title bronze silver gold goat' },
   ] },
   { group: 'Team', items: [
-    { label: 'Moderators Management', path: '/moderators', icon: 'users', hint: 'The town moderators’ accounts', keys: 'moderator lgu account add reset slip town' },
+    { label: 'Moderators Management', path: '/moderators', icon: 'users', hint: 'The municipalities’ moderator accounts', keys: 'moderator lgu account add reset slip municipality town' },
   ] },
 ];
 
@@ -81,13 +81,13 @@ const ADMIN_NAV = [
 // defense notes, 2026-10-23); the dashboard and Jump to page still open it.
 const MODERATOR_NAV = [
   { group: 'Overview', items: [
-    { label: 'Dashboard', path: '/dashboard', icon: 'grid', hint: 'Your town’s spots and where your requests stand', keys: 'home overview' },
+    { label: 'Dashboard', path: '/dashboard', icon: 'grid', hint: 'Your municipality’s spots and where your requests stand', keys: 'home overview' },
   ] },
   { group: 'Content', items: [
-    { label: 'Spot Management', path: '/spots', icon: 'map-pin', hint: 'Your town’s spots: add one or propose changes', keys: 'spots add edit delete map ar food' },
+    { label: 'Spot Management', path: '/spots', icon: 'map-pin', hint: 'Your municipality’s spots: add one or propose changes', keys: 'spots add edit delete map ar food' },
   ] },
   { group: 'Travelers', items: [
-    { label: 'Travelers', path: '/my-travelers', icon: 'users', hint: 'Who visited your town’s spots', keys: 'travelers visitors' },
+    { label: 'Travelers', path: '/my-travelers', icon: 'users', hint: 'Who visited your municipality’s spots', keys: 'travelers visitors' },
   ] },
 ];
 

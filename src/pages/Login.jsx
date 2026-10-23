@@ -33,7 +33,7 @@ const ENDED = {
   signedOut:         'You signed out in another window.',
   passwordChanged:   'Your password was changed. Sign in with the new one.',
   passwordReset:     'Your password was reset. Sign in with the temporary password on your new slip.',
-  deactivated:       'This account has been deactivated. Ask the super admin if you need it back.',
+  deactivated:       'This account has been deleted. Ask the super admin if you need it back.',
   // The countdown in the console's pop-up ran out (components/SignOutPopup.jsx).
   maintenance:       'You were signed out for maintenance. You can sign in again when it’s over.',
   restricted:        'The super admin paused your role’s access to the console, so you were signed out. You can sign in again once it’s back.',
