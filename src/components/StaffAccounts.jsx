@@ -119,7 +119,7 @@ export function AddAccountForm({ roles, accounts, onCancel, onMade }) {
       <h2 id="add-acct-title" style={f.title}>New {roles.length > 1 ? 'account' : 'moderator account'}</h2>
       <p style={f.lead}>
         {fromTown
-          ? 'Pick the town: it names the account and its username. The server makes a temporary password for you to hand over on a slip.'
+          ? 'Pick the municipality: it names the account and its username. The server makes a temporary password for you to hand over on a slip.'
           : 'The server makes a temporary password for you to hand over on a slip.'}
       </p>
       <div style={f.grid}>
@@ -156,7 +156,7 @@ export function AddAccountForm({ roles, accounts, onCancel, onMade }) {
         <div>
           <label htmlFor="acct-username" style={s.panelLabel}>Username</label>
           {fromTown ? (
-            <input id="acct-username" value={name} readOnly placeholder="Pick the town first"
+            <input id="acct-username" value={name} readOnly placeholder="Pick the municipality first"
               style={{ ...s.select, ...f.fixed, ...invalid('username') }}
               aria-invalid={!!shown.username} aria-describedby={shown.username ? 'acct-username-err' : 'acct-username-hint'} />
           ) : (
@@ -168,7 +168,7 @@ export function AddAccountForm({ roles, accounts, onCancel, onMade }) {
           )}
           {fieldError('username') || (
             <p id="acct-username-hint" style={f.hint}>
-              {fromTown ? 'Made from the town. What they type to sign in; it can’t be changed.' : 'What they type to sign in. It can’t be changed later.'}
+              {fromTown ? 'Made from the municipality. What they type to sign in; it can’t be changed.' : 'What they type to sign in. It can’t be changed later.'}
             </p>
           )}
         </div>
@@ -269,7 +269,7 @@ export function StaffTable({ accounts, extra, onChanged, canManage, onUnlock, ca
                   <div style={{ minWidth: 0 }}>
                     <div style={s.personName}>{a.username}</div>
                     <div style={s.personSub}>
-                      {townInName ? (a.municipality || 'No town') : ROLE_NAME[a.role]}{ownName(a) ? ` · ${ownName(a)}` : ''}
+                      {townInName ? (a.municipality || 'No municipality') : ROLE_NAME[a.role]}{ownName(a) ? ` · ${ownName(a)}` : ''}
                     </div>
                   </div>
                 </div>
@@ -304,7 +304,7 @@ export function StaffTable({ accounts, extra, onChanged, canManage, onUnlock, ca
                     )}
                     {a.role === 'moderator' && (
                       <Button variant="subtle" icon="move" style={sq} disabled={busy === a.id} onClick={() => setMoving(a)}
-                        aria-label={`Move ${a.username} to another town`} title="Move to another town" />
+                        aria-label={`Move ${a.username} to another municipality`} title="Move to another municipality" />
                     )}
                     <Button variant="danger" icon="trash" style={sq} disabled={busy === a.id} onClick={() => toggle(a)}
                       aria-label={`Delete ${a.username}`} title="Delete" />
@@ -362,9 +362,9 @@ function MoveDialog({ account, accounts, onClose, onMoved }) {
   return (
     <div style={f.overlay} onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div style={f.dialog} role="dialog" aria-modal="true" aria-labelledby="move-title">
-        <h2 id="move-title" style={f.dialogTitle}>Move {account.username} to another town</h2>
+        <h2 id="move-title" style={f.dialogTitle}>Move {account.username} to another municipality</h2>
         <p style={f.lead}>
-          They look after {account.municipality || 'no town'} now. A moderator with requests still waiting can’t move until
+          They look after {account.municipality || 'no municipality'} now. A moderator with requests still waiting can’t move until
           those are decided. The username stays the same.
         </p>
         <label htmlFor="move-town" style={s.panelLabel}>New municipality</label>

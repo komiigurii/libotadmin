@@ -196,7 +196,7 @@ export default function TownBadges() {
   return (
     <Page>
       <PageHeader
-        title="Town & District Badges"
+        title="Municipality & District Badges"
         count={loading ? '…' : withSpots.length + districtsWithSpots.length}
       />
 
@@ -207,7 +207,7 @@ export default function TownBadges() {
           <Icon name="info" size={14} />
           <span>
             {[
-              missingTownArt && `${missingTownArt} of ${withSpots.length} towns with spots`,
+              missingTownArt && `${missingTownArt} of ${withSpots.length} municipalities with spots`,
               missingDistrictArt && `${missingDistrictArt} of ${districtsWithSpots.length} districts with spots`,
             ].filter(Boolean).join(' and ')} have no badge image yet.
           </span>
@@ -221,8 +221,8 @@ export default function TownBadges() {
           value={show}
           onChange={setShow}
           options={[
-            { value: 'spots',     label: 'Towns with spots', count: withSpots.length },
-            { value: 'all',       label: 'All 24 towns',     count: towns.length },
+            { value: 'spots',     label: 'Municipalities with spots', count: withSpots.length },
+            { value: 'all',       label: 'All 24 municipalities', count: towns.length },
             { value: 'districts', label: 'Districts',        count: districts.length },
           ]}
         />
@@ -231,9 +231,9 @@ export default function TownBadges() {
       {loading ? (
         <Loading label="Loading the badges…" kind="tiles" />
       ) : visible.length === 0 ? (
-        <EmptyState icon="map-pin" title="No town has spots yet" subtitle="A town's badge can be earned once it has at least one spot." />
+        <EmptyState icon="map-pin" title="No municipality has spots yet" subtitle="A municipality's badge can be earned once it has at least one spot." />
       ) : (
-        <Paged {...paged} label={kind === 'town' ? 'Town pages' : 'District pages'}>
+        <Paged {...paged} label={kind === 'town' ? 'Municipality pages' : 'District pages'}>
           <div style={s.grid}>
             {paged.rows.map((item) => (
               <BadgeCard key={KINDS[kind].id(item)} item={item} kind={kind} onSaved={onSaved} />

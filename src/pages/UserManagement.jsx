@@ -572,8 +572,8 @@ function TravelerProgressPanel() {
     { label: 'Spot visits',     hue: 'magenta', value: v(stats?.totalVisits),
       hint: stats ? `${stats.avgVisits} per traveler on average` : null },
     { label: 'Badges collected',                value: v(stats?.totalBadges) },
-    { label: 'Towns finished',                  value: v(stats ? stats.totalTownBadges ?? 0 : null),
-      hint: 'Town badges earned' },
+    { label: 'Municipalities finished',         value: v(stats ? stats.totalTownBadges ?? 0 : null),
+      hint: 'Municipality badges earned' },
   ];
 
   return (
@@ -619,7 +619,7 @@ function TravelerProgressPanel() {
             <Th align="right">Points</Th>
             <Th align="right">Spots visited</Th>
             <Th align="right">Badges</Th>
-            <Th align="right">Towns</Th>
+            <Th align="right">Municipalities</Th>
             <Th align="right">Missions</Th>
             <Th align="right">Last active</Th>
           </>}

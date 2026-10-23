@@ -83,7 +83,7 @@ export default function TravelerDrawer({ traveler, onClose, archivedAction, chil
               ['Points', fmtNum(u.points)],
               ['Spots visited', fmtNum(u.counts.visits)],
               ['Spot badges', fmtNum(u.counts.badges)],
-              ['Towns finished', u.counts.towns != null ? fmtNum(u.counts.towns) : null],
+              ['Municipalities finished', u.counts.towns != null ? fmtNum(u.counts.towns) : null],
               ['Missions done', u.counts.missions != null ? fmtNum(u.counts.missions) : null],
               ['Reviews', fmtNum(u.counts.reviews)],
               ['Days active', fmtNum(u.counts.activeDays)],

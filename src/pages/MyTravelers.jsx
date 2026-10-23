@@ -94,11 +94,11 @@ export default function MyTravelers() {
             options={[
               { value: '',         label: 'All',                      count: rows.length },
               { value: 'locals',   label: `Live in ${town}`,          count: locals },
-              { value: 'visitors', label: 'From other towns',         count: rows.length - locals },
+              { value: 'visitors', label: 'From other municipalities', count: rows.length - locals },
               { value: 'flagged',  label: 'Warned or limited',        count: rows.filter(flagged).length },
             ]}
           />
-          <SearchInput value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search by name, town or spot…" />
+          <SearchInput value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search by name, municipality or spot…" />
         </Toolbar>
       )}
 
@@ -134,7 +134,7 @@ export default function MyTravelers() {
                     <Avatar src={r.profileImage} name={r.name} size={32} />
                     <div style={{ minWidth: 0 }}>
                       <div style={s.personName}>{r.name}</div>
-                      <div style={s.personSub}>{r.homeMunicipality ? `Lives in ${r.homeMunicipality}` : 'Home town not given'}</div>
+                      <div style={s.personSub}>{r.homeMunicipality ? `Lives in ${r.homeMunicipality}` : 'Home municipality not given'}</div>
                     </div>
                   </div>
                 </Td>
@@ -169,7 +169,7 @@ function TravelerDetails({ r, town, spotCount, onClose }) {
   const st = STATUS[r.status] || STATUS.active;
   const visits = r.visits || (r.spotNames || []).map((spot) => ({ spot }));
   return (
-    <Drawer title={r.name} subtitle={r.homeMunicipality ? `Lives in ${r.homeMunicipality}` : 'Home town not given'} onClose={onClose}>
+    <Drawer title={r.name} subtitle={r.homeMunicipality ? `Lives in ${r.homeMunicipality}` : 'Home municipality not given'} onClose={onClose}>
       <div style={d.stack}>
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
           <StatusPill tone={st.tone} icon={st.icon}>{st.label}</StatusPill>

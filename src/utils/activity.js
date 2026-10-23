@@ -17,7 +17,7 @@ export const ACTION_LABELS = {
   // Older entries, from before Delete (2026-10-24): the same actions.
   'account.deactivate':      { label: 'Deleted (archived)', icon: 'trash',      tone: 'danger' },
   'account.reactivate':      { label: 'Restored from the archive', icon: 'rotate-ccw', tone: 'success' },
-  'account.municipality':    { label: 'Moved town',         icon: 'move',       tone: 'info' },
+  'account.municipality':    { label: 'Moved municipality', icon: 'move',       tone: 'info' },
   'traveler.suspend':        { label: 'Suspended',          icon: 'pause',      tone: 'warning' },
   'traveler.ban':            { label: 'Banned',             icon: 'slash',      tone: 'danger' },
   'traveler.unban':          { label: 'Ban lifted',         icon: 'check',      tone: 'success' },
