@@ -90,22 +90,24 @@ export const shadow = {
 };
 
 /* ── Type ─────────────────────────────────────────────────────────────────
-   Newsreader (display serif) for page titles and numerals that should carry
-   weight; Schibsted Grotesk for everything else. Both self-hosted, see the
-   @import block at the top of index.css. */
+   Dongle for everything, regular or bold; Knewave for the LibotBulacan
+   wordmark only (the user, 2026-10-23). Both self-hosted, see the
+   @font-face block at the top of index.css. */
 export const fonts = {
-  display: "'Newsreader Variable', 'Newsreader', Georgia, serif",
-  sans:    "'Schibsted Grotesk Variable', 'Schibsted Grotesk', system-ui, -apple-system, sans-serif",
+  display: 'var(--font-display)',
+  sans:    'var(--font-sans)',
+  brand:   'var(--font-brand)',
   // Tables and IDs: tabular figures so columns of numbers line up and a
   // changing count doesn't make the row jitter.
-  mono:    "ui-monospace, 'SF Mono', Menlo, Consolas, monospace",
+  mono:    'var(--font-mono)',
 };
 
 export const type = {
-  pageTitle: { fontFamily: fonts.display, fontSize: 26, fontWeight: 600, letterSpacing: '-0.015em', lineHeight: 1.2 },
+  // Bold capitals ("DASHBOARD"), like the super admin's band titles.
+  pageTitle: { fontFamily: fonts.display, fontSize: 'clamp(28px, 6vw, 36px)', fontWeight: 700, letterSpacing: '0.01em', lineHeight: 1.1, textTransform: 'uppercase' },
   // Dialogs (alerts, confirms, the spot form, request deletion): the page
   // title's face at a dialog's size, so every title on the panel matches.
-  dialogTitle: { fontFamily: fonts.display, fontSize: 21, fontWeight: 600, letterSpacing: '-0.01em', lineHeight: 1.25 },
+  dialogTitle: { fontFamily: fonts.display, fontSize: 21, fontWeight: 700, letterSpacing: 0, lineHeight: 1.25 },
   cardTitle: { fontFamily: fonts.sans,    fontSize: 15, fontWeight: 600, letterSpacing: '-0.01em' },
   body:      { fontFamily: fonts.sans,    fontSize: 13.5, lineHeight: 1.5 },
   label:     { fontFamily: fonts.sans,    fontSize: 11, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase' },

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { spotAPI, missionAPI } from '../api/api';
-import { notify } from '../components/AppAlert';
+import { notify, promptAction } from '../components/AppAlert';
 import {
   Page, PageHeader, Toolbar, FilterTabs, List, Button, ApprovalPill, Tag,
   Loading, ErrorBanner, EmptyState, SpotThumb, pageStyles as s,
@@ -9,6 +9,7 @@ import { ChangeList, ProposalFieldList } from '../components/ChangeDiff';
 import { MISSION_FIELD_LABELS } from '../utils/changeDiff';
 import { fmtDateTime } from '../utils/format';
 import Icon from '../components/Icon';
+import { useLive } from '../api/live';
 
 const KIND_LABELS = {
   spot:               'Spot edit',
@@ -25,7 +26,14 @@ function toArray(data) {
   return [];
 }
 
-export default function ModRequests() {
+/*
+ * The Approval Queue: a tab of Spot Management since the mock defense
+ * (2026-10-21: "hindi dapat site management tawag kung walang manage na
+ * ginagawa" — everything about spots in one place), so `embedded` drops the
+ * page shell. Rejecting asks for the reason, which the moderator reads in My
+ * Submissions; approving can carry remarks.
+ */
+export default function ModRequests({ embedded = false, onCount }) {
   const [requests, setRequests] = useState([]);
   const [loading,  setLoading]  = useState(true);
   const [error,    setError]    = useState(null);
@@ -34,9 +42,12 @@ export default function ModRequests() {
   const [acting, setActing] = useState(null);
   const [expandedKey, setExpandedKey] = useState(null);
 
-  const load = async () => {
-    setLoading(true);
-    setError(null);
+  // `quiet`: a live update — no spinner, and a failure keeps the queue shown.
+  const load = async ({ quiet = false } = {}) => {
+    if (!quiet) {
+      setLoading(true);
+      setError(null);
+    }
     try {
       // allSettled, NOT all. This queue is assembled from three independent
       // endpoints, and with Promise.all a single one failing rejected the whole
@@ -127,69 +138,67 @@ export default function ModRequests() {
       setRequests(all);
     } catch (err) {
       console.error(err);
-      setError('Couldn’t load the approval queue.');
-      setRequests([]);
+      if (!quiet) {
+        setError('Couldn’t load the approval queue.');
+        setRequests([]);
+      }
     }
-    setLoading(false);
+    if (!quiet) setLoading(false);
   };
 
   useEffect(() => { load(); }, []);
+  useLive(['approvals', 'spots', 'missions'], () => load({ quiet: true }));
 
   const visible = requests.filter(r => !kindFilter || r.kind === kindFilter);
   const pendingCount = requests.filter(r => r.status === 'pending').length;
+  useEffect(() => { if (!loading) onCount?.(pendingCount); }, [loading, pendingCount, onCount]);
 
-  // Approve/reject a NEW spot proposal
-  const decideProposal = async (id, action) => {
-    setActing(id);
+  // One decision, any kind of request. The note is asked for first: a reason
+  // (required) to reject, optional remarks to approve. The dialog is the
+  // confirmation too, so nothing is decided by a single stray click.
+  const decide = async (r, action) => {
+    const name = r.subtitle && r.subtitle !== '—' ? `“${r.subtitle}”` : 'this request';
+    const deleting = r.kind === 'spot-delete';
+    const note = await promptAction(
+      action === 'reject'
+        ? `The moderator reads the reason in My Submissions and is told in their bell, so say what to fix.`
+        : deleting
+          ? `${name} is deleted from the app for good. Any remarks for the moderator?`
+          : `${name} goes live in the app. Any remarks or suggestions for the moderator?`,
+      action === 'reject'
+        ? { title: `Reject ${KIND_LABELS[r.kind].toLowerCase()}?`, label: 'Reason', placeholder: 'e.g. The photo is of a different church.', minLength: 3, maxLength: 500, confirmText: 'Reject', danger: true }
+        : { title: deleting ? `Approve and delete ${name}?` : `Approve ${KIND_LABELS[r.kind].toLowerCase()}?`, label: 'Remarks', placeholder: 'e.g. Next time add the parking info too.', required: false, maxLength: 500, confirmText: deleting ? 'Approve & delete' : 'Approve', danger: deleting },
+    );
+    if (note === null) return;
+    setActing(r.id);
     try {
-      const data = await spotAPI.reviewProposal(id, action);
-      if (data?.success !== false) await load();
-      else notify('Failed: ' + (data?.message || 'Unknown error'), { tone: 'danger' });
+      const call = r.kind === 'spot-proposal' ? spotAPI.reviewProposal
+        : r.kind === 'mission-location' ? missionAPI.reviewLocation
+          : spotAPI.reviewChange;
+      const data = await call(r.id, action, note);
+      if (data?.success !== false) {
+        notify(action === 'reject' ? 'Rejected. The moderator has your reason.' : 'Approved. It’s live in the app.', { tone: 'success' });
+        await load();
+      } else notify('Failed: ' + (data?.message || 'Unknown error'), { tone: 'danger' });
     } catch (err) {
-      console.error(err);
-      notify('Network error', { tone: 'danger' });
-    }
-    setActing(null);
-  };
-
-  // Approve/reject an EXISTING spot's edit or deletion request
-  const decideSpot = async (id, action) => {
-    setActing(id);
-    try {
-      const data = await spotAPI.reviewChange(id, action);
-      if (data?.success !== false) await load();
-      else notify('Failed: ' + (data?.message || 'Unknown error'), { tone: 'danger' });
-    } catch (err) {
-      console.error(err);
-      notify('Network error', { tone: 'danger' });
-    }
-    setActing(null);
-  };
-
-  // Approve/reject a proposed food-mission location change
-  const decideMissionLocation = async (id, action) => {
-    setActing(id);
-    try {
-      const data = await missionAPI.reviewLocation(id, action);
-      if (data?.success !== false) await load();
-      else notify('Failed: ' + (data?.message || 'Unknown error'), { tone: 'danger' });
-    } catch (err) {
-      console.error(err);
-      notify('Network error', { tone: 'danger' });
+      notify(err?.response?.data?.message || 'Couldn’t reach the server. Try again.', { tone: 'danger' });
     }
     setActing(null);
   };
 
   const count = (kind) => requests.filter((r) => r.kind === kind).length;
 
+  const Shell = embedded ? EmbeddedShell : Page;
   return (
-    <Page>
-      <PageHeader
-        title="Approval Queue"
-        count={pendingCount}
-        subtitle="New spots, spot edits and deletions, and food spot locations from moderators — nothing goes live until you approve it."
-        actions={<Button icon="refresh-cw" onClick={load} disabled={loading}>Refresh</Button>}
-      />
+    <Shell>
+      {!embedded && (
+        <PageHeader
+          title="Approval Queue"
+          count={pendingCount}
+          subtitle="New spots, spot edits and deletions, and food spot locations from moderators — nothing goes live until you approve it."
+          actions={<Button icon="refresh-cw" onClick={load} disabled={loading}>Refresh</Button>}
+        />
+      )}
 
       <Toolbar>
         {/* Everything here is waiting on a decision, so the tabs split by
@@ -206,6 +215,7 @@ export default function ModRequests() {
             { value: 'mission-location', label: 'Food spots', count: count('mission-location') },
           ]}
         />
+        {embedded && <Button icon="refresh-cw" onClick={load} disabled={loading}>Refresh</Button>}
       </Toolbar>
 
       {error && <ErrorBanner>{error}</ErrorBanner>}
@@ -232,17 +242,8 @@ export default function ModRequests() {
             const isMissionLocation = r.kind === 'mission-location';
             const hasDetails = r.kind === 'spot' || isNewProposal || isDeleteRequest || isMissionLocation;
 
-            const handleApprove = () => {
-              if (isNewProposal) decideProposal(r.id, 'approve');
-              else if (isMissionLocation) decideMissionLocation(r.id, 'approve');
-              else decideSpot(r.id, 'approve');
-            };
-
-            const handleReject = () => {
-              if (isNewProposal) decideProposal(r.id, 'reject');
-              else if (isMissionLocation) decideMissionLocation(r.id, 'reject');
-              else decideSpot(r.id, 'reject');
-            };
+            const handleApprove = () => decide(r, 'approve');
+            const handleReject = () => decide(r, 'reject');
 
             return (
               <div key={key} style={s.item}>
@@ -322,6 +323,9 @@ export default function ModRequests() {
           })}
         </List>
       )}
-    </Page>
+    </Shell>
   );
 }
+
+// Inside Spot Management, which brings the page shell and the heading.
+const EmbeddedShell = ({ children }) => <>{children}</>;

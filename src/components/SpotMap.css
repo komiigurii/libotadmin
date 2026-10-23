@@ -69,3 +69,19 @@
 .map-dot.is-clash {
   fill: var(--map-clash);
 }
+
+/* A moderator's town (mock defense 2026-10-21): the rest of the map is
+ * greyed out under a wash, and the town's line is drawn solid. */
+.map-town-mask {
+  /* A fixed dark wash: the map tiles are light in both themes. */
+  fill: #0e2326;
+  fill-opacity: 0.42;
+  stroke: none;
+}
+
+.map-town-line {
+  stroke: var(--brand);
+  stroke-width: 2.5;
+  stroke-opacity: 0.9;
+  fill: none;
+}

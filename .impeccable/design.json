@@ -1,0 +1,160 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-23T05:00:00+08:00",
+  "title": "Design System: Libot Bulacan Super Admin Console",
+  "extensions": {
+    "colorMeta": {
+      "river-ink":       { "role": "primary",   "displayName": "River Ink",       "canonical": "oklch(26.4% 0.036 204)", "tonalRamp": ["#000F11","#0B292C","#284548","#466467","#658487","#88A8AC","#ADCFD2","#D4F6FA"] },
+      "libot-yellow":    { "role": "primary",   "displayName": "Libot Yellow",    "canonical": "oklch(85.7% 0.172 95)",  "tonalRamp": ["#100B00","#2C2300","#4C3F00","#6E5D02","#937C06","#BDA000","#E9C506","#FFEFB0"] },
+      "libot-teal":      { "role": "secondary", "displayName": "Libot Teal",      "canonical": "oklch(49.5% 0.082 204)", "tonalRamp": ["#000E11","#002A2E","#02494F","#006B74","#358B94","#5DB1BA","#84D7E1","#C8F9FF"] },
+      "series-teal":     { "role": "tertiary",  "displayName": "Series Teal (travelers)",      "canonical": "oklch(59.1% 0.101 206)", "tonalRamp": ["#000E11","#002A2F","#014950","#046A74","#008E9B","#43B3C1","#6EDAE8","#C9F9FF"] },
+      "series-orange":   { "role": "tertiary",  "displayName": "Series Orange (reviews)",      "canonical": "oklch(65.1% 0.167 43)",  "tonalRamp": ["#1C0300","#421300","#6C2600","#9B3B00","#CB5310","#F57941","#FFB293","#FEEAE1"] },
+      "series-blue":     { "role": "tertiary",  "displayName": "Series Blue (accounts)",       "canonical": "oklch(55.3% 0.164 258)", "tonalRamp": ["#000828","#002055","#003A89","#1759B8","#3A7ADD","#64A1FF","#A7C9FE","#E5EFFF"] },
+      "series-marigold": { "role": "tertiary",  "displayName": "Series Marigold (tickets)",    "canonical": "oklch(67.1% 0.140 77)",  "tonalRamp": ["#140800","#332000","#573900","#7D5500","#A57204","#D29420","#FABA51","#FFECD0"] },
+      "series-violet":   { "role": "tertiary",  "displayName": "Series Violet (system)",       "canonical": "oklch(53.8% 0.193 286)", "tonalRamp": ["#0D002F","#260067","#41169D","#5C3FC2","#7963E8","#9C8FFF","#C3BFFE","#EDEDFE"] },
+      "series-magenta":  { "role": "tertiary",  "displayName": "Series Magenta (arrivals)",    "canonical": "oklch(61.3% 0.173 354)", "tonalRamp": ["#1E000D","#480027","#760044","#A12063","#C74783","#F16DA8","#FFAACB","#FEE7EF"] },
+      "series-slate":    { "role": "tertiary",  "displayName": "Series Slate (routine sign-ins)", "canonical": "oklch(63.5% 0.021 188)", "tonalRamp": ["#020E0D","#182726","#334342","#516260","#708180","#94A6A4","#B9CCCA","#E0F3F1"] },
+      "sage-paper":      { "role": "neutral",   "displayName": "Sage Paper",      "canonical": "oklch(95.5% 0.005 165)", "tonalRamp": ["#090C0B","#222523","#3D413F","#5B5E5D","#7B7E7C","#9FA2A1","#C4C8C6","#EBEFED"] },
+      "ink-text":        { "role": "neutral",   "displayName": "Ink Text",        "canonical": "oklch(23.2% 0.024 191)", "tonalRamp": ["#010E0E","#162827","#314443","#4E6261","#6E8281","#91A7A5","#B6CDCB","#DDF4F2"] },
+      "success":         { "role": "status",    "displayName": "Success",         "canonical": "oklch(50.3% 0.106 160)", "tonalRamp": ["#001006","#002D1A","#004D30","#086F49","#389068","#60B68B","#87DDB0","#C3FFDE"] },
+      "warning":         { "role": "status",    "displayName": "Warning",         "canonical": "oklch(50.1% 0.104 67)",  "tonalRamp": ["#160700","#361D00","#5C3600","#845005","#A67031","#CD9557","#F5BA7C","#FFEBD7"] },
+      "danger":          { "role": "status",    "displayName": "Danger",          "canonical": "oklch(51.7% 0.164 28)",  "tonalRamp": ["#210000","#4C0001","#7D0003","#A62821","#CC4D41","#F77365","#FFB0A5","#FEE9E6"] }
+    },
+    "typographyMeta": {
+      "display":    { "displayName": "Display (Knewave)", "purpose": "Page title in the band. 29px under 720px." },
+      "numeral":    { "displayName": "Numeral (Knewave)", "purpose": "Stat-strip numbers and the health panel's ping figure. 28px under 720px." },
+      "brand":      { "displayName": "Brand (Knewave)", "purpose": "The rail's Libot Bulacan wordmark; avatar initials at 14px." },
+      "strip-word": { "displayName": "Strip Word (Dongle 700)", "purpose": "A word in a stat cell (a state, a username). Never Knewave." },
+      "title":      { "displayName": "Title (Dongle 700)", "purpose": "Panel titles." },
+      "body":       { "displayName": "Body (Dongle 400)", "purpose": "Rows, links, menus. Dongle loads with size-adjust 172%, ascent 55.8%, descent 15.1%, line-gap 0 (x-height 0.30 em vs Schibsted 0.53, measured in Edge)." },
+      "label":      { "displayName": "Label (Dongle 700, uppercase)", "purpose": "Table column heads and filter-group heads on ink." },
+      "mono":       { "displayName": "Mono", "purpose": "Times, IDs and measurements wherever they appear." }
+    },
+    "shadows": [
+      { "name": "menu",   "value": "0 10px 28px rgba(6,19,21,0.22), 0 2px 6px rgba(6,19,21,0.10)", "purpose": "Account and theme menus." },
+      { "name": "dialog", "value": "0 18px 48px rgba(6,19,21,0.30), 0 4px 12px rgba(6,19,21,0.12)", "purpose": "Ctrl K jump dialog and profile dialog." },
+      { "name": "drawer", "value": "8px 0 28px rgba(0,0,0,0.28)", "purpose": "The rail as a phone drawer (under 720px) only." },
+      { "name": "switch-knob", "value": "0 1px 2px rgba(0,0,0,0.25)", "purpose": "The toggle switch's thumb." }
+    ],
+    "motion": [
+      { "name": "ease-out-expo", "value": "cubic-bezier(0.22, 1, 0.36, 1)", "purpose": "Rail fold (0.2s), drawer slide (0.24s), switch thumb (0.2s), menu and dialog entrance (0.16 to 0.18s, 4px rise and fade)." },
+      { "name": "hover", "value": "0.15s ease", "purpose": "Background, colour and border changes on rail links, icon buttons, strip cells and the jump field." },
+      { "name": "backdrop-fade", "value": "0.14s ease", "purpose": "Dialog backdrop fade-in." },
+      { "name": "reduced-motion", "value": "transition: none; animation: none", "purpose": "Under prefers-reduced-motion the rail, menus, dialogs, backdrop and switch thumb do not animate." }
+    ],
+    "breakpoints": [
+      { "name": "wide", "value": "1280px" },
+      { "name": "tablet", "value": "1100px" },
+      { "name": "single-column", "value": "860px" },
+      { "name": "phone", "value": "720px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Libot yellow, the one primary action on a screen.",
+      "html": "<button class=\"ds-btn-primary\"><svg width=\"14\" height=\"14\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M22 2 11 13\"/><path d=\"M22 2 15 22l-4-9-9-4 20-7z\"/></svg>Publish notice</button>",
+      "css": ".ds-btn-primary { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 8px 15px; border: 1px solid transparent; border-radius: 10px; background: var(--accent, #F2CE1B); color: var(--on-accent, #2C2810); font-family: 'Dongle Libot', 'Schibsted Grotesk Variable', system-ui, sans-serif; font-size: 13px; font-weight: 700; cursor: pointer; transition: filter 0.15s ease; } .ds-btn-primary:hover { filter: brightness(0.96); } .ds-btn-primary:focus-visible { outline: 2px solid var(--brand, #0A6F78); outline-offset: 2px; }"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "White, bordered; every neutral action.",
+      "html": "<button class=\"ds-btn-secondary\"><svg width=\"14\" height=\"14\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M21 12a9 9 0 1 1-3-6.7L21 8\"/><path d=\"M21 3v5h-5\"/></svg>Clear cache</button>",
+      "css": ".ds-btn-secondary { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 8px 15px; border: 1px solid var(--border, #D3DEDB); border-radius: 10px; background: var(--card-bg, #FFFFFF); color: var(--text-primary, #0F2120); font-family: 'Dongle Libot', 'Schibsted Grotesk Variable', system-ui, sans-serif; font-size: 13px; font-weight: 600; cursor: pointer; transition: background 0.15s ease; } .ds-btn-secondary:hover { background: var(--card-bg-hover, #F3F7F5); } .ds-btn-secondary:focus-visible { outline: 2px solid var(--brand, #0A6F78); outline-offset: 2px; }"
+    },
+    {
+      "name": "Page Band with Stat Strip",
+      "kind": "custom",
+      "refersTo": "page-band",
+      "description": "Signature: the ink band every page opens with; the swatch-keyed strip is the page's legend.",
+      "html": "<section class=\"ds-band\"><h1 class=\"ds-band-title\">Dashboard</h1><p class=\"ds-band-live\">Refreshed <b class=\"ds-mono\">Oct 23, 4:34 AM</b> &nbsp; Database <b class=\"ds-mono\">125 ms</b></p><div class=\"ds-strip\"><a class=\"ds-cell\" href=\"#\"><span class=\"ds-cell-label\"><span class=\"ds-swatch\" style=\"background:#B8850A\"></span>Tickets waiting</span><span class=\"ds-cell-value\">3</span><span class=\"ds-cell-hint\">2 open</span></a><a class=\"ds-cell\" href=\"#\"><span class=\"ds-cell-label\"><span class=\"ds-swatch\" style=\"background:#3F80DC\"></span>Staff accounts</span><span class=\"ds-cell-value\">9</span><span class=\"ds-cell-hint\">2 admins</span></a><a class=\"ds-cell\" href=\"#\"><span class=\"ds-cell-label\"><span class=\"ds-swatch\" style=\"background:#1C9CA6\"></span>Travelers</span><span class=\"ds-cell-value\">41</span><span class=\"ds-cell-hint\">11 today</span></a><div class=\"ds-cell\"><span class=\"ds-cell-label\"><span class=\"ds-swatch\" style=\"background:#8875E4\"></span>Maintenance</span><span class=\"ds-cell-value ds-word ds-good\">Off</span><span class=\"ds-cell-hint\">last ended 2 days ago</span></div></div></section>",
+      "css": ".ds-band { background: #0C2A2D; color: #EAF4F2; border-radius: 14px; padding: 22px 24px 20px; display: flex; flex-direction: column; gap: 16px; font-family: 'Dongle Libot', 'Schibsted Grotesk Variable', system-ui, sans-serif; } .ds-band-title { margin: 0; font-family: 'Knewave Libot', 'Dongle Libot', system-ui, sans-serif; font-size: 36px; line-height: 1.02; font-weight: 400; letter-spacing: 0.005em; } .ds-band-live { margin: 6px 0 0; font-size: 16px; color: #A9C4C1; } .ds-band-live b { color: #EAF4F2; } .ds-mono { font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace; font-size: 13px; font-variant-numeric: tabular-nums; } .ds-strip { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px; background: rgba(234,244,242,0.12); border: 1px solid rgba(234,244,242,0.12); border-radius: 10px; overflow: hidden; } .ds-cell { display: flex; flex-direction: column; gap: 4px; padding: 13px 15px 12px; background: #0C2A2D; color: inherit; text-decoration: none; transition: background 0.15s ease; } a.ds-cell:hover { background: #143A3E; } a.ds-cell:focus-visible { outline: 2px solid #F2CE1B; outline-offset: -2px; } .ds-cell-label { display: flex; gap: 7px; align-items: flex-start; font-size: 15px; line-height: 1.2; color: #A9C4C1; } .ds-swatch { width: 10px; height: 10px; border-radius: 3px; margin-top: 3px; flex-shrink: 0; } .ds-cell-value { font-family: 'Knewave Libot', 'Dongle Libot', system-ui, sans-serif; font-size: 34px; line-height: 1; letter-spacing: 0.01em; } .ds-cell-value.ds-word { font-family: 'Dongle Libot', 'Schibsted Grotesk Variable', system-ui, sans-serif; font-weight: 700; font-size: 25px; line-height: 1.05; padding-top: 4px; letter-spacing: 0; } .ds-good { color: #5FD69A; } .ds-cell-hint { font-size: 14px; line-height: 1.25; color: #86A6A3; }"
+    },
+    {
+      "name": "Panel with Ink Head",
+      "kind": "card",
+      "refersTo": "panel-head-ink",
+      "description": "A live list or table: ink head, white body, rows divided by hairlines.",
+      "html": "<section class=\"ds-panel\"><div class=\"ds-panel-head ds-ink\"><h2 class=\"ds-panel-title\">Recent activity</h2><a href=\"#\" class=\"ds-panel-link\">Activity Log</a></div><ul class=\"ds-rows\"><li><time class=\"ds-mono\">4 min ago</time><span class=\"ds-what\"><span class=\"ds-swatch\" style=\"background:#7D8F8D\"></span>Signed in</span><span class=\"ds-who\">lguadmin</span></li><li><time class=\"ds-mono\">21 min ago</time><span class=\"ds-what\"><span class=\"ds-swatch\" style=\"background:#C58800\"></span>Ticket sent</span><span class=\"ds-who\">pulilanmod</span></li><li><time class=\"ds-mono\">5 h ago</time><span class=\"ds-what\"><span class=\"ds-swatch\" style=\"background:#2F6FD0\"></span>Account made</span><span class=\"ds-who\">devteam</span></li></ul></section>",
+      "css": ".ds-panel { background: var(--card-bg, #FFFFFF); border: 1px solid var(--border, #D3DEDB); border-radius: 14px; color: var(--text-primary, #0F2120); font-family: 'Dongle Libot', 'Schibsted Grotesk Variable', system-ui, sans-serif; } .ds-panel-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 11px 16px; border-bottom: 1px solid var(--divider, #E1E9E6); } .ds-panel-head.ds-ink { background: #0C2A2D; color: #DCEBE8; border-bottom: none; border-radius: 13px 13px 0 0; } .ds-panel-title { margin: 0; font-size: 18px; font-weight: 700; } .ds-panel-link { font-size: 15px; font-weight: 700; color: var(--brand, #0A6F78); text-decoration: none; } .ds-ink .ds-panel-link { color: #EAF4F2; } .ds-panel-link:hover { text-decoration: underline; } .ds-panel-link:focus-visible { outline: 2px solid #F2CE1B; outline-offset: 2px; } .ds-rows { list-style: none; margin: 0; padding: 0; } .ds-rows li { display: grid; grid-template-columns: 78px 1fr max-content; gap: 12px; align-items: center; padding: 9px 16px; font-size: 15px; } .ds-rows li + li { border-top: 1px solid var(--divider, #E1E9E6); } .ds-mono { font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace; font-size: 12.5px; font-variant-numeric: tabular-nums; color: var(--text-muted, #4F6563); } .ds-what { display: inline-flex; align-items: center; gap: 7px; font-weight: 700; } .ds-swatch { width: 10px; height: 10px; border-radius: 3px; } .ds-who { color: var(--text-muted, #4F6563); }"
+    },
+    {
+      "name": "Rail Navigation",
+      "kind": "nav",
+      "refersTo": "rail-link",
+      "description": "The ink rail: brand, Ctrl K jump, grouped links, current page raised with a yellow icon.",
+      "html": "<nav class=\"ds-rail\"><div class=\"ds-brand\">Libot Bulacan<small>Super admin console</small></div><button class=\"ds-jump\">Jump to page<kbd>Ctrl K</kbd></button><div class=\"ds-group\">Overview</div><a class=\"ds-link\" aria-current=\"page\" href=\"#\"><svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><rect x=\"3\" y=\"3\" width=\"7\" height=\"7\"/><rect x=\"14\" y=\"3\" width=\"7\" height=\"7\"/><rect x=\"3\" y=\"14\" width=\"7\" height=\"7\"/><rect x=\"14\" y=\"14\" width=\"7\" height=\"7\"/></svg>Dashboard</a><div class=\"ds-group\">System</div><a class=\"ds-link\" href=\"#\"><svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><path d=\"M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z\"/><path d=\"M4 22v-7\"/></svg>Tickets<span class=\"ds-count\">3</span></a></nav>",
+      "css": ".ds-rail { width: 256px; padding: 0 10px 12px; background: #0C2A2D; color: #EAF4F2; font-family: 'Dongle Libot', 'Schibsted Grotesk Variable', system-ui, sans-serif; } .ds-brand { display: flex; flex-direction: column; padding: 16px 8px 14px; font-family: 'Knewave Libot', 'Dongle Libot', system-ui, sans-serif; font-size: 21px; line-height: 1.05; } .ds-brand small { font-family: 'Dongle Libot', system-ui, sans-serif; font-size: 14px; color: #A9C4C1; margin-top: 2px; } .ds-jump { display: flex; align-items: center; width: 100%; min-height: 38px; padding: 8px 10px; margin-bottom: 10px; border: 1px solid rgba(234,244,242,0.12); border-radius: 9px; background: rgba(0,0,0,0.12); color: #A9C4C1; font: inherit; font-size: 15px; cursor: pointer; transition: border-color 0.15s ease, color 0.15s ease; } .ds-jump:hover { border-color: rgba(234,244,242,0.30); color: #EAF4F2; } .ds-jump kbd { margin-left: auto; font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace; font-size: 11px; padding: 1px 6px; border: 1px solid rgba(234,244,242,0.30); border-radius: 5px; } .ds-group { padding: 12px 10px 4px; font-size: 14px; font-weight: 700; color: #86A6A3; } .ds-link { display: flex; align-items: center; gap: 11px; min-height: 40px; padding: 7px 10px; border-radius: 9px; color: #A9C4C1; font-size: 16px; text-decoration: none; transition: background 0.15s ease, color 0.15s ease; } .ds-link:hover { background: #143A3E; color: #EAF4F2; } .ds-link:focus-visible { outline: 2px solid #F2CE1B; outline-offset: 1px; } .ds-link[aria-current='page'] { background: #1D4A4F; color: #EAF4F2; font-weight: 700; } .ds-link[aria-current='page'] svg { color: #F2CE1B; } .ds-count { margin-left: auto; min-width: 22px; height: 20px; padding: 0 7px; border-radius: 999px; display: inline-flex; align-items: center; justify-content: center; background: #F2CE1B; color: #2C2810; font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; }"
+    },
+    {
+      "name": "Filter List",
+      "kind": "nav",
+      "refersTo": "filter-item",
+      "description": "The left filter column on Tickets and Accounts: ink group head, hairline rows, selected row in the teal tint.",
+      "html": "<div class=\"ds-filters\"><div class=\"ds-filter-label\">Status</div><button class=\"ds-filter\" aria-pressed=\"true\">Open<span class=\"ds-filter-n ds-flag\">2</span></button><button class=\"ds-filter\" aria-pressed=\"false\">Being worked on<span class=\"ds-filter-n\">1</span></button><button class=\"ds-filter\" aria-pressed=\"false\">Closed<span class=\"ds-filter-n\">11</span></button></div>",
+      "css": ".ds-filters { width: 236px; display: flex; flex-direction: column; overflow: hidden; background: var(--card-bg, #FFFFFF); border: 1px solid var(--border, #D3DEDB); border-radius: 14px; font-family: 'Dongle Libot', 'Schibsted Grotesk Variable', system-ui, sans-serif; } .ds-filter-label { padding: 9px 14px; font-size: 13px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; background: #0C2A2D; color: #DCEBE8; } .ds-filter { display: flex; align-items: center; gap: 9px; min-height: 40px; padding: 8px 14px; border: none; border-bottom: 1px solid var(--divider, #E1E9E6); background: transparent; color: var(--text-secondary, #384D4B); font: inherit; font-size: 16px; text-align: left; cursor: pointer; } .ds-filter:last-child { border-bottom: none; } .ds-filter:hover { background: var(--card-bg-hover, #F3F7F5); color: var(--text-primary, #0F2120); } .ds-filter:focus-visible { outline: 2px solid var(--brand, #0A6F78); outline-offset: -2px; } .ds-filter[aria-pressed='true'] { background: rgba(10,111,120,0.10); color: var(--text-primary, #0F2120); font-weight: 700; } .ds-filter-n { margin-left: auto; font-size: 14px; color: var(--text-muted, #4F6563); font-variant-numeric: tabular-nums; } .ds-filter-n.ds-flag { background: #F2CE1B; color: #2C2810; border-radius: 6px; padding: 0 7px; font-weight: 700; }"
+    },
+    {
+      "name": "Role Chip",
+      "kind": "chip",
+      "refersTo": "role-chip",
+      "description": "What a staff account is or where it works: outlined, icon plus word.",
+      "html": "<span class=\"ds-role\"><svg width=\"13\" height=\"13\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><path d=\"M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0z\"/><circle cx=\"12\" cy=\"10\" r=\"3\"/></svg>Malolos</span>",
+      "css": ".ds-role { display: inline-flex; align-items: center; gap: 6px; padding: 1px 9px 1px 7px; border: 1px solid var(--border, #D3DEDB); border-radius: 6px; background: var(--card-bg, #FFFFFF); color: var(--text-secondary, #384D4B); font-family: 'Dongle Libot', 'Schibsted Grotesk Variable', system-ui, sans-serif; font-size: 14px; font-weight: 700; white-space: nowrap; }"
+    },
+    {
+      "name": "Toggle Switch",
+      "kind": "input",
+      "refersTo": "switch",
+      "description": "Who can use the console: slate off, success on.",
+      "html": "<button class=\"ds-switch\" role=\"switch\" aria-checked=\"true\" aria-label=\"Moderators can sign in\"></button>",
+      "css": ".ds-switch { position: relative; width: 46px; height: 26px; border: none; border-radius: 999px; background: #7D8F8D; cursor: pointer; transition: background 0.18s ease; } .ds-switch::after { content: ''; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: #FFFFFF; box-shadow: 0 1px 2px rgba(0,0,0,0.25); transition: transform 0.2s cubic-bezier(0.22, 1, 0.36, 1); } .ds-switch[aria-checked='true'] { background: var(--success, #16764F); } .ds-switch[aria-checked='true']::after { transform: translateX(20px); } .ds-switch:focus-visible { outline: 2px solid var(--brand, #0A6F78); outline-offset: 2px; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Legend Strip Control Room",
+    "overview": "The super admin console is the development team's control room, read through the day and on a projector at the thesis defense. It wraps full-width pages in deep river-teal ink: the rail, the top bar, every page's opening band and every table head share that one ink, so the frame reads as one instrument. Content sits on pale sage paper in white panels with hairline borders and no shadows. Density is high and deliberate: dense tables, stat strips, a live health panel, small multiples of the usage charts.\n\nThe system's spine is its series hues. Each kind of thing (travelers, reviews, accounts, tickets, the system, spot arrivals) owns one validated hue, and that hue comes back everywhere the thing appears: the swatch beside a stat-strip label, the bars of its chart, the tag in the activity feed, its segment of the activity-mix bar. A page's stat strip is therefore also the legend for that page. Text never wears a series hue; a swatch beside the words carries the identity.\n\nType is loud at the top and quiet below. Knewave, a brush display face, sets page titles, the brand and big numerals only; Dongle, size-adjusted to read like a normal UI sans, sets every other word; monospace carries times, IDs and measurements. Libot yellow is the one primary action on any screen. The console refuses both the cream single-teal admin page and the generic navy dashboard.",
+    "keyCharacteristics": [
+      "Ink frame (rail, top bar, page band, table heads) around sage paper and white panels.",
+      "Six validated series hues plus slate, one per kind of thing, identical in strip, chart, tag and mix bar.",
+      "Knewave for titles, brand and numerals; Dongle for words; monospace for times, IDs and measurements.",
+      "Flat panels with hairlines; only menus and dialogs float.",
+      "Full width, no max-width; panels in a two-column split that collapses in priority order.",
+      "Light and dark themes, both holding WCAG AA on every text pair."
+    ],
+    "rules": [
+      { "name": "The Legend Rule", "body": "A thing's hue is the same in the stat strip, its chart, its tag and the activity-mix bar. A page's strip is that page's legend; never assign a hue to a thing that already owns another.", "section": "colors" },
+      { "name": "The Swatch Not Text Rule", "body": "Series hues mark swatches, bars and segments. Words stay in the text ladder.", "section": "colors" },
+      { "name": "The Teal Next To Blue Rule", "body": "Series blue and series teal fail the normal-vision separation floor side by side (ΔE 13.5). Stacked or adjacent marks never put them next to each other. The activity mix stacks sign-ins slate, accounts blue, tickets marigold, travelers teal, system violet, an order that passes.", "section": "colors" },
+      { "name": "The State Is Not A Series Rule", "body": "Success, warning and danger are separate from the six series hues and always arrive with an icon and a word, never colour alone.", "section": "colors" },
+      { "name": "The One Yellow Rule", "body": "Libot yellow with on-yellow text is the one primary action per screen.", "section": "colors" },
+      { "name": "The Knewave Is For Numbers Rule", "body": "Knewave sets page titles, the brand and numerals only. A word in the stat strip is Dongle 700, never Knewave.", "section": "typography" },
+      { "name": "The Measured Things Are Mono Rule", "body": "Times, IDs and measurements are monospace wherever they appear: band live line, activity times, health facts, ticket and log tables, \"Signed in 30 min ago\".", "section": "typography" },
+      { "name": "The Only Floating Things Float Rule", "body": "No shadow on panels, cards, the band or tables. Menus, dialogs and the phone drawer are the only shadowed surfaces.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do open every super admin page with the band and, where a page has figures, a stat strip whose swatches key that page's charts and tags.",
+      "Do give each kind of thing its one series hue everywhere: teal travelers, orange reviews, blue accounts, marigold tickets, violet system, magenta arrivals, slate sign-ins.",
+      "Do use the dark (`-dark`) series steps for swatches on the ink band and for marks in the dark theme.",
+      "Do set times, IDs and measurements in monospace with tabular figures.",
+      "Do give live lists and tables an ink panel head and forms, charts and notes a plain white head.",
+      "Do divide rows inside a panel with divider hairlines.",
+      "Do pair every status colour with an icon and a word.",
+      "Do keep Dongle's size-adjust (172%) and its divided metric overrides whenever the face is loaded.",
+      "Do scope every rule under `:root[data-console='superadmin']`, and write no colour in a component; use the tokens."
+    ],
+    "donts": [
+      "Don't set a word in Knewave; it is for page titles, the brand and numerals.",
+      "Don't put series blue next to series teal in stacked or adjacent marks.",
+      "Don't colour text with a series hue, or use a series hue to signal a state.",
+      "Don't add a second yellow button to a screen, or use yellow beyond the primary action, count badges, the avatar and the current rail icon.",
+      "Don't put shadows on panels, the band or tables; only menus, dialogs and the phone drawer float.",
+      "Don't box rows inside a panel as nested cards.",
+      "Don't draw a spark from made-up data; sparks show real daily series only."
+    ]
+  }
+}

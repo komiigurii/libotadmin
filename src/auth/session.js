@@ -7,19 +7,29 @@
  * stored, so an expired session left the panel open with every request failing.
  * Now an expired or rejected token ends the session and sends the admin to the
  * sign-in page with an explanation.
+ *
+ * One session per account (mock defense 2026-10-21): every sign-in ends the
+ * account's other sessions on the server, and the server says why
+ * (signedInElsewhere, passwordReset, …); that reason goes to the sign-in page.
+ * Tabs of the same browser share this storage, so they share one session —
+ * components/SessionWatcher.jsx keeps them in step.
  */
 
-const KEYS = ['token', 'role', 'city'];
+const KEYS = ['token', 'role', 'city', 'mustChangePassword'];
 
 export const getToken = () => localStorage.getItem('token');
 
-export function saveSession({ token, role, city }) {
+export function saveSession({ token, role, city, mustChangePassword }) {
   localStorage.setItem('token', token);
-  // Don't coerce — preserves 'superadmin' as-is. The old default of 'admin'
-  // was fine when only two roles existed; now it would break superadmin routing.
+  // 'superadmin', 'admin' or 'moderator', as the server sent it.
   localStorage.setItem('role', role || 'admin');
   localStorage.setItem('city', city || '');
+  if (mustChangePassword) localStorage.setItem('mustChangePassword', '1');
+  else localStorage.removeItem('mustChangePassword');
 }
+
+/** True while the account still has to replace its temporary password. */
+export const mustChangePassword = () => localStorage.getItem('mustChangePassword') === '1';
 
 export function clearSession() {
   KEYS.forEach((k) => localStorage.removeItem(k));
@@ -54,6 +64,13 @@ export const hasValidSession = () => {
   return Boolean(token) && !isExpired(token);
 };
 
+// Fired to make components/SessionWatcher.jsx ask the server now.
+export const SESSION_CHECK_EVENT = 'libot:session-check';
+
+// The reasons the server gives for a session that ended; anything else reads
+// as "expired".
+export const END_REASONS = ['expired', 'signedInElsewhere', 'signedOut', 'passwordChanged', 'passwordReset', 'deactivated'];
+
 let ending = false;
 
 /** Clears the session and goes to sign-in, saying why. Safe to call repeatedly. */
@@ -61,5 +78,19 @@ export function endSession(reason = 'expired') {
   clearSession();
   if (ending) return;
   ending = true;
-  window.location.assign(`/login?reason=${encodeURIComponent(reason)}`);
+  const why = END_REASONS.includes(reason) ? reason : 'expired';
+  window.location.assign(`/login?reason=${encodeURIComponent(why)}`);
+}
+
+/*
+ * What another tab's change to the stored token means for this one:
+ *   'signedOut' — the token is gone (Sign out, or a session that ended there);
+ *   'replaced'  — a different token (someone signed in there, maybe as another
+ *                 account): this tab must reload to follow it;
+ *   null        — nothing to do.
+ */
+export function classifyTokenChange(oldToken, newToken) {
+  if (oldToken === newToken) return null;
+  if (!newToken) return oldToken ? 'signedOut' : null;
+  return oldToken ? 'replaced' : null;
 }

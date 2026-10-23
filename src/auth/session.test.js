@@ -1,5 +1,8 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { tokenExpiry, isExpired, hasValidSession, saveSession, clearSession, endSession } from './session';
+import {
+  tokenExpiry, isExpired, hasValidSession, saveSession, clearSession, endSession,
+  mustChangePassword, classifyTokenChange,
+} from './session';
 
 // A JWT-shaped token with the given payload (the signature is irrelevant here:
 // the panel only reads the expiry; the server verifies).
@@ -73,5 +76,22 @@ describe('session storage', () => {
     endSession('expired');
     expect(localStorage.getItem('token')).toBeNull();
     expect(window.location.assign).toHaveBeenCalledWith('/login?reason=expired');
+  });
+
+  it('remembers that a temporary password still has to be changed, until it is', () => {
+    saveSession({ token: token({ exp: inSeconds(3600) }), role: 'moderator', city: 'Baliwag', mustChangePassword: true });
+    expect(mustChangePassword()).toBe(true);
+    saveSession({ token: token({ exp: inSeconds(3600) }), role: 'moderator', city: 'Baliwag', mustChangePassword: false });
+    expect(mustChangePassword()).toBe(false);
+  });
+});
+
+describe('another tab changing the session', () => {
+  it('a removed token means signed out; a different one means follow it', () => {
+    expect(classifyTokenChange('a', null)).toBe('signedOut');
+    expect(classifyTokenChange('a', 'b')).toBe('replaced');
+    expect(classifyTokenChange('a', 'a')).toBeNull();
+    expect(classifyTokenChange(null, 'b')).toBeNull();
+    expect(classifyTokenChange(null, null)).toBeNull();
   });
 });

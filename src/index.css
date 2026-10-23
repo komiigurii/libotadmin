@@ -15,22 +15,79 @@
  * Add a colour here AND in theme.jsx. Never hardcode a hex in a component.
  */
 
-/* Self-hosted so there's no external request and no flash of fallback text.
-   Newsreader is the display serif; Schibsted Grotesk carries the UI. Same pair
-   as the mobile app and the download site, so all three speak with one voice.
-   Both are variable fonts, so the sans is a single file covering 400..900
-   instead of the four fixed weights this used to import. */
-@import '@fontsource-variable/newsreader';
-/* The italic for the sidebar's tagline. font-synthesis is off (below), so
-   without the real italic file it would render upright. The browser only
-   downloads it where italic Newsreader is actually used. */
-@import '@fontsource-variable/newsreader/wght-italic.css';
-@import '@fontsource-variable/schibsted-grotesk';
+/* ── Type ────────────────────────────────────────────────────────────────────
+   One face for all three consoles (the user, 2026-10-23: "Lahat ng font
+   dongle gamit, ibat ibang thickness lang. Yung logo lang yung knewave"):
+   Dongle (Yanghee Ryu) for every word, regular or bold; Knewave (Tyler Finck)
+   for the LibotBulacan wordmark and nothing else. Both SIL OFL 1.1,
+   self-hosted (the CSP allows fonts from this site only), Latin subsets only.
+
+   Dongle's letters are small for their size: its x-height is 0.30 em where a
+   normal UI sans sits near 0.53. Rather than restate every font size in the
+   panel, this face is scaled by size-adjust so 14px Dongle reads like 14px
+   of any other sans. The browser multiplies the metric overrides by
+   size-adjust too, so they are written divided by 1.72: an ascent of 0.96 em
+   and a descent of 0.26 em after scaling, instead of Dongle's own 1.45 em of
+   line box, which would double every row's height. Measured in Edge. */
+@font-face {
+  font-family: 'Dongle Libot';
+  src: url('./assets/fonts/dongle-latin-400-normal.woff2') format('woff2');
+  font-weight: 400; font-style: normal; font-display: swap;
+  size-adjust: 172%; ascent-override: 55.8%; descent-override: 15.1%; line-gap-override: 0%;
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Dongle Libot';
+  src: url('./assets/fonts/dongle-latin-ext-400-normal.woff2') format('woff2');
+  font-weight: 400; font-style: normal; font-display: swap;
+  size-adjust: 172%; ascent-override: 55.8%; descent-override: 15.1%; line-gap-override: 0%;
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+1E00-1E9F, U+20A0-20AB, U+20AD-20C0, U+2113, U+A720-A7FF;
+}
+/* One bold file covers 600 to 900, so the 600 and 700 the panel asks for
+   both land on it. 500 is left to the regular file: the panel uses it for
+   quiet text (units, "optional", meter labels), which bold would shout. */
+@font-face {
+  font-family: 'Dongle Libot';
+  src: url('./assets/fonts/dongle-latin-700-normal.woff2') format('woff2');
+  font-weight: 600 900; font-style: normal; font-display: swap;
+  size-adjust: 172%; ascent-override: 55.8%; descent-override: 15.1%; line-gap-override: 0%;
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Dongle Libot';
+  src: url('./assets/fonts/dongle-latin-ext-700-normal.woff2') format('woff2');
+  font-weight: 600 900; font-style: normal; font-display: swap;
+  size-adjust: 172%; ascent-override: 55.8%; descent-override: 15.1%; line-gap-override: 0%;
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+1E00-1E9F, U+20A0-20AB, U+20AD-20C0, U+2113, U+A720-A7FF;
+}
+/* Knewave has one weight; 400 to 900 all map to it, so a heading that asks
+   for 600 doesn't fall back. Its line box is tightened the same way. */
+@font-face {
+  font-family: 'Knewave Libot';
+  src: url('./assets/fonts/knewave-latin-400-normal.woff2') format('woff2');
+  font-weight: 400 900; font-style: normal; font-display: swap;
+  ascent-override: 98%; descent-override: 24%; line-gap-override: 0%;
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Knewave Libot';
+  src: url('./assets/fonts/knewave-latin-ext-400-normal.woff2') format('woff2');
+  font-weight: 400 900; font-style: normal; font-display: swap;
+  ascent-override: 98%; descent-override: 24%; line-gap-override: 0%;
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+1E00-1E9F, U+20A0-20AB, U+20AD-20C0, U+2113, U+A720-A7FF;
+}
 
 /* ── LIGHT (default) ─────────────────────────────────────────────────────────
    The warm capiz-cream page from the mobile app, value for value, so the admin
    reads as the same product. The website uses the same values. */
 :root {
+  /* The faces, as tokens; theme.jsx's `fonts` read these. Display is the
+     title and big-number face (used bold), brand is the wordmark's. */
+  --font-sans:    'Dongle Libot', system-ui, -apple-system, sans-serif;
+  --font-display: 'Dongle Libot', system-ui, -apple-system, sans-serif;
+  --font-brand:   'Knewave Libot', 'Dongle Libot', system-ui, sans-serif;
+  --font-mono:    ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+
   --bg:              #FBF8F2;
   --sidebar-bg:      #F4EFE4;
   --card-bg:         #FFFFFF;

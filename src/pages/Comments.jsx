@@ -1,96 +1,134 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { commentAPI, bannedAccountsAPI } from '../api/api';
 import { notify, confirmAction } from '../components/AppAlert';
 import {
-  Page, PageHeader, Toolbar, SearchInput, List, Button, Tag,
+  Page, PageHeader, Toolbar, SearchInput, FilterTabs, List, Button, Tag, StatusPill,
   Loading, ErrorBanner, EmptyState, Avatar, ReviewPhotos, pageStyles as s,
 } from '../components/Layout';
-import { fmtDateTime } from '../utils/format';
+import Pagination from '../components/Pagination';
+import { fmtDateTime, fmtNum } from '../utils/format';
 import Icon from '../components/Icon';
+import { theme as t, radius } from '../theme';
+import { useLive } from '../api/live';
 
-// Reviews & Feedback — admin only. Every review travelers have left, and the
+// Rate and Review — admin only (named as the paper names it; it was "Reviews
+// & Feedback"). Every review travelers have left, 20 to a page, and the
 // spec's user-management actions on its author: warn, suspend, ban
 // permanently, or delete the review itself.
+//
+// Mock defense 2026-10-21: travelers no longer report reviews; the server
+// masks bad words with *** as a review is posted. Those reviews carry a
+// "Filtered" tag and have their own tab, and the admin can read what was
+// actually written, to warn the writer.
 
-function toArray(data) {
-  if (!data) return [];
-  if (Array.isArray(data))         return data;
-  if (Array.isArray(data.reviews)) return data.reviews;
-  if (Array.isArray(data.data))    return data.data;
-  return [];
-}
+const PAGE_SIZE = 20;
+const STARS = [{ value: '', label: 'Any rating' }, ...[5, 4, 3, 2, 1].map((n) => ({ value: String(n), label: `${n} star${n === 1 ? '' : 's'}` }))];
 
 export default function Comments() {
-  const [comments, setComments] = useState([]);
+  const [data,     setData]     = useState(null);
   const [loading,  setLoading]  = useState(true);
   const [error,    setError]    = useState(null);
+  const [query,    setQuery]    = useState('');
   const [search,   setSearch]   = useState('');
+  const [tab,      setTab]      = useState('');
+  const [rating,   setRating]   = useState('');
+  const [page,     setPage]     = useState(1);
   const [expandedId, setExpandedId] = useState(null);
 
-  const load = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      setComments(toArray(await commentAPI.getAll()));
-    } catch {
-      setError('Couldn’t load reviews.');
-      setComments([]);
+  // Search waits for a pause in typing, then starts again from page 1.
+  useEffect(() => {
+    const timer = setTimeout(() => { setSearch(query.trim()); setPage(1); }, 300);
+    return () => clearTimeout(timer);
+  }, [query]);
+
+  // `quiet`: a live update — no spinner, and a failure keeps the page shown.
+  const load = useCallback(async ({ quiet = false } = {}) => {
+    if (!quiet) {
+      setLoading(true);
+      setError(null);
     }
-    setLoading(false);
-  };
+    try {
+      setData(await commentAPI.getAll({
+        page, limit: PAGE_SIZE,
+        ...(search ? { q: search } : {}),
+        ...(tab === 'filtered' ? { filtered: 1 } : {}),
+        ...(rating ? { rating } : {}),
+      }));
+    } catch {
+      if (!quiet) setError('Couldn’t load reviews.');
+    }
+    if (!quiet) setLoading(false);
+  }, [page, search, tab, rating]);
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [load]);
+  // New reviews as travelers post them; a warning changes the writer's standing.
+  useLive(['reviews', 'travelers'], () => load({ quiet: true }));
 
-  const visible = comments.filter(c => {
-    if (!c?._id) return false;
-    if (!search) return true;
-    const q = search.toLowerCase();
-    const spotName = (c.spotId && typeof c.spotId === 'object' ? c.spotId.name : '') || '';
-    const userName = (c.userId && typeof c.userId === 'object' ? c.userId.name : c.userName) || '';
-    return (c.comment || '').toLowerCase().includes(q)
-      || spotName.toLowerCase().includes(q)
-      || userName.toLowerCase().includes(q);
-  });
+  const reviews = (data?.reviews || []).filter((c) => c?._id);
+  const filtersOn = !!(search || tab || rating);
 
   return (
     <Page>
       <PageHeader
-        title="Reviews & Feedback"
-        count={comments.length}
-        subtitle="Every review travelers have left, across all spots. Warn, suspend or ban the author, or delete the review."
+        title="Rate and Review"
+        count={data?.counts?.all}
+        subtitle="Every review travelers have left, across all spots. Bad words are masked with *** automatically; warn, suspend or ban the writer, or delete the review."
         actions={<Button icon="refresh-cw" onClick={load} disabled={loading}>Refresh</Button>}
       />
 
       <Toolbar>
+        <FilterTabs
+          label="Which reviews"
+          value={tab}
+          onChange={(v) => { setTab(v); setPage(1); }}
+          options={[
+            { value: '', label: 'All', count: data?.counts?.all },
+            { value: 'filtered', label: 'Filtered', count: data?.counts?.filtered },
+          ]}
+        />
+        <select value={rating} onChange={(e) => { setRating(e.target.value); setPage(1); }} aria-label="Rating"
+          style={{ ...s.select, width: 'auto' }}>
+          {STARS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+        </select>
         <SearchInput
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          placeholder="Search reviews, travelers or spots…"
+          value={query}
+          onChange={e => setQuery(e.target.value)}
+          placeholder="Search what they wrote, or a traveler’s name…"
         />
       </Toolbar>
 
-      {loading ? (
+      {error && <ErrorBanner>{error}</ErrorBanner>}
+      {!data ? (
         <Loading label="Loading reviews…" />
-      ) : error ? (
-        <ErrorBanner>{error}</ErrorBanner>
-      ) : visible.length === 0 ? (
+      ) : reviews.length === 0 ? (
         <EmptyState
           icon="message-square"
-          title={comments.length === 0 ? 'No reviews yet' : 'No reviews match'}
-          subtitle={comments.length === 0 ? 'Reviews travelers leave in the app will appear here.' : 'Try a different search.'}
+          title={filtersOn ? 'No reviews match' : 'No reviews yet'}
+          subtitle={filtersOn
+            ? (tab === 'filtered' && !search && !rating ? 'No review has needed masking.' : 'Try a different search or filter.')
+            : 'Reviews travelers leave in the app will appear here.'}
         />
       ) : (
-        <List>
-          {visible.map(c => (
-            <CommentRow
-              key={c._id}
-              comment={c}
-              expanded={expandedId === c._id}
-              onToggle={() => setExpandedId(expandedId === c._id ? null : c._id)}
-              onUpdated={() => { setExpandedId(null); load(); }}
-            />
-          ))}
-        </List>
+        // The page in view stays, dimmed, while the next one loads.
+        <div style={{ opacity: loading ? 0.6 : 1, transition: 'opacity 0.2s', display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <List>
+            {reviews.map(c => (
+              <CommentRow
+                key={c._id}
+                comment={c}
+                expanded={expandedId === c._id}
+                onToggle={() => setExpandedId(expandedId === c._id ? null : c._id)}
+                onUpdated={() => { setExpandedId(null); load(); }}
+              />
+            ))}
+          </List>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+            <span style={s.itemDate}>
+              {fmtNum((data.page - 1) * PAGE_SIZE + 1)}–{fmtNum((data.page - 1) * PAGE_SIZE + reviews.length)} of {fmtNum(data.total)}
+            </span>
+            <Pagination page={data.page} pages={data.pages} onChange={(p) => { setPage(p); window.scrollTo?.(0, 0); }} label="Review pages" />
+          </div>
+        </div>
       )}
     </Page>
   );
@@ -172,8 +210,14 @@ function CommentRow({ comment, expanded, onToggle, onUpdated }) {
             <span style={s.itemTitle}>{userName}</span>
             <span style={s.itemDate}>{fmtDateTime(comment.createdAt)}</span>
             <Tag icon="map-pin">{spotName}{spotCity ? ` · ${spotCity}` : ''}</Tag>
+            {comment.filtered && <StatusPill tone="warning" icon="eye-off">Filtered</StatusPill>}
           </div>
           <p style={s.itemText}>{comment.comment}</p>
+          {comment.filtered && comment.commentOriginal && (
+            <p style={orig.box}>
+              <span style={orig.label}>What they wrote (only admins see this):</span> {comment.commentOriginal}
+            </p>
+          )}
           <ReviewPhotos photos={comment.photos} />
           <div style={s.itemFacts}>
             {comment.rating != null && <span style={s.itemFact}><Icon name="star" size={12} /> {comment.rating}/5</span>}
@@ -224,3 +268,9 @@ function CommentRow({ comment, expanded, onToggle, onUpdated }) {
     </div>
   );
 }
+
+// The original of a masked review: muted, set apart, for the admin only.
+const orig = {
+  box:   { fontSize: 12.5, color: t.textSecondary, lineHeight: 1.5, margin: '8px 0 0', padding: '8px 10px', borderRadius: radius.md, background: t.sidebarBg, border: `1px solid ${t.divider}`, overflowWrap: 'anywhere' },
+  label: { fontWeight: 600, color: t.textMuted },
+};

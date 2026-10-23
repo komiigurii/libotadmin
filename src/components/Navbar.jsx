@@ -4,6 +4,8 @@ import { theme as t, radius, fonts, useThemePref } from '../theme';
 import Icon from './Icon';
 import logo from '../assets/logo.png';
 import { clearSession, getToken } from '../auth/session';
+import { roleLabel, isSuperAdmin } from '../auth/roles';
+import { useHeartbeat } from '../auth/heartbeat';
 import { authAPI } from '../api/api';
 import { confirmAction } from './AppAlert';
 
@@ -36,17 +38,20 @@ import { confirmAction } from './AppAlert';
 // uses the same name, so the link and the page it opens always agree.
 //
 // Paths are unchanged from before the rename, so bookmarks keep working.
+//
+// Mock defense 2026-10-21: everything about spots is in Spot Management (its
+// Approval Queue is a tab there, /spots/approvals), reviews are "Rate and
+// Review" as the paper calls them, and travelers no longer report reviews —
+// the automatic filter masks bad words instead — so Reported Reviews is gone.
 const ADMIN_NAV = [
   { group: 'Overview', items: [
     { label: 'Dashboard',          path: '/dashboard',         icon: 'grid' },
   ] },
   { group: 'Content', items: [
-    { label: 'Spot Management',    path: '/spots',             icon: 'map-pin' },
-    { label: 'Approval Queue',     path: '/mod-requests',      icon: 'inbox' },
+    { label: 'Spot Management',    path: '/spots',             icon: 'map-pin', badge: 'approvals' },
   ] },
   { group: 'Community', items: [
-    { label: 'Reviews & Feedback', path: '/comments',          icon: 'message-square' },
-    { label: 'Reported Reviews',   path: '/reported-comments', icon: 'flag' },
+    { label: 'Rate and Review',    path: '/comments',          icon: 'message-square' },
   ] },
   { group: 'Travelers', items: [
     { label: 'Traveler Progress',  path: '/user-progress',     icon: 'award' },
@@ -58,6 +63,34 @@ const ADMIN_NAV = [
     { label: 'Moderators',         path: '/moderators',        icon: 'users' },
   ] },
 ];
+
+// The super admin's console holds only the super admin's own work (the user,
+// 2026-10-22: "superadmin panel should only contain superadmin functions"):
+// maintenance and the tools, the staff's tickets, every account, and what was
+// done in the console. Spots, reviews and travelers are the admins' job.
+const SUPER_ADMIN_NAV = [
+  { group: 'Overview', items: [
+    { label: 'Dashboard',          path: '/dashboard',         icon: 'grid' },
+  ] },
+  { group: 'System', items: [
+    { label: 'System',             path: '/system',            icon: 'tool' },
+    { label: 'Tickets',            path: '/tickets',           icon: 'flag', badge: 'tickets' },
+  ] },
+  { group: 'Accounts', items: [
+    { label: 'Accounts',           path: '/accounts',          icon: 'shield' },
+    { label: 'Activity Log',       path: '/activity',          icon: 'history' },
+  ] },
+];
+
+// Every role's bell; admins and moderators also report problems from here
+// (the super admin answers them under Tickets).
+const inboxNav = (superAdmin) => ({ group: 'Inbox', items: [
+  { label: 'Notifications',      path: '/notifications',     icon: 'bell', badge: 'unread' },
+  ...(superAdmin ? [] : [{ label: 'Report a Problem', path: '/tickets', icon: 'flag' }]),
+] });
+
+// A link is "here" on its own page and on the pages under it (/tickets/12).
+const isHere = (item, path) => path === item.path || path.startsWith(`${item.path}/`);
 
 // A moderator's job is attractions in their municipality and the requests
 // they've sent, plus a read-only list of the travelers who visited their
@@ -99,9 +132,16 @@ export default function Navbar() {
   };
 
   const isModerator = role === 'moderator';
-  const nav = isModerator ? MODERATOR_NAV : ADMIN_NAV;
+  const superAdmin = isSuperAdmin(role);
+  const consoleName = `${roleLabel(role)} Console`;
+  const nav = [
+    ...(superAdmin ? SUPER_ADMIN_NAV : isModerator ? MODERATOR_NAV : ADMIN_NAV),
+    inboxNav(superAdmin),
+  ];
   const home = '/dashboard';
-  const current = nav.flatMap((g) => g.items).find((i) => i.path === location.pathname);
+  const current = nav.flatMap((g) => g.items).find((i) => isHere(i, location.pathname));
+  const beat = useHeartbeat();
+  const badges = { unread: beat?.unread || 0, tickets: beat?.openTickets || 0, approvals: beat?.pendingApprovals || 0 };
 
   // ── Phone drawer (App.css shows it only at ≤ 720px) ──
   const [menuOpen, setMenuOpen] = useState(false);
@@ -140,16 +180,9 @@ export default function Navbar() {
 
   return (
     <>
+    {/* The menu button sits on the left, on the side the drawer opens from
+        (mock defense 2026-10-21: "location ng burger menu kapag niliitan"). */}
     <header className="mobile-bar" style={s.mobileBar}>
-      <button
-        type="button"
-        onClick={() => navigate(home)}
-        style={s.mobileBrand}
-        aria-label="Go to dashboard"
-      >
-        <img src={logo} alt="" style={s.mobileLogo} />
-      </button>
-      <div style={s.mobileTitle}>{current?.label || (isModerator ? 'Moderator Console' : 'Admin Console')}</div>
       <button
         ref={menuBtnRef}
         type="button"
@@ -160,6 +193,15 @@ export default function Navbar() {
         aria-controls="admin-nav"
       >
         <Icon name="menu" size={22} color={t.textPrimary} />
+      </button>
+      <div style={s.mobileTitle}>{current?.label || consoleName}</div>
+      <button
+        type="button"
+        onClick={() => navigate(home)}
+        style={s.mobileBrand}
+        aria-label="Go to dashboard"
+      >
+        <img src={logo} alt="" style={s.mobileLogo} />
       </button>
     </header>
     {menuOpen && <div className="nav-backdrop" onClick={() => setMenuOpen(false)} aria-hidden="true" />}
@@ -182,14 +224,14 @@ export default function Navbar() {
         role="button"
         tabIndex={0}
         onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate(home); } }}
-        aria-label={`Libot Bulacan ${isModerator ? 'Moderator' : 'Admin'} Console — go to dashboard`}
+        aria-label={`Libot Bulacan ${consoleName} — go to dashboard`}
       >
         <span className="sidebar-emblem" style={s.emblem}>
           <img src={logo} alt="" style={s.logo} />
         </span>
         <div className="sidebar-text" style={s.brandText}>
-          <div style={s.brandName}>Libot Bulacan</div>
-          <div style={s.brandSub}>{isModerator ? 'Moderator console' : 'Admin console'}</div>
+          <div style={s.brandName}>LibotBulacan</div>
+          <div style={s.brandSub}>{consoleName}</div>
           <div style={s.brandScope}>
             <Icon name="map-pin" size={11} color={t.textMuted} />
             {isModerator ? (city || 'No city assigned') : 'All of Bulacan'}
@@ -213,7 +255,8 @@ export default function Navbar() {
               >
                 <div className="sidebar-links" style={s.links}>
                   {section.items.map((item) => {
-                    const active = location.pathname === item.path;
+                    const active = isHere(item, location.pathname);
+                    const count = item.badge ? badges[item.badge] : 0;
                     return (
                       <button
                         key={item.path}
@@ -222,7 +265,7 @@ export default function Navbar() {
                         // aria-current is how a screen reader knows which page
                         // it's on; the filled pill only says it visually.
                         aria-current={active ? 'page' : undefined}
-                        title={item.label}
+                        title={count ? `${item.label} (${count})` : item.label}
                         style={{ ...s.link, ...(active ? s.linkActive : {}) }}
                       >
                         <Icon
@@ -231,7 +274,11 @@ export default function Navbar() {
                           color={active ? t.brand : 'currentColor'}
                           weight={active ? 'fill' : 'regular'}
                         />
-                        <span className="sidebar-text">{item.label}</span>
+                        <span className="sidebar-text">
+                          {item.label}
+                          {count > 0 && <span className="visually-hidden">, {count} new</span>}
+                        </span>
+                        {count > 0 && <span className="nav-badge" style={s.badge} aria-hidden="true">{count > 99 ? '99+' : count}</span>}
                       </button>
                     );
                   })}
@@ -265,6 +312,18 @@ export default function Navbar() {
           })}
         </div>
 
+        {/* Any role, any time (mock defense 2026-10-21). */}
+        <button
+          onClick={() => navigate('/change-password')}
+          className="logout-btn"
+          style={{ ...s.keyBtn, ...(location.pathname === '/change-password' ? s.themeBtnOn : null) }}
+          title="Change password"
+          aria-label="Change password"
+          aria-current={location.pathname === '/change-password' ? 'page' : undefined}
+        >
+          <Icon name="key" size={15} color={t.textSecondary} />
+          <span className="sidebar-text">Change password</span>
+        </button>
         <button onClick={logout} className="logout-btn" style={s.logoutBtn} title="Sign out">
           <Icon name="log-out" size={15} color={t.textSecondary} />
           <span className="sidebar-text">Sign out</span>
@@ -293,16 +352,17 @@ const s = {
   emblem: { display: 'grid', placeItems: 'center', width: 40, height: 40, flexShrink: 0 },
   logo: { width: 40, height: 40, objectFit: 'contain', borderRadius: 11, display: 'block' },
   brandText: { minWidth: 0, display: 'flex', flexDirection: 'column' },
+  // The wordmark in Knewave, the one place these consoles use it.
   brandName: {
-    fontFamily: fonts.display, color: t.textPrimary, fontWeight: 600, fontSize: 19,
-    lineHeight: 1.1, letterSpacing: '-0.01em', whiteSpace: 'nowrap',
+    fontFamily: fonts.brand, color: t.textPrimary, fontWeight: 400, fontSize: 20,
+    lineHeight: 1.1, whiteSpace: 'nowrap',
   },
   brandSub: {
-    marginTop: 3, color: t.textSecondary, fontSize: 12, fontWeight: 500,
+    marginTop: 3, color: t.textPrimary, fontSize: 13, fontWeight: 400,
     overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
   },
   brandScope: {
-    marginTop: 2, display: 'flex', alignItems: 'center', gap: 4, color: t.textMuted, fontSize: 12,
+    marginTop: 2, display: 'flex', alignItems: 'center', gap: 4, color: t.textMuted, fontSize: 13,
     overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
   },
 
@@ -318,23 +378,33 @@ const s = {
   link: {
     display: 'flex', alignItems: 'center', gap: 12,
     textAlign: 'left', padding: '10px 14px', borderRadius: 10, border: 'none',
-    background: 'transparent', color: t.textSecondary, fontWeight: 500, fontSize: 13.5,
+    background: 'transparent', color: t.textSecondary, fontWeight: 400, fontSize: 16,
     cursor: 'pointer', transition: 'background 0.15s, color 0.15s',
-    width: '100%', fontFamily: 'inherit', minHeight: 42,
+    width: '100%', fontFamily: 'inherit', minHeight: 42, position: 'relative',
   },
   // A tint and the brand colour: still the one thing in the rail you find at a
   // glance, without a solid teal block and its glow competing with the page.
   linkActive: { background: t.brandSoft, color: t.brand, fontWeight: 600 },
+  // The bell's unread count: the brand colour, so it reads as "for you", not
+  // as an error.
+  badge: {
+    marginLeft: 'auto', minWidth: 20, height: 20, padding: '0 6px', boxSizing: 'border-box',
+    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+    // The card colour on the brand colour: dark on light teal in the dark
+    // theme, white on dark teal in the light one.
+    borderRadius: radius.pill, background: t.brand, color: t.cardBg,
+    fontSize: 11, fontWeight: 700, fontVariantNumeric: 'tabular-nums',
+  },
 
   footer: {
-    display: 'flex', alignItems: 'center', gap: 8, padding: '12px 14px 16px',
+    display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8, padding: '12px 14px 16px',
     borderTop: `1px solid ${t.divider}`,
   },
 
   // ── Phone top bar + drawer close. Display comes from App.css. ──
   mobileBar: {
     position: 'sticky', top: 0, zIndex: 30, alignItems: 'center', gap: 12,
-    minHeight: 56, padding: '8px 10px 8px 12px', boxSizing: 'border-box',
+    minHeight: 56, padding: '8px 12px 8px 6px', boxSizing: 'border-box',
     background: t.sidebarBg, color: t.textPrimary, borderBottom: `1px solid ${t.border}`,
   },
   mobileBrand: {
@@ -364,6 +434,14 @@ const s = {
     cursor: 'pointer', transition: 'background 0.15s',
   },
   themeBtnOn: { background: t.cardBg, boxShadow: `inset 0 0 0 1px ${t.border}` },
+  // Its own row above the theme switch and Sign out; in the icon rail, App.css
+  // shrinks it to the key like the other footer buttons.
+  keyBtn: {
+    flex: '1 1 100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+    padding: '8px 12px', minHeight: 36, borderRadius: radius.md, border: `1px solid ${t.border}`,
+    background: 'transparent', color: t.textSecondary, fontSize: 13, fontWeight: 600, fontFamily: 'inherit',
+    cursor: 'pointer', transition: 'background 0.15s, border-color 0.15s',
+  },
   logoutBtn: {
     flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
     padding: '8px 12px', borderRadius: radius.md,

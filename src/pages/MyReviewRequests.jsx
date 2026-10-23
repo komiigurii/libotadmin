@@ -8,6 +8,7 @@ import { ChangeList, ProposalFieldList } from '../components/ChangeDiff';
 import { changedFieldLabels, recordFromRequest, MISSION_FIELD_LABELS } from '../utils/changeDiff';
 import { fmtDateTime } from '../utils/format';
 import Icon from '../components/Icon';
+import { useLive } from '../api/live';
 
 // Request Tracking — every request this moderator has sent and where it
 // stands: new spots, edits to existing ones, deletions, and food spot
@@ -43,9 +44,12 @@ export default function MyReviewRequests() {
   const [statusFilter, setStatusFilter] = useState('');
   const [expanded, setExpanded] = useState(null);
 
-  const load = async () => {
-    setLoading(true);
-    setError(null);
+  // `quiet`: a live update (an admin decided), without the spinner.
+  const load = async ({ quiet = false } = {}) => {
+    if (!quiet) {
+      setLoading(true);
+      setError(null);
+    }
     // allSettled: one source failing shouldn't hide the others.
     const [spotsRes, proposalsRes, deletesRes, changesRes] = await Promise.allSettled([
       spotAPI.getMine(),
@@ -72,6 +76,7 @@ export default function MyReviewRequests() {
       image: imageOf.get(String(c.spotId)) || null,
       date: c.submittedAt,
       decidedAt: c.reviewedAt,
+      note: c.reviewNote,
       record: recordFromRequest(c),
       locationName: c.changes?.locationName,
     }));
@@ -99,6 +104,7 @@ export default function MyReviewRequests() {
       image: p.image || null,
       date: p.submittedAt || p.createdAt,
       decidedAt: p.reviewedAt,
+      note: p.reviewNote || p.rejectionReason,
       record: p,
     }));
 
@@ -109,6 +115,7 @@ export default function MyReviewRequests() {
       subtitle: d.spotName || '—',
       date: d.submittedAt,
       decidedAt: d.reviewedAt,
+      note: d.reviewNote,
       reason: d.reason,
     }));
 
@@ -121,6 +128,7 @@ export default function MyReviewRequests() {
   };
 
   useEffect(() => { load(); }, []);
+  useLive(['approvals', 'spots', 'missions'], () => load({ quiet: true }));
 
   const visible = requests.filter((r) => !statusFilter || r.status === statusFilter);
   const count = (st) => requests.filter((r) => r.status === st).length;
@@ -210,6 +218,14 @@ export default function MyReviewRequests() {
                         </span>
                       </div>
                     )}
+                    {/* The admin's reason for a rejection, or remarks on an
+                        approval (mock defense 2026-10-21). */}
+                    {r.note && DECIDED[r.status] && (
+                      <p style={noteStyle}>
+                        <strong style={{ color: 'var(--text-primary)' }}>{r.status === 'rejected' ? 'Why it was rejected: ' : 'Admin’s remarks: '}</strong>
+                        {r.note}
+                      </p>
+                    )}
                   </div>
 
                   {hasDetails && (
@@ -231,3 +247,8 @@ export default function MyReviewRequests() {
     </Page>
   );
 }
+
+const noteStyle = {
+  fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.5, margin: '8px 0 0', padding: '8px 10px',
+  borderRadius: 8, background: 'var(--sidebar-bg)', border: '1px solid var(--divider)', overflowWrap: 'anywhere',
+};
