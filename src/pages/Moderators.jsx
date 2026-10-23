@@ -60,10 +60,7 @@ export default function Moderators() {
         title="Moderators"
         count={mods.length}
         subtitle={`The LGU moderator accounts${towns ? `, covering ${towns} ${towns === 1 ? 'municipality' : 'municipalities'}` : ''}. Each one can only propose changes to spots in their own municipality, and every change waits in the Approval Queue.`}
-        actions={<>
-          <Button icon="refresh-cw" onClick={load} disabled={loading}>Refresh</Button>
-          {!adding && <Button variant="primary" icon="plus" onClick={() => setAdding(true)}>Add moderator</Button>}
-        </>}
+        actions={!adding && <Button variant="primary" icon="plus" onClick={() => setAdding(true)}>Add moderator</Button>}
       />
 
       {error && <ErrorBanner onDismiss={() => setError('')}>{error}</ErrorBanner>}

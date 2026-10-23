@@ -16,16 +16,10 @@ import './Login.css';
  * and every role lands on the dashboard (the super admin's System pages are in
  * the same sidebar).
  *
- * Built from the console's own frame, so signing in already looks like the
- * panel you land in: the teal rail with the emblem in its dark well, LIBOT BULACAN in
- * tracked capitals and the console name; the app's sign-in artwork (bg.png)
- * framed on the rail the way the church print sits at the foot of the
- * sidebar; the app slogan in the sidebar tagline's italic with its yellow
- * misregistration; and a cream panel with the rail's one oversized top-left
- * corner, holding the form in a dashboard-style card.
- *
- * No text sits on the picture: the slogan is on solid teal (white, ≥ 5:1 in
- * both themes), so the artwork needs no scrim.
+ * The left side is the app's sign-in artwork (bg.png) and nothing else, no
+ * teal around it, no frame. The emblem, wordmark, console name and app slogan
+ * sit on it in dark ink (Login.css); the right side is the cream panel with
+ * the form in a dashboard-style card.
  */
 
 const SLOGAN = ['Discover,', 'Explore,', 'Experience', 'Bulacan.'];
@@ -151,7 +145,7 @@ function SignInForm() {
 
   return (
     <div className="signin">
-      <aside className="signin-rail" aria-label="Libot Bulacan">
+      <aside className="signin-rail" aria-label="Libot Bulacan" style={{ backgroundImage: `url(${loginBg})` }}>
         {/* The sidebar's brand block, larger. */}
         <div className="signin-brand" style={s.brand}>
           <span className="signin-emblem" style={s.emblem}>
@@ -162,10 +156,6 @@ function SignInForm() {
             <div style={s.console}>Admin and moderator console</div>
           </div>
         </div>
-
-        {/* The app's sign-in artwork, framed like the church print at the foot
-            of the sidebar. Decorative: the slogan below carries the words. */}
-        <div className="signin-art" style={{ backgroundImage: `url(${loginBg})` }} aria-hidden="true" />
 
         <p className="signin-slogan" style={s.slogan}>
           {SLOGAN.map((line, i) => <span key={line} style={s.sloganLine}>{line}{i < SLOGAN.length - 1 ? ' ' : ''}</span>)}
@@ -288,104 +278,208 @@ function SignInForm() {
 
 /*
  * Staff have no email, so a forgotten password goes to the super admin as a
- * ticket (POST /api/auth/forgot-password), and they hand over a new slip. The
- * answer is the same whether or not the username exists.
+ * ticket, and they make a new slip. Since 2026-10-23 the request names an
+ * email address for that slip and proves it with a 6-digit code before
+ * anything is sent (POST /api/auth/forgot-password, then …/verify): the
+ * confirmed request reaches the super admin and support@, and the slip is
+ * emailed to that address. The answers are the same whether or not the
+ * username exists.
  */
+const EMAIL_SHAPE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const OFFLINE = "Couldn't reach the server. Check your connection and try again.";
+
 function ForgotPassword({ initialUsername, onBack }) {
-  const ids = { user: useId(), note: useId(), err: useId() };
+  const ids = { user: useId(), email: useId(), note: useId(), code: useId(), userErr: useId(), emailErr: useId(), codeErr: useId() };
   const [username, setUsername] = useState(initialUsername || '');
+  const [email, setEmail] = useState('');
   const [note, setNote] = useState('');
+  const [code, setCode] = useState('');
   const [tried, setTried] = useState(false);
   const [sending, setSending] = useState(false);
-  const [sent, setSent] = useState('');
+  // The code step: { requestId, email, minutes } once a code is mailed.
+  const [pending, setPending] = useState(null);
+  const [resent, setResent] = useState(false);
+  const [done, setDone] = useState('');
   const [error, setError] = useState('');
-  const missing = !username.trim();
+  // What the server said about one field.
+  const [serverField, setServerField] = useState({});
 
-  const send = async (e) => {
-    e.preventDefault();
+  const problems = {
+    username: !username.trim() ? 'Enter your username.' : '',
+    email: !email.trim() ? 'Enter the email address for your new slip.'
+      : !EMAIL_SHAPE.test(email.trim()) ? 'Enter a whole email address, like name@example.com.' : '',
+  };
+  const shown = (f) => serverField[f] || (tried ? problems[f] || '' : '');
+
+  const fail = (err) => {
+    const body = err?.response?.data;
+    if (body?.field) setServerField({ [body.field]: body.message });
+    else setError(body?.message || OFFLINE);
+    return body;
+  };
+
+  const askCode = async (again = false) => {
     setTried(true);
-    if (missing) return document.getElementById(ids.user)?.focus();
+    if (problems.username) return document.getElementById(ids.user)?.focus();
+    if (problems.email) return document.getElementById(ids.email)?.focus();
     setSending(true);
     setError('');
+    setServerField({});
     try {
-      const data = await authAPI.forgotPassword(username.trim(), note.trim());
-      setSent(data.message);
+      setPending(await authAPI.forgotPassword(username.trim(), email.trim(), note.trim()));
+      setCode('');
+      setResent(again);
     } catch (err) {
-      setError(err?.response?.data?.message || "Couldn't reach the server. Check your connection and try again.");
+      // A bad address takes them back to fix it.
+      if (fail(err)?.field) setPending(null);
     }
     setSending(false);
   };
 
+  const confirm = async () => {
+    if (code.length !== 6) {
+      setServerField({ code: 'Enter the 6-digit code from the email.' });
+      return document.getElementById(ids.code)?.focus();
+    }
+    setSending(true);
+    setError('');
+    setServerField({});
+    try {
+      setDone((await authAPI.verifyForgotPassword(pending.requestId, code)).message);
+    } catch (err) {
+      // Expired or used up: back to the first step, with everything still filled in.
+      if (fail(err)?.code === 'expired') setPending(null);
+    }
+    setSending(false);
+  };
+
+  const submit = (e) => {
+    e.preventDefault();
+    if (pending) confirm(); else askCode();
+  };
+
+  const fieldError = (f, id) => shown(f) && (
+    <p id={id} style={s.fieldError}><Icon name="alert-circle" size={13} /> {shown(f)}</p>
+  );
+  const errorBanner = error && (
+    <div role="alert" style={{ ...s.banner, ...s.bannerError }}>
+      <Icon name="alert-circle" size={15} /><span>{error}</span>
+    </div>
+  );
+  const backLink = (
+    <p style={s.help}>
+      <button type="button" style={s.linkBtn} onClick={onBack}>Back to sign in</button>
+    </p>
+  );
+
+  if (done) {
+    return (
+      <div className="signin-card" style={s.card} role="region" aria-labelledby="forgot-title">
+        <h1 id="forgot-title" style={s.title}>Request sent</h1>
+        <p style={s.subtitle}>The super admin checks it and makes your new slip. It comes to the address you confirmed.</p>
+        <div role="status" style={{ ...s.banner, ...s.bannerInfo }}>
+          <Icon name="check-circle" size={15} />
+          <span>{done}</span>
+        </div>
+        <Button variant="primary" onClick={onBack} style={s.submit}>Back to sign in</Button>
+      </div>
+    );
+  }
+
+  if (pending) {
+    return (
+      <form className="signin-card" style={s.card} onSubmit={submit} noValidate aria-labelledby="forgot-title">
+        <h1 id="forgot-title" style={s.title}>Check your email</h1>
+        <p style={s.subtitle}>
+          We sent a 6-digit code to <strong style={{ color: t.textPrimary, overflowWrap: 'anywhere' }}>{pending.email}</strong>.
+          Enter it within {pending.minutes || 15} minutes to send your request to the super admin.
+        </p>
+        {resent && !error && (
+          <div role="status" style={{ ...s.banner, ...s.bannerInfo }}>
+            <Icon name="mail" size={15} /><span>We sent a new code. Use the newest email.</span>
+          </div>
+        )}
+        {errorBanner}
+        <div style={s.field}>
+          <label htmlFor={ids.code} style={s.label}>Code</label>
+          <input id={ids.code} type="text" value={code} onChange={(e) => { setCode(e.target.value.replace(/\D/g, '').slice(0, 6)); setServerField({}); }}
+            inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]*" autoFocus className="modern-input"
+            aria-invalid={!!shown('code')} aria-describedby={shown('code') ? ids.codeErr : undefined}
+            style={{ ...s.input, ...s.codeInput, ...(shown('code') ? s.inputInvalid : null) }} />
+          {fieldError('code', ids.codeErr)}
+        </div>
+        <Button type="submit" variant="primary" disabled={sending} style={s.submit}>
+          {sending ? 'Checking…' : 'Confirm and send request'}
+        </Button>
+        <p style={s.help}>
+          No email? Check spam, or{' '}
+          <button type="button" style={s.linkBtn} onClick={() => askCode(true)} disabled={sending}>send a new code</button>
+          {' · '}
+          <button type="button" style={s.linkBtn} onClick={() => { setPending(null); setError(''); setServerField({}); }}>change the address</button>
+        </p>
+      </form>
+    );
+  }
+
   return (
-    <form className="signin-card" style={s.card} onSubmit={send} noValidate aria-labelledby="forgot-title">
+    <form className="signin-card" style={s.card} onSubmit={submit} noValidate aria-labelledby="forgot-title">
       <h1 id="forgot-title" style={s.title}>Forgot password</h1>
       <p style={s.subtitle}>
-        Your account has no email, so the super admin makes you a new slip with a temporary password. Send them your username.
+        Your account has no email, so tell us where to send your new slip. We’ll email a code there first to check it’s yours.
       </p>
-      {sent ? (
-        <>
-          <div role="status" style={{ ...s.banner, ...s.bannerInfo }}>
-            <Icon name="check-circle" size={15} />
-            <span>{sent}</span>
-          </div>
-          <Button variant="primary" onClick={onBack} style={s.submit}>Back to sign in</Button>
-        </>
-      ) : (
-        <>
-          {error && (
-            <div role="alert" style={{ ...s.banner, ...s.bannerError }}>
-              <Icon name="alert-circle" size={15} /><span>{error}</span>
-            </div>
-          )}
-          <div style={s.field}>
-            <label htmlFor={ids.user} style={s.label}>Username</label>
-            <input id={ids.user} type="text" value={username} onChange={(e) => setUsername(e.target.value)}
-              autoComplete="username" autoCapitalize="none" spellCheck={false} autoFocus className="modern-input"
-              aria-invalid={tried && missing} aria-describedby={tried && missing ? ids.err : undefined}
-              style={{ ...s.input, ...(tried && missing ? s.inputInvalid : null) }} />
-            {tried && missing && <p id={ids.err} style={s.fieldError}><Icon name="alert-circle" size={13} /> Enter your username.</p>}
-          </div>
-          <div style={s.field}>
-            <label htmlFor={ids.note} style={s.label}>Note for the super admin <span style={s.optional}>(optional)</span></label>
-            <textarea id={ids.note} value={note} onChange={(e) => setNote(e.target.value)} maxLength={500} rows={3}
-              placeholder="e.g. I'm at the Baliwag tourism office until 5 PM."
-              style={{ ...s.input, height: 'auto', padding: '10px 14px', resize: 'vertical', fontSize: 14, lineHeight: 1.5 }} />
-          </div>
-          <Button type="submit" variant="primary" disabled={sending} style={s.submit}>
-            {sending ? 'Sending…' : 'Send request'}
-          </Button>
-          <p style={s.help}>
-            <button type="button" style={s.linkBtn} onClick={onBack}>Back to sign in</button>
-          </p>
-        </>
-      )}
+      {errorBanner}
+      <div style={s.field}>
+        <label htmlFor={ids.user} style={s.label}>Username</label>
+        <input id={ids.user} type="text" value={username} onChange={(e) => { setUsername(e.target.value); setServerField({}); }}
+          autoComplete="username" autoCapitalize="none" spellCheck={false} autoFocus className="modern-input"
+          aria-invalid={!!shown('username')} aria-describedby={shown('username') ? ids.userErr : undefined}
+          style={{ ...s.input, ...(shown('username') ? s.inputInvalid : null) }} />
+        {fieldError('username', ids.userErr)}
+      </div>
+      <div style={s.field}>
+        <label htmlFor={ids.email} style={s.label}>Email for your new slip</label>
+        <input id={ids.email} type="email" value={email} onChange={(e) => { setEmail(e.target.value); setServerField({}); }}
+          autoComplete="email" autoCapitalize="none" spellCheck={false} className="modern-input"
+          placeholder="name@example.com"
+          aria-invalid={!!shown('email')} aria-describedby={shown('email') ? ids.emailErr : undefined}
+          style={{ ...s.input, ...(shown('email') ? s.inputInvalid : null) }} />
+        {fieldError('email', ids.emailErr)}
+      </div>
+      <div style={s.field}>
+        <label htmlFor={ids.note} style={s.label}>Note for the super admin <span style={s.optional}>(optional)</span></label>
+        <textarea id={ids.note} value={note} onChange={(e) => setNote(e.target.value)} maxLength={500} rows={3}
+          placeholder="e.g. I'm at the Baliwag tourism office until 5 PM."
+          style={{ ...s.input, height: 'auto', padding: '10px 14px', resize: 'vertical', fontSize: 14, lineHeight: 1.5 }} />
+      </div>
+      <Button type="submit" variant="primary" disabled={sending} style={s.submit}>
+        {sending ? 'Sending…' : 'Email me a code'}
+      </Button>
+      {backLink}
     </form>
   );
 }
 
 const s = {
-  // ── Rail (the sidebar's brand block, scaled up) ──
+  // ── Brand on the picture (the sidebar's brand block, scaled up). Colour
+  // comes from .signin-rail: one fixed ink, since the artwork doesn't theme.
+  // Everything on the picture shares one left edge with the slogan. ──
   brand: {
-    display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', gap: 14,
+    display: 'flex', flexDirection: 'column', alignItems: 'flex-start', textAlign: 'left', gap: 14,
   },
   emblem: { display: 'grid', placeItems: 'center', flexShrink: 0 },
   logo: { width: 64, height: 64, objectFit: 'contain', borderRadius: 18, display: 'block' },
-  brandText: { display: 'flex', flexDirection: 'column', alignItems: 'center' },
+  brandText: { display: 'flex', flexDirection: 'column', alignItems: 'flex-start' },
   // The wordmark in Knewave, as the sidebar sets it.
   wordmark: {
-    fontFamily: fonts.brand, color: t.onBrandSolid, fontWeight: 400, fontSize: 'clamp(24px, 2.4vw, 32px)',
+    fontFamily: fonts.brand, fontWeight: 400, fontSize: 'clamp(24px, 2.4vw, 32px)',
     lineHeight: 1.1, whiteSpace: 'nowrap',
   },
-  // Full white, not onBrandSolidMuted: 86% white is 4.2:1 on the dark theme's
-  // teal (white: 5.1, light theme 5.9).
-  console: { marginTop: 6, color: t.onBrandSolid, fontSize: 13, fontWeight: 500 },
-  // White on teal, without the yellow off-register shadow it used to carry.
+  console: { marginTop: 6, fontSize: 13, fontWeight: 600 },
   // Upright: Dongle has no italic.
   slogan: {
     width: '100%', maxWidth: 400, margin: 0,
     fontFamily: fonts.display, fontWeight: 700,
     fontSize: 'clamp(22px, 2.1vw, 28px)', lineHeight: 1.12,
-    color: t.onBrandSolid,
   },
   sloganLine: { display: 'block' },
 
@@ -431,6 +525,9 @@ const s = {
     borderRadius: radius.md,
   },
   fieldError: { display: 'flex', alignItems: 'center', gap: 6, margin: '7px 0 0', fontSize: 13, color: t.danger },
+  // The emailed code, spaced like the slip's password.
+  // textIndent balances the spacing after the last digit, so the code centres.
+  codeInput: { fontFamily: fonts.mono, fontSize: 24, fontWeight: 700, letterSpacing: '0.35em', textIndent: '0.35em', textAlign: 'center' },
   capsHint:   { display: 'flex', alignItems: 'center', gap: 6, margin: '7px 0 0', fontSize: 13, color: t.warning },
 
   submit: { width: '100%', minHeight: 46, fontSize: 15, marginTop: 6 },

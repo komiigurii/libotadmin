@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { systemAPI, ticketsAPI, accountsAPI, activityAPI } from '../api/api';
-import { Page, PageHeader, ErrorBanner, Button, StatusPill } from '../components/Layout';
+import { Page, PageHeader, ErrorBanner, StatusPill } from '../components/Layout';
 import UsageCharts from '../components/UsageCharts';
 import Icon from '../components/Icon';
 import { fmtNum as fmt, plural, timeAgo, fmtDateTime } from '../utils/format';
@@ -60,18 +60,13 @@ const counts = (pts) => (pts || []).map((p) => p.count);
 
 export default function SuperAdminDashboard() {
   const [data, setData] = useState(null);
-  const [refreshing, setRefreshing] = useState(false);
   const health = useHealthSamples();
 
-  // `quiet`: a live update, which doesn't turn the button to "Refreshing…".
-  const refresh = useCallback(async ({ quiet = false } = {}) => {
-    if (!quiet) setRefreshing(true);
-    setData(await load());
-    if (!quiet) setRefreshing(false);
-  }, []);
+  const refresh = useCallback(async () => { setData(await load()); }, []);
   useEffect(() => { refresh(); }, [refresh]);
-  // Seven requests a time, so at most every 5 s however busy it gets.
-  useLive(['system', 'tickets', 'staff', 'travelers', 'activity', 'progress', 'reviews'], () => { forgetUsage(); refresh({ quiet: true }); }, { gap: 5000 });
+  // Live updates, no Refresh button. Seven requests a time, so at most every
+  // 5 s however busy it gets.
+  useLive(['system', 'tickets', 'staff', 'travelers', 'activity', 'progress', 'reviews'], () => { forgetUsage(); refresh(); }, { gap: 5000 });
 
   const loading = data === null;
   const sys = data?.system;
@@ -86,7 +81,7 @@ export default function SuperAdminDashboard() {
   const openOnly = data?.tickets?.total ?? null;
   const ticketsHint = data?.tickets ? `${fmt(openOnly)} open · ${fmt(Math.max(0, waitingTickets - openOnly))} being worked on` : null;
   const passwordRequests = data?.tickets?.tickets?.filter((tk) => tk.category === 'passwordReset').length || 0;
-  const lockedCount = data?.locked ? data.locked.length : null;
+  const lockedCount = data?.locked ? data.locked.accounts.length : null;
   const series = data?.usage?.series;
   const activeToday = series?.active?.length ? series.active[series.active.length - 1].count : null;
 
@@ -94,7 +89,7 @@ export default function SuperAdminDashboard() {
     sys?.maintenance?.on && { icon: 'tool', label: 'Maintenance is on', detail: `Since ${timeAgo(sys.maintenance.startedAt)}. Admins and moderators can’t save. End it when the work is done.`, to: '/system', tone: 'warning', count: null },
     sys?.restrictedRoles?.length > 0 && { icon: 'pause', label: `${sys.restrictedRoles.map((r) => (r === 'admin' ? 'Admins' : 'Moderators')).join(' and ')} paused`, detail: 'They can’t use the console until you let them back in.', to: '/system', tone: 'warning', count: null },
     { icon: 'flag', hue: 'marigold', label: 'Tickets waiting', detail: ticketsHint ? `${ticketsHint}${passwordRequests ? `, ${plural(passwordRequests, 'password request')}` : ''}` : 'Problems admins and moderators reported', to: '/tickets', count: waitingTickets },
-    { icon: 'lock', hue: 'blue', label: 'Locked accounts', detail: 'Too many wrong passwords; unlock on the System page', to: '/system#tools', count: lockedCount },
+    { icon: 'lock', hue: 'blue', label: 'Locked accounts', detail: 'Staff and travelers with too many wrong passwords; unlock on the System page', to: '/system#tools', count: lockedCount },
     { icon: 'key', hue: 'blue', label: 'Waiting for a first sign-in', detail: 'Accounts still on their slip’s temporary password', to: '/accounts?status=firstSignIn', count: onSlip },
   ].filter(Boolean);
   const waiting = loading ? null
@@ -131,12 +126,11 @@ export default function SuperAdminDashboard() {
         title="Dashboard"
         live={live}
         stats={stats}
-        actions={<Button icon="refresh-cw" onClick={refresh} disabled={refreshing}>{refreshing ? 'Refreshing…' : 'Refresh'}</Button>}
       />
 
       {data?.failed?.length > 0 && <ErrorBanner>Couldn’t load {data.failed.join(', ')}. Everything else is current.</ErrorBanner>}
 
-      <div className="sa-grid sa-split sa-dash" style={{ opacity: refreshing && !loading ? 0.7 : 1, transition: 'opacity 0.2s' }}>
+      <div className="sa-grid sa-split sa-dash">
         <div className="sa-col">
           <section className="sa-panel sa-o-attention" aria-labelledby="dash-attention">
             <div className="sa-panel-head dark">

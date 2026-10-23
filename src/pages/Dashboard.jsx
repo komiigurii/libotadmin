@@ -1,25 +1,31 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  spotAPI, missionAPI, appealAPI, userProgressAPI,
+  spotAPI, missionAPI, appealAPI, userProgressAPI, myTravelersAPI,
 } from '../api/api';
-import { theme as t, radius, type } from '../theme';
+import { theme as t } from '../theme';
 import {
-  Page, PageHeader, Card, Avatar, ErrorBanner, Stat, Button, ApprovalPill, pageStyles,
+  Page, PageHeader, Avatar, ErrorBanner, ApprovalPill,
 } from '../components/Layout';
-import { fmtNum as fmt, plural, timeAgo } from '../utils/format';
+import { fmtNum as fmt, plural, timeAgo, fmtDateTime } from '../utils/format';
+import { loadUsage } from '../utils/usage';
 import Icon from '../components/Icon';
 import UsageCharts from '../components/UsageCharts';
 import SuperAdminDashboard from './SuperAdminDashboard';
 import { isSuperAdmin } from '../auth/roles';
+import { useLive } from '../api/live';
 
 /*
  * The landing page for admins and moderators: what's live, what's waiting on
  * you, and how travelers are using the app.
  *
+ * Laid out like the super admin's (2026-10-23, the consoles' look): the band
+ * with a stat strip, then two columns that fill the width, with lists under
+ * ink heads and charts under plain ones.
+ *
  * Every figure here is a real count from an existing endpoint. The day-by-day
- * charts (components/UsageCharts.jsx) come from GET /api/admin/stats/usage;
- * nothing else here claims a trend.
+ * charts (components/UsageCharts.jsx) and the sparks in an admin's strip come
+ * from GET /api/admin/stats/usage; nothing else here claims a trend.
  *
  * Each source loads independently (allSettled): one failing call blanks the
  * figure it feeds and says so, instead of blanking the dashboard.
@@ -62,6 +68,7 @@ async function loadAdmin() {
     : null;
 
   return {
+    at: new Date(),
     progress: val(progress),
     spots: ok(spots) ? listOf(val(spots), 'spots') : null,
     attention: {
@@ -79,14 +86,16 @@ async function loadAdmin() {
 }
 
 // A moderator's dashboard is about their attractions and their requests —
-// the same sources as My Submissions, so the two always agree.
+// the same sources as My Submissions, so the two always agree — and the
+// travelers who visited them (the Travelers page's list).
 async function loadModerator() {
-  const [mySpots, myProposals, myDeletes, myChanges] =
+  const [mySpots, myProposals, myDeletes, myChanges, myTravelers] =
     await Promise.allSettled([
       spotAPI.getMine(),
       spotAPI.getMyProposals(),
       spotAPI.getMyDeleteRequests(),
       spotAPI.getMyChangeRequests(),
+      myTravelersAPI.getAll(),
     ]);
   const ok = (r) => r.status === 'fulfilled';
   const val = (r) => (ok(r) ? r.value : undefined);
@@ -114,11 +123,14 @@ async function loadModerator() {
 
   const sources = [myProposals, myDeletes, myChanges];
   return {
+    at: new Date(),
     spots,
     submissions: sources.some(ok) || spots ? submissions : null,
+    travelers: ok(myTravelers) ? (val(myTravelers)?.travelers || []) : null,
     failed: [
       !ok(mySpots) && 'your spots',
       !sources.every(ok) && 'some of your submissions',
+      !ok(myTravelers) && 'your town’s travelers',
     ].filter(Boolean),
   };
 }
@@ -136,115 +148,119 @@ function StaffDashboard() {
   const city = localStorage.getItem('city') || '';
 
   const [data, setData] = useState(null);
-  const [refreshing, setRefreshing] = useState(false);
 
   const load = useCallback(async () => {
-    setRefreshing(true);
-    const next = await (isModerator ? loadModerator() : loadAdmin());
-    setData(next);
-    setRefreshing(false);
+    setData(await (isModerator ? loadModerator() : loadAdmin()));
   }, [isModerator]);
 
   useEffect(() => { load(); }, [load]);
+  // Live updates, no Refresh button. Six requests a time for an admin, so at
+  // most every 5 s.
+  useLive(isModerator ? ['spots', 'approvals'] : ['spots', 'approvals', 'missions', 'progress', 'travelers'], load, { gap: 5000 });
+
+  // The usage figures behind an admin's sparks: the same 30 days the charts
+  // below read, shared through utils/usage.js. Asked again after every load,
+  // so a live update brings them along.
+  const [usage, setUsage] = useState(null);
+  useEffect(() => {
+    if (isModerator || !data) return undefined;
+    let live = true;
+    loadUsage(30).then((u) => { if (live) setUsage(u); }).catch(() => {});
+    return () => { live = false; };
+  }, [isModerator, data]);
 
   const loading = data === null;
-  const stats = data?.progress?.stats;
+  const figures = data?.progress?.stats;
   const leaderboard = data?.progress?.leaderboard || [];
   const spots = data?.spots;
+  const subs = data?.submissions;
+  const series = usage?.series;
   // Admin only: everything waiting on a decision, or null if none of it loaded.
   const waiting = data?.attention
     ? sumKnown(Object.values(pick(data.attention, ['approvals', 'appeals'])))
     : null;
+  const v = (n) => (loading ? '…' : fmt(n));
 
-  // Each section fades in a beat after the one before it.
-  const reveal = (i) => ({ animationDelay: `${i * 70}ms` });
+  // Hues as everywhere in the consoles: teal travelers, magenta arrivals,
+  // orange reviews. The figures with no hue are things, not series.
+  const stats = isModerator ? [
+    { label: city ? `Spots in ${city}` : 'Your spots', to: '/spots', value: v(spots?.length),
+      hint: spots ? `${fmt(spots.filter((x) => x.AR3DModelURL).length)} with an AR model` : null },
+    { label: 'Waiting for approval', to: '/my-review-requests', value: v(subs?.filter((x) => x.status === 'pending').length),
+      hint: subs ? `${fmt(subs.filter((x) => x.status === 'rejected').length)} rejected so far` : null },
+    { label: 'Approved', to: '/my-review-requests', value: v(subs?.filter((x) => x.status === 'approved').length),
+      hint: subs ? `${plural(subs.length, 'request')} sent in all` : null },
+    { label: 'Travelers', hue: 'teal', to: '/my-travelers', value: v(data?.travelers?.length),
+      hint: `visited the spots${city ? ` in ${city}` : ''}` },
+  ] : [
+    { label: 'Needs attention', value: v(waiting), tone: loading || waiting == null ? undefined : waiting ? 'warn' : 'good',
+      hint: loading ? null : waiting ? 'approvals and ban appeals' : 'Nothing waiting on you' },
+    { label: 'Travelers', hue: 'teal', to: '/user-progress', value: v(figures?.totalUsers),
+      hint: figures ? `${fmt(figures.activeLast7)} active this week` : null, spark: counts(series?.active) },
+    { label: 'Spot visits', hue: 'magenta', to: '/user-progress', value: v(figures?.totalVisits),
+      hint: figures ? `by ${plural(figures.explorers, 'traveler')}` : null, spark: counts(series?.arrivals) },
+    { label: 'Reviews', hue: 'orange', to: '/comments', value: series ? fmt(sum(series.reviews)) : loading ? '…' : '—',
+      hint: 'in the last 30 days', spark: counts(series?.reviews) },
+    { label: 'Published spots', to: '/spots', value: v(spots?.length),
+      hint: spots ? `across ${plural(new Set(spots.map((x) => (x.city || '').trim().toLowerCase()).filter(Boolean)).size, 'city', 'cities')}` : null },
+  ];
+
+  const live = (
+    <>
+      <span>Refreshed <b className="sa-mono">{data ? fmtDateTime(data.at) : '…'}</b></span>
+      <span>{isModerator ? <>Looking after <b>{city || 'no town yet'}</b></> : <>Looking after <b>all of Bulacan</b></>}</span>
+    </>
+  );
 
   return (
     <Page>
-      {/* Same header as every other page — the dashboard used to have its own,
-          larger one in a card. */}
-      <div className="dash-reveal" style={reveal(0)}>
-        <PageHeader
-          title="Dashboard"
-          subtitle={`${greeting()}. ${isModerator
-            ? `Here are the spots you look after${city ? ` in ${city}` : ''}, and where each request you’ve sent for approval stands.`
-            : 'Here’s what’s live in the app, what’s waiting on you, and how travelers are using it.'}`}
-          actions={<Button icon="refresh-cw" onClick={load} disabled={refreshing}>{refreshing ? 'Refreshing…' : 'Refresh'}</Button>}
-        />
-      </div>
+      <PageHeader
+        title="Dashboard"
+        subtitle={`${greeting()}. ${isModerator
+          ? `Here are the spots you look after${city ? ` in ${city}` : ''}, and where each request you’ve sent for approval stands.`
+          : 'Here’s what’s live in the app, what’s waiting on you, and how travelers are using it.'}`}
+        live={live}
+        stats={stats}
+      />
 
       {data?.failed?.length > 0 && (
         <ErrorBanner>Couldn&rsquo;t load {data.failed.join(', ')}. Everything else below is current.</ErrorBanner>
       )}
 
-      {/* ── KPI row ── The previous numbers stay (dimmed) while a refresh runs,
-          instead of flashing back to placeholders. */}
-      <section
-        aria-label="Key figures"
-        className="dash-reveal"
-        style={{ ...s.statGrid, ...reveal(1), opacity: refreshing && !loading ? 0.6 : 1, transition: 'opacity 0.2s' }}
-      >
+      {/* On a phone the panels come in the order they matter (console.css,
+          .sa-o-*). */}
+      <div className="sa-grid sa-split sa-dash">
         {isModerator ? (
           <>
-            <Stat icon="map-pin" label={city ? `Spots in ${city}` : 'Your spots'} to="/spots" value={loading ? '…' : fmt(spots?.length)}
-              hint={loading ? null : spots ? `${fmt(spots.filter((x) => x.AR3DModelURL).length)} with an AR model` : null} />
-            <Stat icon="send" label="Waiting for approval" to="/my-review-requests" value={loading ? '…' : fmt(data?.submissions?.filter((x) => x.status === 'pending').length)}
-              hint={loading ? null : data?.submissions ? `${fmt(data.submissions.filter((x) => x.status === 'rejected').length)} rejected so far` : null} />
-            <Stat icon="check-circle" label="Approved" to="/my-review-requests" value={loading ? '…' : fmt(data?.submissions?.filter((x) => x.status === 'approved').length)}
-              hint={loading ? null : data?.submissions ? `${fmt(data.submissions.length)} requests sent in total` : null} />
+            <div className="sa-col">
+              <SubmissionsPanel submissions={subs} loading={loading} />
+              <CoveragePanel spots={spots} loading={loading} scope={city || 'your area'} />
+            </div>
+            <div className="sa-col">
+              <VisitorsPanel travelers={data?.travelers} loading={loading} />
+              <QuickActions isModerator />
+            </div>
           </>
         ) : (
           <>
-            <Stat icon="users" label="Travelers" to="/user-progress" value={loading ? '…' : fmt(stats?.totalUsers)}
-              hint={loading ? null : stats ? `${fmt(stats.activeLast7)} active this week` : null} />
-            <Stat icon="map-pin" label="Spot visits" to="/user-progress" value={loading ? '…' : fmt(stats?.totalVisits)}
-              hint={loading ? null : stats ? `by ${plural(stats.explorers, 'traveler')}` : null} />
-            <Stat icon="image" label="Published spots" to="/spots" value={loading ? '…' : fmt(spots?.length)}
-              hint={loading ? null : spots ? `across ${plural(new Set(spots.map((x) => (x.city || '').trim().toLowerCase()).filter(Boolean)).size, 'city', 'cities')}` : null} />
-            <Stat icon="inbox" label="Waiting on you" to="/spots/approvals"
-              emphasis={waiting > 0}
-              value={loading ? '…' : fmt(waiting)}
-              hint="approvals & appeals" />
+            <div className="sa-col">
+              <AttentionPanel attention={data?.attention} loading={loading} />
+              <div className="sa-usage sa-o-usage"><UsageCharts /></div>
+              <QuickActions />
+            </div>
+            <div className="sa-col">
+              <TopTravelers rows={leaderboard} loading={loading} failed={!loading && !data?.progress} />
+              <CoveragePanel spots={spots} loading={loading} />
+            </div>
           </>
         )}
-      </section>
-
-      {/* ── Work ── */}
-      <div className="dash-split" style={s.split}>
-        <div className="dash-reveal" style={reveal(2)}>
-          {isModerator
-            ? <SubmissionsCard submissions={data?.submissions} loading={loading} />
-            : <AttentionCard attention={data?.attention} loading={loading} />}
-        </div>
-        <div className="dash-reveal" style={reveal(3)}>
-          <QuickActions isModerator={isModerator} />
-        </div>
       </div>
-
-      {/* ── Content (+ travelers, for admins) ── */}
-      {isModerator ? (
-        <div className="dash-reveal" style={reveal(4)}>
-          <ContentCard spots={spots} loading={loading} scope={city || 'your area'} />
-        </div>
-      ) : (
-        <>
-          <div className="dash-reveal" style={reveal(4)}>
-            <UsageCharts />
-          </div>
-          <div className="dash-split" style={s.split}>
-            <div className="dash-reveal" style={reveal(5)}>
-              <ContentCard spots={spots} loading={loading} />
-            </div>
-            <div className="dash-reveal" style={reveal(6)}>
-              <TopTravelers rows={leaderboard} loading={loading} failed={!loading && !data?.progress} />
-            </div>
-          </div>
-        </>
-      )}
     </Page>
   );
 }
 
+const sum = (pts) => (pts || []).reduce((n, p) => n + p.count, 0);
+const counts = (pts) => (pts || []).map((p) => p.count);
 const pick = (obj = {}, keys) => Object.fromEntries(keys.map((k) => [k, obj[k]]));
 // A sum that says "unknown" rather than 0 when nothing loaded.
 const sumKnown = (vals) => {
@@ -254,107 +270,136 @@ const sumKnown = (vals) => {
 
 // ── Pieces ───────────────────────────────────────────────────────────
 
-function CardTitle({ children, to, linkLabel }) {
+// A panel as on the super admin's dashboard: an ink head for a live list,
+// a plain one for charts and the actions.
+function Panel({ id, title, dark, meta, to, linkLabel, className = '', children }) {
   return (
-    <div style={s.cardHead}>
-      <h2 style={s.cardTitle}>{children}</h2>
-      {to && (
-        <Link to={to} style={s.cardLink}>
-          {linkLabel} <Icon name="chevron-right" size={12} />
-        </Link>
-      )}
-    </div>
+    <section className={`sa-panel ${className}`} aria-labelledby={id}>
+      <div className={`sa-panel-head${dark ? ' dark' : ''}`}>
+        <h2 id={id} className="sa-panel-title">{title}</h2>
+        {meta && <span className="sa-panel-meta">{meta}</span>}
+        {to && <Link to={to} className={dark ? undefined : 'sa-panel-link'}>{linkLabel} <Icon name="chevron-right" size={13} /></Link>}
+      </div>
+      {children}
+    </section>
   );
 }
 
-function CountBadge({ count, loading }) {
-  if (loading) return <span style={s.badgeMuted}>…</span>;
-  if (count == null) return <span style={s.badgeMuted}>Couldn&rsquo;t load</span>;
-  if (count === 0) return <span style={s.badgeClear}><Icon name="check" size={11} weight="bold" /> Clear</span>;
-  return <span style={s.badgeCount}>{fmt(count)} waiting</span>;
+function Count({ count, loading }) {
+  if (loading) return <span style={d.muted}>…</span>;
+  if (count == null) return <span style={d.muted}>Couldn&rsquo;t load</span>;
+  if (count === 0) return <span style={d.clear}><Icon name="check" size={12} weight="bold" /> Clear</span>;
+  return <span style={d.badge}>{fmt(count)}</span>;
 }
 
-function AttentionCard({ attention, loading }) {
+function AttentionPanel({ attention, loading }) {
   const rows = [
-    { icon: 'inbox', label: 'Approval queue', to: '/spots/approvals', count: attention?.approvals,
+    { icon: 'inbox', label: 'Approval Queue', to: '/spots/approvals', count: attention?.approvals,
       detail: 'New spots, edits, deletions and food spot locations from moderators' },
     { icon: 'slash', label: 'Ban appeals', to: '/banned-accounts', count: attention?.appeals,
       detail: 'Suspended or banned travelers asking to come back' },
   ];
-  const allClear = !loading && rows.every((r) => r.count === 0);
+  const total = sumKnown(rows.map((r) => r.count));
   return (
-    <Card style={s.card}>
-      <CardTitle>Needs your attention</CardTitle>
-      {allClear && (
-        <p style={s.allClear}><Icon name="check-circle" size={14} color={t.success} /> Nothing is waiting on you. Nice.</p>
-      )}
-      <ul style={s.list}>
+    <Panel id="dash-attention" title="Needs your attention" dark className="sa-o-attention"
+      meta={loading ? '…' : total ? `${fmt(total)} waiting` : total === 0 ? 'All clear' : null}>
+      <ul style={d.list}>
         {rows.map((r) => (
-          <li key={r.to}>
-            <Link to={r.to} className="dash-link" style={s.row}>
-              <span style={s.rowIcon}><Icon name={r.icon} size={16} /></span>
-              <span style={s.rowText}>
-                <span style={s.rowLabel}>{r.label}</span>
-                <span style={s.rowDetail}>{r.detail}</span>
+          <li key={r.to} style={d.li}>
+            <Link to={r.to} className="dash-link" style={d.row}>
+              <span style={d.rowIcon}><Icon name={r.icon} size={17} /></span>
+              <span style={d.rowText}>
+                <span style={d.rowLabel}>{r.label}</span>
+                <span style={d.rowDetail}>{r.detail}</span>
               </span>
-              <CountBadge count={r.count} loading={loading} />
+              <Count count={r.count} loading={loading} />
               {/* Icon doesn't forward className, and its colour must be
                   inherited for the hover rule in App.css to recolour it. */}
-              <span className="dash-chevron" style={s.chevron}>
-                <Icon name="chevron-right" size={13} />
-              </span>
+              <span className="dash-chevron" style={d.chevron}><Icon name="chevron-right" size={14} /></span>
             </Link>
           </li>
         ))}
       </ul>
       {attention?.approvalsPartial && (
-        <p style={s.note}>Part of the approval queue didn&rsquo;t load, so its count may be low.</p>
+        <p style={d.pad}>Part of the approval queue didn&rsquo;t load, so its count may be low.</p>
       )}
-    </Card>
+    </Panel>
   );
 }
 
-function SubmissionsCard({ submissions, loading }) {
-  const recent = (submissions || []).slice(0, 5);
+const SUBMISSIONS_SHOWN = 6;
+
+function SubmissionsPanel({ submissions, loading }) {
+  const recent = (submissions || []).slice(0, SUBMISSIONS_SHOWN);
   return (
-    <Card style={s.card}>
-      <CardTitle to="/my-review-requests" linkLabel="All submissions">Your recent submissions</CardTitle>
+    <Panel id="dash-submissions" title="Your recent submissions" dark className="sa-o-attention" to="/my-review-requests" linkLabel="My Submissions">
       {loading ? (
-        <p style={s.muted}>Loading…</p>
+        <p style={d.pad}>Loading…</p>
       ) : submissions == null ? (
-        <p style={s.muted}>Couldn&rsquo;t load your submissions.</p>
+        <p style={d.pad}>Couldn&rsquo;t load your submissions.</p>
       ) : recent.length === 0 ? (
-        <p style={s.muted}>
+        <p style={d.pad}>
           Nothing sent yet. Changes you make in Spot Management go to an admin for approval, and show up here.
         </p>
       ) : (
-        <ul style={s.list}>
-          {recent.map((r, i) => {
-            return (
-              <li key={`${r.kind}-${r.name}-${i}`} style={s.row}>
-                <span style={s.rowIcon}>
-                  <Icon name={r.kind === 'Food spot location' ? 'utensils' : r.kind === 'Deletion' ? 'trash' : 'map-pin'} size={16} />
-                </span>
-                <span style={s.rowText}>
-                  <span style={s.rowLabel}>{r.name || '—'}</span>
-                  <span style={s.rowDetail}>{r.kind} · {timeAgo(r.date)}</span>
-                </span>
-                <ApprovalPill status={r.status} />
-              </li>
-            );
-          })}
+        <ul style={d.list}>
+          {recent.map((r, i) => (
+            <li key={`${r.kind}-${r.name}-${i}`} style={d.itemRow}>
+              <span style={d.rowIcon}>
+                <Icon name={r.kind === 'Food spot location' ? 'utensils' : r.kind === 'Deletion' ? 'trash' : 'map-pin'} size={17} />
+              </span>
+              <span style={d.rowText}>
+                <span style={d.rowLabel}>{r.name || '—'}</span>
+                <span style={d.rowDetail}>{r.kind} · <span className="sa-mono">{timeAgo(r.date)}</span></span>
+              </span>
+              <ApprovalPill status={r.status} />
+            </li>
+          ))}
         </ul>
       )}
-    </Card>
+    </Panel>
   );
 }
 
-function QuickActions({ isModerator }) {
+// The latest arrivals at the moderator's spots, from the Travelers page's list
+// (newest visit first).
+const VISITORS_SHOWN = 6;
+
+function VisitorsPanel({ travelers, loading }) {
+  const rows = (travelers || []).slice(0, VISITORS_SHOWN);
+  return (
+    <Panel id="dash-visitors" title="Recent visitors" dark className="sa-o-health" to="/my-travelers" linkLabel="Travelers">
+      {loading ? (
+        <p style={d.pad}>Loading…</p>
+      ) : travelers == null ? (
+        <p style={d.pad}>Couldn&rsquo;t load your town&rsquo;s travelers.</p>
+      ) : rows.length === 0 ? (
+        <p style={d.pad}>No visits yet. Travelers show here once the app records their arrival at one of your spots.</p>
+      ) : (
+        <ul style={d.list}>
+          {rows.map((r) => (
+            <li key={r.id} style={d.personRow}>
+              <Avatar src={r.profileImage} name={r.name} size={32} />
+              <span style={d.rowText}>
+                <span style={d.personName}>{r.name}</span>
+                <span style={d.rowDetail}>{(r.spotNames || []).join(', ') || plural(r.spotsVisited, 'spot')}</span>
+              </span>
+              <span className="sa-mono" style={d.when}>{r.lastVisitAt ? timeAgo(r.lastVisitAt) : '—'}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </Panel>
+  );
+}
+
+function QuickActions({ isModerator = false }) {
   const actions = isModerator
     ? [
         { icon: 'plus', label: 'Add a spot', to: '/spots?new=1' },
         { icon: 'map-pin', label: 'Edit a spot', to: '/spots' },
         { icon: 'send', label: 'My submissions', to: '/my-review-requests' },
+        { icon: 'users', label: 'Travelers', to: '/my-travelers' },
       ]
     : [
         { icon: 'inbox', label: 'Review approvals', to: '/spots/approvals' },
@@ -363,17 +408,16 @@ function QuickActions({ isModerator }) {
         { icon: 'award', label: 'Leaderboard', to: '/user-progress' },
       ];
   return (
-    <Card style={s.card}>
-      <CardTitle>Quick actions</CardTitle>
-      <div style={s.actions}>
+    <Panel id="dash-actions" title="Quick actions">
+      <div style={d.actions}>
         {actions.map((a) => (
-          <Link key={a.to} to={a.to} className="dash-action" style={s.action}>
-            <Icon name={a.icon} size={15} color={t.brand} />
+          <Link key={a.to} to={a.to} className="dash-action" style={d.action}>
+            <Icon name={a.icon} size={17} color={t.brand} />
             <span>{a.label}</span>
           </Link>
         ))}
       </div>
-    </Card>
+    </Panel>
   );
 }
 
@@ -388,7 +432,7 @@ const COVERAGE = [
   { key: 'display', label: '3D display model',  test: (x) => !!x.modelUrl },
 ];
 
-function ContentCard({ spots, loading, scope }) {
+function CoveragePanel({ spots, loading, scope }) {
   const total = spots?.length || 0;
   const cats = {};
   (spots || []).forEach((x) => {
@@ -399,16 +443,13 @@ function ContentCard({ spots, loading, scope }) {
   const catMax = Math.max(1, ...catRows.map(([, n]) => n));
 
   return (
-    <Card style={s.card}>
-      <CardTitle to="/spots" linkLabel="Spot Management">
-        Content coverage{scope ? ` · ${scope}` : ''}
-      </CardTitle>
+    <Panel id="dash-coverage" title={`Content coverage${scope ? ` · ${scope}` : ''}`} to="/spots" linkLabel="Spot Management">
       {loading ? (
-        <p style={s.muted}>Loading…</p>
+        <p style={d.pad}>Loading…</p>
       ) : spots == null ? (
-        <p style={s.muted}>Couldn&rsquo;t load spots.</p>
+        <p style={d.pad}>Couldn&rsquo;t load spots.</p>
       ) : total === 0 ? (
-        <p style={s.muted}>No spots yet.</p>
+        <p style={d.pad}>No spots yet.</p>
       ) : (
         <div style={s.contentGrid}>
           <div>
@@ -449,102 +490,88 @@ function ContentCard({ spots, loading, scope }) {
           </div>
         </div>
       )}
-    </Card>
+    </Panel>
   );
 }
 
 function TopTravelers({ rows, loading, failed }) {
   const top = rows.slice(0, 5);
   return (
-    <Card style={s.card}>
-      <CardTitle to="/user-progress" linkLabel="Full leaderboard">Top travelers</CardTitle>
+    <Panel id="dash-travelers" title="Top travelers" dark className="sa-o-activity" to="/user-progress" linkLabel="Leaderboard">
       {loading ? (
-        <p style={s.muted}>Loading…</p>
+        <p style={d.pad}>Loading…</p>
       ) : failed ? (
-        <p style={s.muted}>Couldn&rsquo;t load the leaderboard.</p>
+        <p style={d.pad}>Couldn&rsquo;t load the leaderboard.</p>
       ) : top.length === 0 ? (
-        <p style={s.muted}>No travelers yet — rankings appear once someone visits a spot.</p>
+        <p style={d.pad}>No travelers yet — rankings appear once someone visits a spot.</p>
       ) : (
-        <ol style={s.list}>
+        <ol style={d.list}>
           {top.map((r) => (
-            <li key={r.clerkUserId} style={s.travelerRow}>
-              <span style={s.rank}>{r.rank}</span>
+            <li key={r.clerkUserId} style={d.personRow}>
+              <span style={d.rank}>{r.rank}</span>
               <Avatar src={r.profileImage} name={r.name} size={32} />
-              <span style={s.rowText}>
-                <span style={s.rowLabel}>{r.name}</span>
-                <span style={s.rowDetail}>{plural(r.spotsVisited, 'spot')} visited · {plural(r.badges, 'badge')}</span>
+              <span style={d.rowText}>
+                <span style={d.personName}>{r.name}</span>
+                <span style={d.rowDetail}>{plural(r.spotsVisited, 'spot')} visited · {plural(r.badges, 'badge')}</span>
               </span>
-              <span style={s.points}>{fmt(r.points)} <span style={s.pointsUnit}>pts</span></span>
+              <span style={d.points}>{fmt(r.points)} <span style={d.pointsUnit}>pts</span></span>
             </li>
           ))}
         </ol>
       )}
-    </Card>
+    </Panel>
   );
 }
 
 // ── Styles ───────────────────────────────────────────────────────────
 
+// Rows and panels, the same metrics as the super admin's dashboard.
+const d = {
+  list:     { listStyle: 'none', margin: 0, padding: 0 },
+  li:       { borderBottom: `1px solid ${t.divider}` },
+  row:      { display: 'flex', alignItems: 'center', gap: 12, padding: '11px 16px', color: 'inherit', textDecoration: 'none' },
+  itemRow:  { display: 'flex', alignItems: 'center', gap: 12, padding: '11px 16px', borderBottom: `1px solid ${t.divider}` },
+  rowIcon:  { width: 36, height: 36, borderRadius: 10, flexShrink: 0, display: 'grid', placeItems: 'center', background: t.sidebarBg, color: t.textSecondary, border: `1px solid ${t.divider}` },
+  rowText:  { display: 'flex', flexDirection: 'column', minWidth: 0, flex: 1 },
+  rowLabel: { fontSize: 16, fontWeight: 700, color: t.textPrimary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  rowDetail: { fontSize: 14.5, color: t.textMuted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  chevron:  { display: 'inline-flex', flexShrink: 0, color: t.textMuted },
+  badge:    { flexShrink: 0, minWidth: 30, textAlign: 'center', fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 19, lineHeight: 1, padding: '5px 10px 4px', borderRadius: 8, background: t.accent, color: t.onAccent },
+  clear:    { flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 15, fontWeight: 700, color: t.success },
+  muted:    { fontSize: 15, color: t.textMuted },
+  pad:      { margin: 0, padding: '14px 16px', fontSize: 15, color: t.textMuted, lineHeight: 1.4 },
+
+  personRow:  { display: 'flex', alignItems: 'center', gap: 11, padding: '9px 16px', borderBottom: `1px solid ${t.divider}` },
+  personName: { fontSize: 16, fontWeight: 700, color: t.textPrimary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  when:       { flexShrink: 0, color: t.textMuted, whiteSpace: 'nowrap' },
+  rank:       { width: 22, textAlign: 'center', fontFamily: 'var(--font-display)', fontSize: 19, fontWeight: 700, color: t.textMuted, flexShrink: 0 },
+  points:     { flexShrink: 0, fontFamily: 'var(--font-display)', fontSize: 21, fontWeight: 700, color: t.textPrimary, whiteSpace: 'nowrap' },
+  pointsUnit: { fontFamily: 'var(--font-sans)', fontSize: 14, fontWeight: 400, color: t.textMuted },
+
+  // Two across when the column is wide enough, one when it isn't (tablet).
+  actions:  { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 8, padding: 12 },
+  action:   { display: 'flex', alignItems: 'center', gap: 9, padding: '11px 12px', borderRadius: 10, border: `1px solid ${t.border}`, background: t.sidebarBg, color: t.textPrimary, fontSize: 16, fontWeight: 700, textDecoration: 'none' },
+};
+
+// The coverage meters and category bars.
 const s = {
-  ...pageStyles,
-  split: { display: 'grid', gridTemplateColumns: 'minmax(0, 1.55fr) minmax(0, 1fr)', gap: 18, alignItems: 'start' },
-
-  card: { padding: 18 },
-  cardHead: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 12 },
-  cardTitle: { ...type.cardTitle, color: t.textPrimary, margin: 0 },
-  cardLink: { display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12.5, fontWeight: 600, color: t.brand, textDecoration: 'none', whiteSpace: 'nowrap' },
-
-  list: { listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 2 },
-  row: {
-    display: 'flex', alignItems: 'center', gap: 12, padding: '10px 10px', margin: '0 -10px',
-    borderRadius: radius.md, color: 'inherit', textDecoration: 'none',
-  },
-  rowIcon: {
-    width: 34, height: 34, borderRadius: radius.md, flexShrink: 0,
-    display: 'flex', alignItems: 'center', justifyContent: 'center', background: t.sidebarBg, color: t.textSecondary,
-  },
-  rowText: { display: 'flex', flexDirection: 'column', minWidth: 0, flex: 1 },
-  rowLabel: { fontSize: 13.5, fontWeight: 600, color: t.textPrimary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
-  rowDetail: { fontSize: 12, color: t.textMuted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
-
-  chevron: { display: 'inline-flex', flexShrink: 0, color: t.textMuted },
-  badgeCount: { flexShrink: 0, fontSize: 12, fontWeight: 700, padding: '3px 10px', borderRadius: radius.pill, background: t.accentBg, color: t.textPrimary, border: `1px solid ${t.accent}` },
-  badgeClear: { flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12, fontWeight: 600, color: t.success },
-  badgeMuted: { flexShrink: 0, fontSize: 12, color: t.textMuted },
-
-  allClear: { display: 'flex', alignItems: 'center', gap: 7, fontSize: 13, color: t.textSecondary, margin: '0 0 8px' },
-  muted: { fontSize: 13, color: t.textMuted, margin: 0, lineHeight: 1.5 },
-  note: { fontSize: 12, color: t.textMuted, margin: '10px 0 0', lineHeight: 1.5 },
-
-
-  actions: { display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 8 },
-  action: {
-    display: 'flex', alignItems: 'center', gap: 9, padding: '11px 12px', borderRadius: radius.md,
-    border: `1px solid ${t.border}`, background: t.sidebarBg, color: t.textPrimary,
-    fontSize: 13, fontWeight: 600, textDecoration: 'none', transition: 'border-color 0.15s, background 0.15s',
-  },
-
-  contentGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 24 },
-  miniHead: { fontSize: 12.5, fontWeight: 600, color: t.textSecondary, margin: '0 0 10px' },
+  contentGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 24, padding: '14px 16px 16px' },
+  miniHead: { fontSize: 15, fontWeight: 700, color: t.textSecondary, margin: '0 0 10px' },
   meterList: { listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 11 },
   meterRow: { display: 'flex', flexDirection: 'column', gap: 5 },
-  meterLabels: { display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 13 },
-  meterLabel: { color: t.textPrimary, fontWeight: 500 },
+  meterLabels: { display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 15.5 },
+  meterLabel: { color: t.textPrimary },
   meterValue: { color: t.textPrimary, fontWeight: 700 },
-  meterOf: { color: t.textMuted, fontWeight: 500 },
+  meterOf: { color: t.textMuted, fontWeight: 400 },
   meterTrack: { height: 8, borderRadius: 4, background: t.data1Track, overflow: 'hidden' },
   meterFill: { height: '100%', borderRadius: 4, background: t.data1, transition: 'width 0.5s ease' },
 
   barList: { listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 9 },
   barRow: { display: 'grid', gridTemplateColumns: '92px minmax(0, 1fr)', alignItems: 'center', gap: 10 },
-  barLabel: { fontSize: 13, color: t.textPrimary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  barLabel: { fontSize: 15.5, color: t.textPrimary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   barTrack: { display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 },
   // Square at the baseline, 4px round at the data end; 12px thick (≤ 24).
   barFill: { height: 12, borderRadius: '0 4px 4px 0', background: t.data1, minWidth: 2, flexShrink: 0, maxWidth: 'calc(100% - 30px)' },
-  barValue: { fontSize: 12.5, fontWeight: 700, color: t.textPrimary },
-
-  travelerRow: { display: 'flex', alignItems: 'center', gap: 12, padding: '8px 0' },
-  rank: { width: 20, textAlign: 'center', fontSize: 13, fontWeight: 700, color: t.textMuted, fontVariantNumeric: 'tabular-nums', flexShrink: 0 },
-  points: { flexShrink: 0, fontSize: 13.5, fontWeight: 700, color: t.textPrimary },
-  pointsUnit: { fontSize: 11.5, fontWeight: 500, color: t.textMuted },
+  barValue: { fontSize: 15, fontWeight: 700, color: t.textPrimary },
+  note: { fontSize: 14, color: t.textMuted, margin: '10px 0 0', lineHeight: 1.4 },
 };

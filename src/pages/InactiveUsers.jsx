@@ -58,7 +58,6 @@ export default function InactiveUsers() {
         title="Inactive Accounts"
         count={users.length}
         subtitle='Travelers who haven’t opened the app in 30 days or more. Archiving keeps their record for good; it is never deleted.'
-        actions={<Button icon="refresh-cw" onClick={load} disabled={loading}>Refresh</Button>}
       />
 
       {error && <ErrorBanner onDismiss={() => setError(null)}>{error}</ErrorBanner>}

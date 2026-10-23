@@ -2,7 +2,7 @@ import { Fragment, useCallback, useEffect, useRef, useState } from 'react';
 import { activityAPI } from '../api/api';
 import { useLiveTick } from '../api/live';
 import {
-  Page, PageHeader, Toolbar, SearchInput, Button, Table, Th, Td,
+  Page, PageHeader, Toolbar, SearchInput, Table, Th, Td,
   Loading, EmptyState, ErrorBanner, pageStyles as s,
 } from '../components/Layout';
 import Pagination from '../components/Pagination';
@@ -43,7 +43,6 @@ export default function ActivityLog() {
   const [query, setQuery] = useState('');
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
-  const [asked, setAsked] = useState(0); // Refresh asks again
 
   useEffect(() => {
     const timer = setTimeout(() => { setSearch(query.trim()); setPage(1); }, 300);
@@ -61,7 +60,7 @@ export default function ActivityLog() {
       .then((d) => { if (live) { setData(d); setError(''); } })
       .catch(() => { if (live && !quiet) setError('Couldn’t load the activity log.'); });
     return () => { live = false; };
-  }, [page, group, search, asked, changed]);
+  }, [page, group, search, changed]);
 
   // Each kind's total: one small ask each.
   const loadCounts = useCallback(async () => {
@@ -109,7 +108,6 @@ export default function ActivityLog() {
         title="Activity Log"
         subtitle="Who did what in the console, newest first: sign-ins, account changes, tickets, the system, and actions on travelers."
         stats={stats}
-        actions={<Button icon="refresh-cw" onClick={() => { loadCounts(); setAsked((v) => v + 1); }}>Refresh</Button>}
       >
         {mix}
       </PageHeader>

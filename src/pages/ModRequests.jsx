@@ -196,7 +196,6 @@ export default function ModRequests({ embedded = false, onCount }) {
           title="Approval Queue"
           count={pendingCount}
           subtitle="New spots, spot edits and deletions, and food spot locations from moderators — nothing goes live until you approve it."
-          actions={<Button icon="refresh-cw" onClick={load} disabled={loading}>Refresh</Button>}
         />
       )}
 
@@ -215,7 +214,6 @@ export default function ModRequests({ embedded = false, onCount }) {
             { value: 'mission-location', label: 'Food spots', count: count('mission-location') },
           ]}
         />
-        {embedded && <Button icon="refresh-cw" onClick={load} disabled={loading}>Refresh</Button>}
       </Toolbar>
 
       {error && <ErrorBanner>{error}</ErrorBanner>}

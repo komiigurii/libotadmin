@@ -2,7 +2,8 @@ import { useEffect, useId, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { authAPI, accountsAPI, activityAPI } from '../api/api';
 import { saveSession, getToken, clearSession } from '../auth/session';
-import { isSuperAdmin } from '../auth/roles';
+import { getRole, isSuperAdmin, roleLabel } from '../auth/roles';
+import { useHeartbeat } from '../auth/heartbeat';
 import { actionLabel, groupOf, GROUP_HUE } from '../utils/activity';
 import { fmtDateTime, timeAgo } from '../utils/format';
 import { theme as t, radius, fonts, type } from '../theme';
@@ -10,6 +11,7 @@ import { Page, PageHeader, Button } from '../components/Layout';
 import { notify } from '../components/AppAlert';
 import Icon from '../components/Icon';
 import logo from '../assets/logo.png';
+import loginBg from '../assets/login-bg.jpg';
 import { passwordChecks, passwordProblem, PASSWORD_MAX } from '../utils/passwordRule';
 import './Login.css';
 
@@ -128,7 +130,7 @@ export function SetPassword() {
   };
   return (
     <div className="signin">
-      <aside className="signin-rail" aria-label="Libot Bulacan">
+      <aside className="signin-rail" aria-label="Libot Bulacan" style={{ backgroundImage: `url(${loginBg})` }}>
         <div style={f.brand}>
           <img src={logo} alt="" style={f.logo} />
           <div style={f.wordmark}>LibotBulacan</div>
@@ -165,25 +167,48 @@ export default function ChangePassword() {
     }} />
   );
   const subtitle = 'Choose a new password for your account. You stay signed in here; any other window or device is signed out.';
-  // The super admin's console fills the width: the form, and beside it what
-  // was done with this account lately, so a sign-in you don't recognise
-  // stands out before you change the password.
-  if (isSuperAdmin()) {
-    return (
-      <Page>
-        <PageHeader title="Change password" subtitle={subtitle} />
-        <div className="sa-grid sa-split-even">
-          <section className="sa-panel" style={{ padding: '18px 20px' }} aria-label="New password">{form}</section>
-          <MyRecentActivity />
-        </div>
-      </Page>
-    );
-  }
+  // The form, and beside it: for the super admin, what was done with this
+  // account lately, so a sign-in you don't recognise stands out before you
+  // change the password (only the super admin can read the activity log);
+  // for an admin or a moderator, the account itself and where to turn.
   return (
     <Page>
       <PageHeader title="Change password" subtitle={subtitle} />
-      <div style={{ ...f.card, maxWidth: 460 }}>{form}</div>
+      <div className="sa-grid sa-split-even">
+        <section className="sa-panel" style={{ padding: '18px 20px' }} aria-label="New password">{form}</section>
+        {isSuperAdmin() ? <MyRecentActivity /> : <MyAccount />}
+      </div>
     </Page>
+  );
+}
+
+function MyAccount() {
+  const beat = useHeartbeat();
+  const role = getRole();
+  const city = localStorage.getItem('city') || '';
+  const rows = [
+    ['Username', beat?.username ? <span style={{ fontFamily: fonts.mono }}>{beat.username}</span> : '…'],
+    ['Role', roleLabel(role)],
+    ['Looks after', role === 'moderator' ? (city || 'No city assigned') : 'All of Bulacan'],
+  ];
+  return (
+    <section className="sa-panel" aria-labelledby="my-account">
+      <div className="sa-panel-head">
+        <h2 id="my-account" className="sa-panel-title"><Icon name="user" size={16} /> Your account</h2>
+      </div>
+      <dl style={{ margin: 0 }}>
+        {rows.map(([k, v]) => (
+          <div key={k} style={f.fact}>
+            <dt style={{ color: t.textMuted }}>{k}</dt>
+            <dd style={{ margin: 0, fontWeight: 700, color: t.textPrimary, textAlign: 'right' }}>{v}</dd>
+          </div>
+        ))}
+      </dl>
+      <p style={{ ...f.help, textAlign: 'left', margin: 0, padding: '12px 16px 14px' }}>
+        Usernames are permanent. Forgot your password later? Use “Forgot your password?” on the sign-in page: the super admin
+        gives you a new slip. Something you don’t recognise? <Link to="/tickets" style={f.inlineLink}>Report a Problem</Link>.
+      </p>
+    </section>
   );
 }
 
@@ -237,14 +262,17 @@ function MyRecentActivity() {
 
 const f = {
   pad:        { margin: 0, padding: '14px 16px', fontSize: 15, color: t.textMuted },
+  fact:       { display: 'flex', justifyContent: 'space-between', gap: 16, padding: '10px 16px', borderBottom: `1px solid ${t.divider}`, fontSize: 16 },
+  inlineLink: { color: t.brand, fontWeight: 700 },
   recent:     { listStyle: 'none', margin: 0, padding: 0 },
   recentRow:  { display: 'grid', gridTemplateColumns: 'minmax(120px, auto) minmax(0, 1fr) auto', alignItems: 'center', gap: 12, padding: '9px 16px', borderBottom: `1px solid ${t.divider}`, fontSize: 15 },
   recentWhat: { display: 'inline-flex', alignItems: 'center', gap: 8, fontWeight: 700, color: t.textPrimary, whiteSpace: 'nowrap' },
   recentText: { color: t.textSecondary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
-  brand:   { display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', gap: 12 },
+  brand:   { display: 'flex', flexDirection: 'column', alignItems: 'flex-start', textAlign: 'left', gap: 12 },
   logo:     { width: 64, height: 64, objectFit: 'contain', borderRadius: 18, display: 'block' },
-  wordmark: { fontFamily: fonts.brand, color: t.onBrandSolid, fontWeight: 400, fontSize: 'clamp(24px, 2.4vw, 32px)', lineHeight: 1.1 },
-  console:  { color: t.onBrandSolid, fontSize: 13, fontWeight: 500 },
+  // Ink comes from .signin-rail (the brand sits on the sign-in artwork).
+  wordmark: { fontFamily: fonts.brand, fontWeight: 400, fontSize: 'clamp(24px, 2.4vw, 32px)', lineHeight: 1.1 },
+  console:  { fontSize: 13, fontWeight: 600 },
   card: {
     width: '100%', maxWidth: 440, boxSizing: 'border-box',
     background: t.cardBg, border: `1px solid ${t.border}`, borderRadius: radius.xl,

@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useId, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ticketsAPI } from '../api/api';
+import { useLive, useLiveTick } from '../api/live';
 import {
-  Page, PageHeader, Toolbar, SearchInput, FilterTabs, Button, StatusPill, Tag, Loading, EmptyState, ErrorBanner,
+  Page, PageHeader, Toolbar, SearchInput, Button, StatusPill, Tag, Loading, EmptyState, ErrorBanner,
   Table, Th, Td, pageStyles as s,
 } from '../components/Layout';
 import Pagination from '../components/Pagination';
@@ -68,11 +69,12 @@ function TicketQueue() {
     return () => clearTimeout(timer);
   }, [query]);
 
-  const load = useCallback(async () => {
+  // `quiet`: a live update; a failure keeps the list shown.
+  const load = useCallback(async ({ quiet = false } = {}) => {
     try {
       setData(await ticketsAPI.list({ page, limit: 25, ...(status ? { status } : {}), ...(category ? { category } : {}), ...(search ? { q: search } : {}) }));
       setError('');
-    } catch (err) { setError(errorOf(err)); }
+    } catch (err) { if (!quiet) setError(errorOf(err)); }
   }, [page, status, category, search]);
   useEffect(() => { load(); }, [load]);
 
@@ -86,6 +88,8 @@ function TicketQueue() {
     setCounts({ open, inProgress, resolved, all, passwords });
   }, []);
   useEffect(() => { loadCounts(); }, [loadCounts]);
+  // New tickets, replies and status changes, from anyone.
+  useLive(['tickets'], () => { load({ quiet: true }); loadCounts(); });
 
   const pick = (s, c = category) => { setStatus(s); setCategory(c); setPage(1); };
   const n = (v) => (v == null ? '…' : fmtNum(v));
@@ -104,7 +108,6 @@ function TicketQueue() {
         title="Tickets"
         subtitle="Problems admins and moderators reported, and password requests from the sign-in page. Newest activity first."
         stats={stats}
-        actions={<Button icon="refresh-cw" onClick={() => { load(); loadCounts(); }}>Refresh</Button>}
       />
       {error && <ErrorBanner onDismiss={() => setError('')}>{error}</ErrorBanner>}
 
@@ -190,34 +193,53 @@ function ReportProblem() {
     return () => clearTimeout(timer);
   }, [query]);
 
-  const load = useCallback(async () => {
+  // `quiet`: a live update (the super admin answered); a failure keeps the list.
+  const load = useCallback(async ({ quiet = false } = {}) => {
     try {
       setData(await ticketsAPI.list({ page, limit: 20, ...(status ? { status } : {}), ...(search ? { q: search } : {}) }));
       setError('');
-    } catch (err) { setError(errorOf(err)); }
+    } catch (err) { if (!quiet) setError(errorOf(err)); }
   }, [page, status, search]);
   useEffect(() => { load(); }, [load]);
+  useLive(['tickets'], () => load({ quiet: true }));
+
+  // How many of yours in each status, one small ask each, as on the super
+  // admin's queue; the strip's cells filter the list below.
+  const [counts, setCounts] = useState(null);
+  const loadCounts = useCallback(async () => {
+    const total = (p) => ticketsAPI.list({ ...p, limit: 1 }).then((d) => d.total).catch(() => null);
+    const [open, inProgress, resolved, all] = await Promise.all([
+      total({ status: 'open' }), total({ status: 'inProgress' }), total({ status: 'resolved' }), total({}),
+    ]);
+    setCounts({ open, inProgress, resolved, all });
+  }, []);
+  useEffect(() => { loadCounts(); }, [loadCounts]);
+  useLive(['tickets'], () => { loadCounts(); });
+
+  const pick = (st) => { setStatus(st); setPage(1); };
+  const n = (v) => (v == null ? '…' : fmtNum(v));
+  const stats = [
+    { label: 'Open', hue: 'marigold', value: n(counts?.open), hint: 'waiting for the super admin', onClick: () => pick('open'), current: status === 'open' },
+    { label: 'Being worked on', hue: 'marigold', value: n(counts?.inProgress), hint: 'the super admin picked these up', onClick: () => pick('inProgress'), current: status === 'inProgress' },
+    { label: 'Resolved', hue: 'marigold', value: n(counts?.resolved), hint: 'answered and closed', onClick: () => pick('resolved'), current: status === 'resolved' },
+    { label: 'All your tickets', value: n(counts?.all), hint: 'everything you’ve sent', onClick: () => pick(''), current: !status },
+  ];
 
   return (
     <Page>
       <PageHeader
         title="Report a Problem"
-        count={data?.open || undefined}
         subtitle="Tell the super admin about a problem with the console. You’re told in the bell when they answer."
+        stats={stats}
+        statsLabel="Your tickets by status"
         actions={!writing && <Button variant="primary" icon="plus" onClick={() => setWriting(true)}>New ticket</Button>}
       />
       {error && <ErrorBanner onDismiss={() => setError('')}>{error}</ErrorBanner>}
       {writing && <NewTicket onCancel={() => setWriting(false)} onSent={(tk) => { setWriting(false); navigate(`/tickets/${tk._id}`); }} />}
 
       <Toolbar>
-        <FilterTabs label="Status" value={status} onChange={(v) => { setStatus(v); setPage(1); }}
-          options={[
-            { value: '', label: 'All' },
-            { value: 'open', label: 'Open' },
-            { value: 'inProgress', label: 'Being worked on' },
-            { value: 'resolved', label: 'Resolved' },
-          ]} />
-        <SearchInput value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search your tickets…" />
+        <span style={x.scope}>{status ? TICKET_STATUS[status].label : 'All'}{data ? ` · ${fmtNum(data.total)}` : ''}</span>
+        <SearchInput value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search your tickets by title or number…" />
       </Toolbar>
 
       {!data ? <Loading label="Loading tickets…" />
@@ -226,27 +248,24 @@ function ReportProblem() {
             subtitle="Use New ticket to report a problem." />
         ) : (
           <>
-            <ul style={x.list} aria-label="Tickets">
+            <Table caption="Your tickets" head={<><Th width={64}>No.</Th><Th>Ticket</Th><Th>About</Th><Th align="right">Replies</Th><Th>Updated</Th><Th>Status</Th></>}>
               {data.tickets.map((tk) => {
                 const cat = CATEGORY[tk.category] || CATEGORY.other;
                 const st = TICKET_STATUS[tk.status] || TICKET_STATUS.open;
                 return (
-                  <li key={tk._id}>
-                    <button type="button" style={x.row} onClick={() => navigate(`/tickets/${tk._id}`)}>
-                      <span style={x.number}>#{tk.number}</span>
-                      <span style={{ minWidth: 0, flex: 1 }}>
-                        <span style={x.subject}>{tk.subject}</span>
-                        <span style={x.meta}>
-                          <Tag icon={cat.icon}>{cat.label}</Tag>
-                          <span>{tk.replyCount ? `${tk.replyCount} repl${tk.replyCount === 1 ? 'y' : 'ies'} · ` : ''}updated {timeAgo(tk.updatedAt)}</span>
-                        </span>
-                      </span>
-                      <StatusPill tone={st.tone} icon={st.icon}>{st.label}</StatusPill>
-                    </button>
-                  </li>
+                  <tr key={tk._id} style={{ cursor: 'pointer' }} onClick={() => navigate(`/tickets/${tk._id}`)}>
+                    <Td><span className="sa-mono" style={{ color: t.textMuted }}>#{tk.number}</span></Td>
+                    <Td>
+                      <Link to={`/tickets/${tk._id}`} style={x.subjectLink} onClick={(e) => e.stopPropagation()}>{tk.subject}</Link>
+                    </Td>
+                    <Td><Tag icon={cat.icon}>{cat.label}</Tag></Td>
+                    <Td align="right">{fmtNum(tk.replyCount || 0)}</Td>
+                    <Td muted style={{ whiteSpace: 'nowrap' }}><span className="sa-mono" title={fmtDateTime(tk.updatedAt)}>{timeAgo(tk.updatedAt)}</span></Td>
+                    <Td><StatusPill tone={st.tone} icon={st.icon}>{st.label}</StatusPill></Td>
+                  </tr>
                 );
               })}
-            </ul>
+            </Table>
             {data.pages > 1 && <Pagination page={data.page} pages={data.pages} onChange={setPage} label="Ticket pages" />}
           </>
         )}
@@ -288,7 +307,7 @@ function NewTicket({ onCancel, onSent }) {
 
   const err = (k) => shown[k] && <p style={x.error}><Icon name="alert-circle" size={12} /> {shown[k]}</p>;
   return (
-    <form style={x.card} onSubmit={send} noValidate aria-label="New ticket">
+    <form className="sa-panel" style={{ padding: '14px 16px' }} onSubmit={send} noValidate aria-label="New ticket">
       <div style={x.formGrid}>
         <div>
           <label htmlFor={ids.cat} style={s.panelLabel}>What it’s about</label>
@@ -332,11 +351,17 @@ export function TicketDetail() {
   const [slip, setSlip] = useState(null);
   const replyId = useId();
 
+  // A reply or a status change from the other side shows as it happens; the
+  // reply being typed stays. Once this ticket is shown, a failed reload keeps it.
+  const changed = useLiveTick(['tickets']);
+  const shownId = useRef(null);
   useEffect(() => {
     let live = true;
-    ticketsAPI.get(id).then((tk) => { if (live) setTicket(tk); }).catch((err) => { if (live) setError(errorOf(err)); });
+    ticketsAPI.get(id)
+      .then((tk) => { if (live) { setTicket(tk); shownId.current = id; } })
+      .catch((err) => { if (live && shownId.current !== id) setError(errorOf(err)); });
     return () => { live = false; };
-  }, [id]);
+  }, [id, changed]);
 
   const run = async (key, fn) => {
     setBusy(key);
@@ -351,14 +376,17 @@ export function TicketDetail() {
   };
   const setStatus = (status) => run(status, async () => setTicket(await ticketsAPI.setStatus(id, status)));
   const newSlip = () => run('slip', async () => {
+    const to = ticket.contactEmail;
     const ok = await confirmAction(
-      `Make a new temporary password for ${ticket.from.username}? Their old password stops working. Give them the slip in person or through your office’s own channel.`,
-      { title: 'Make a new slip?', confirmText: 'Make a slip', tone: 'warning' },
+      to
+        ? `Make a new temporary password for ${ticket.from.username}? Their old password stops working, and the slip is emailed to ${to}. Make sure that address is really theirs.`
+        : `Make a new temporary password for ${ticket.from.username}? Their old password stops working. Give them the slip in person or through your office’s own channel.`,
+      { title: 'Make a new slip?', confirmText: to ? 'Make and email the slip' : 'Make a slip', tone: 'warning' },
     );
     if (!ok) return;
     const data = await ticketsAPI.resetPassword(id);
     setTicket(data.ticket);
-    setSlip(data);
+    setSlip({ ...data, email: data.emailedTo || data.emailFailed ? { to: data.emailedTo || to, sent: !!data.emailedTo } : null });
   });
 
   if (error) {
@@ -376,51 +404,68 @@ export function TicketDetail() {
   const st = TICKET_STATUS[ticket.status] || TICKET_STATUS.open;
   const passwordRequest = ticket.category === 'passwordReset';
 
-  // The super admin's console: the ticket's facts in the band's strip, its
-  // actions in the band, and the answer box beside the thread.
-  if (superAdmin) {
-    const stats = [
-      { label: 'Status', small: true, value: st.label, tone: ticket.status === 'resolved' ? 'good' : ticket.status === 'open' ? 'warn' : undefined },
-      { label: 'About', hue: passwordRequest ? 'blue' : 'marigold', small: true, value: cat.label },
-      { label: 'From', small: true, value: ticket.from?.username || 'someone', hint: ticket.from?.city || ROLE[ticket.from?.role] || '' },
-      { label: 'Sent', small: true, value: timeAgo(ticket.createdAt), hint: <span className="sa-mono">{fmtDateTime(ticket.createdAt)}</span> },
-      { label: 'Replies', value: fmtNum(ticket.replies.length), hint: ticket.replies.length ? <>last <span className="sa-mono">{timeAgo(ticket.replies[ticket.replies.length - 1].at)}</span></> : 'none yet' },
-    ];
-    return (
-      <Page>
-        <PageHeader
-          title={`#${ticket.number} · ${ticket.subject}`}
-          stats={stats}
-          actions={<>
-            <Button icon="chevron-left" onClick={() => navigate('/tickets')}>All tickets</Button>
-            {passwordRequest && ticket.status !== 'resolved' && (
-              <Button variant="primary" icon="key" onClick={newSlip} disabled={busy === 'slip'}>Make a new slip</Button>
-            )}
-            {ticket.status !== 'inProgress' && ticket.status !== 'resolved' && (
-              <Button icon="tool" onClick={() => setStatus('inProgress')} disabled={!!busy}>Mark as being worked on</Button>
-            )}
-            {ticket.status !== 'resolved'
-              ? <Button variant="success" icon="check" onClick={() => setStatus('resolved')} disabled={!!busy}>Mark resolved</Button>
-              : <Button icon="refresh-cw" onClick={() => setStatus('open')} disabled={!!busy}>Open again</Button>}
-          </>}
-        />
-        <div className="sa-grid sa-split">
-          <div className="sa-col">
-            <ol style={x.thread} aria-label="Messages">
-              <Message who={ticket.from} at={ticket.createdAt} text={ticket.message} first />
-              {ticket.replies.map((r) => <Message key={r._id} who={r.by} at={r.at} text={r.message} />)}
-            </ol>
-            {passwordRequest && (
-              <section className="sa-panel" aria-label="About password requests">
-                <div className="sa-panel-head"><h2 className="sa-panel-title"><Icon name="key" size={16} /> A password request</h2></div>
+  // The ticket's facts in the band's strip, its actions in the band, and the
+  // answer box beside the thread. The super admin answers and sets the
+  // status; the admin or moderator who sent it can add to it.
+  const replies = ticket.replies.length;
+  const stats = [
+    { label: 'Status', small: true, value: st.label, tone: ticket.status === 'resolved' ? 'good' : ticket.status === 'open' ? 'warn' : undefined },
+    { label: 'About', hue: passwordRequest ? 'blue' : 'marigold', small: true, value: cat.label },
+    ...(superAdmin ? [{ label: 'From', small: true, value: ticket.from?.username || 'someone', hint: ticket.from?.city || ROLE[ticket.from?.role] || '' }] : []),
+    { label: 'Sent', small: true, value: timeAgo(ticket.createdAt), hint: <span className="sa-mono">{fmtDateTime(ticket.createdAt)}</span> },
+    { label: 'Replies', value: fmtNum(replies), hint: replies ? <>last <span className="sa-mono">{timeAgo(ticket.replies[replies - 1].at)}</span></> : 'none yet' },
+  ];
+  const back = <Button icon="chevron-left" onClick={() => navigate('/tickets')}>All tickets</Button>;
+  return (
+    <Page>
+      <PageHeader
+        title={`#${ticket.number} · ${ticket.subject}`}
+        stats={stats}
+        actions={superAdmin ? <>
+          {back}
+          {passwordRequest && ticket.status !== 'resolved' && (
+            <Button variant="primary" icon="key" onClick={newSlip} disabled={busy === 'slip'}>Make a new slip</Button>
+          )}
+          {ticket.status !== 'inProgress' && ticket.status !== 'resolved' && (
+            <Button icon="tool" onClick={() => setStatus('inProgress')} disabled={!!busy}>Mark as being worked on</Button>
+          )}
+          {ticket.status !== 'resolved'
+            ? <Button variant="success" icon="check" onClick={() => setStatus('resolved')} disabled={!!busy}>Mark resolved</Button>
+            : <Button icon="refresh-cw" onClick={() => setStatus('open')} disabled={!!busy}>Open again</Button>}
+        </> : back}
+      />
+      <div className="sa-grid sa-split">
+        <div className="sa-col">
+          <ol style={x.thread} aria-label="Messages">
+            <Message who={ticket.from} at={ticket.createdAt} text={ticket.message} first />
+            {ticket.replies.map((r) => <Message key={r._id} who={r.by} at={r.at} text={r.message} />)}
+          </ol>
+          {superAdmin && passwordRequest && (
+            <section className="sa-panel" aria-label="About password requests">
+              <div className="sa-panel-head"><h2 className="sa-panel-title"><Icon name="key" size={16} /> A password request</h2></div>
+              {ticket.contactEmail ? (
+                <div style={{ padding: '12px 16px 14px' }}>
+                  <div style={x.slipTo}>
+                    <Icon name="mail" size={15} color={t.brand} />
+                    <span>Slip goes to <strong style={{ color: t.textPrimary }}>{ticket.contactEmail}</strong></span>
+                  </div>
+                  <p style={{ ...x.note, margin: '8px 0 0' }}>
+                    They confirmed this address with a code, so it’s theirs to read, but anyone who knows a username can ask. Check
+                    it really belongs to {ticket.from?.username} (for example, call their office), then make a new slip: it’s emailed
+                    there and shown to you once. They choose their own password at the next sign-in.
+                  </p>
+                </div>
+              ) : (
                 <p style={{ ...x.note, margin: 0, padding: '12px 16px 14px' }}>
                   {ticket.from?.username} can’t sign in, so they won’t see replies here. Make a new slip and hand it to them; they
                   choose their own password at the next sign-in. The slip shows the new temporary password once.
                 </p>
-              </section>
-            )}
-          </div>
-          <div className="sa-col">
+              )}
+            </section>
+          )}
+        </div>
+        <div className="sa-col">
+          {superAdmin ? (
             <form className="sa-panel" style={{ padding: '14px 16px' }} onSubmit={send}>
               <label htmlFor={replyId} style={s.panelLabel}>Answer</label>
               <textarea id={replyId} value={reply} onChange={(e) => setReply(e.target.value)} maxLength={2000} rows={6} style={s.textarea}
@@ -432,42 +477,26 @@ export function TicketDetail() {
               </div>
               <p style={x.note}>{ticket.from?.username || 'They'} {passwordRequest ? 'can’t read this until they can sign in again.' : 'is told in their bell.'}</p>
             </form>
-          </div>
+          ) : !passwordRequest && (
+            <form className="sa-panel" style={{ padding: '14px 16px' }} onSubmit={send}>
+              <label htmlFor={replyId} style={s.panelLabel}>Add to this ticket</label>
+              <textarea id={replyId} value={reply} onChange={(e) => setReply(e.target.value)} maxLength={2000} rows={6} style={s.textarea}
+                placeholder="Anything more about the problem." />
+              <div style={{ ...s.buttonRow, justifyContent: 'flex-end' }}>
+                <Button type="submit" variant="primary" icon="send" disabled={busy === 'reply' || !reply.trim()}>
+                  {busy === 'reply' ? 'Sending…' : 'Send'}
+                </Button>
+              </div>
+              <p style={x.note}>
+                {ticket.status === 'resolved' ? 'Writing again opens the ticket again.' : 'The super admin is told; their answer comes to your bell.'}
+              </p>
+            </form>
+          )}
         </div>
-        {slip && (
-          <CredentialSlip kind="reset" account={slip.account} tempPassword={slip.tempPassword}
-            expiresAt={slip.tempPasswordExpiresAt} onClose={() => setSlip(null)} />
-        )}
-      </Page>
-    );
-  }
-
-  return (
-    <Page>
-      <div><Button size="sm" icon="chevron-left" onClick={() => navigate('/tickets')}>All tickets</Button></div>
-      <PageHeader
-        title={`#${ticket.number} · ${ticket.subject}`}
-        subtitle={`${cat.label} · from ${ticket.from?.username || 'someone'}${ticket.from?.city ? ` (${ticket.from.city})` : ''} · ${fmtDateTime(ticket.createdAt)}`}
-        actions={<StatusPill tone={st.tone} icon={st.icon}>{st.label}</StatusPill>}
-      />
-
-      <ol style={x.thread} aria-label="Messages">
-        <Message who={ticket.from} at={ticket.createdAt} text={ticket.message} first />
-        {ticket.replies.map((r) => <Message key={r._id} who={r.by} at={r.at} text={r.message} />)}
-      </ol>
-
-      {!passwordRequest && (
-        <form style={x.card} onSubmit={send}>
-          <label htmlFor={replyId} style={s.panelLabel}>Add to this ticket</label>
-          <textarea id={replyId} value={reply} onChange={(e) => setReply(e.target.value)} maxLength={2000} rows={3} style={s.textarea}
-            placeholder="Anything more about the problem." />
-          <div style={{ ...s.buttonRow, justifyContent: 'flex-end' }}>
-            <Button type="submit" variant="primary" icon="send" disabled={busy === 'reply' || !reply.trim()}>
-              {busy === 'reply' ? 'Sending…' : 'Send'}
-            </Button>
-          </div>
-          {ticket.status === 'resolved' && <p style={x.note}>Writing again opens the ticket again.</p>}
-        </form>
+      </div>
+      {slip && (
+        <CredentialSlip kind="reset" account={slip.account} tempPassword={slip.tempPassword}
+          expiresAt={slip.tempPasswordExpiresAt} email={slip.email} onClose={() => setSlip(null)} />
       )}
     </Page>
   );
@@ -491,22 +520,13 @@ function Message({ who, at, text, first }) {
 const x = {
   scope:   { fontSize: 15, fontWeight: 700, color: t.textPrimary, whiteSpace: 'nowrap' },
   subjectLink: { fontSize: 14, fontWeight: 700, color: t.textPrimary, textDecoration: 'none', overflowWrap: 'anywhere' },
-  list:    { listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 8 },
-  row: {
-    display: 'flex', alignItems: 'center', gap: 14, width: '100%', textAlign: 'left', cursor: 'pointer', flexWrap: 'wrap',
-    padding: '14px 16px', borderRadius: radius.lg, border: `1px solid ${t.border}`, background: t.cardBg,
-    fontFamily: 'inherit', color: 'inherit',
-  },
-  number:  { fontSize: 13, fontWeight: 700, color: t.textMuted, fontVariantNumeric: 'tabular-nums', minWidth: 34 },
-  subject: { display: 'block', fontSize: 14, fontWeight: 700, color: t.textPrimary, overflowWrap: 'anywhere' },
-  meta:    { display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginTop: 5, fontSize: 12, color: t.textMuted },
-  card:    { background: t.cardBg, border: `1px solid ${t.border}`, borderRadius: radius.lg, padding: '16px 18px' },
   formGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '12px 16px' },
   // Shorthand, like the s.select / s.textarea it's spread over.
   invalid: { border: `1px solid ${t.danger}` },
   error:   { fontSize: 12, color: t.danger, margin: '5px 0 0', display: 'flex', alignItems: 'center', gap: 4 },
   actionsRow: { display: 'flex', gap: 8, flexWrap: 'wrap' },
   note:    { fontSize: 12.5, color: t.textMuted, lineHeight: 1.5, margin: '10px 0 0' },
+  slipTo:  { display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, color: t.textSecondary, overflowWrap: 'anywhere' },
   thread:  { listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 10 },
   message: { background: t.cardBg, borderWidth: 1, borderStyle: 'solid', borderColor: t.border, borderRadius: radius.lg, padding: '14px 16px' },
   messageSuper: { background: t.brandSoft, borderColor: 'transparent' },

@@ -15,8 +15,11 @@ import './CredentialSlip.css';
  * they must choose their own password, and the temporary one stops working
  * after 72 hours. Closing asks first: it can't be shown again.
  *
+ * A forgotten password's slip is also emailed to the address the person
+ * confirmed with a code (2026-10-23); `email` says where, and whether it went.
+ *
  * Props: { kind: 'new' | 'reset', account: { username, role, municipality },
- *          tempPassword, expiresAt, onClose }
+ *          tempPassword, expiresAt, onClose, email?: { to, sent } }
  */
 
 // "Tq7#mR2v!Kp9" → "Tq7# mR2v !Kp9": easier to read off paper. Copy and print
@@ -25,7 +28,7 @@ const grouped = (pw) => pw.replace(/(.{4})(?=.)/g, '$1 ');
 
 const roleName = (role) => (role === 'admin' ? 'admin' : role === 'superadmin' ? 'super admin' : 'moderator');
 
-export default function CredentialSlip({ kind = 'new', account, tempPassword, expiresAt, onClose }) {
+export default function CredentialSlip({ kind = 'new', account, tempPassword, expiresAt, onClose, email = null }) {
   const titleId = useId();
   const [copied, setCopied] = useState(false);
   const panelUrl = `${window.location.origin}/login`;
@@ -74,9 +77,20 @@ export default function CredentialSlip({ kind = 'new', account, tempPassword, ex
             {kind === 'reset' ? `New temporary password for ${account.username}` : `New ${who} account`}
           </h2>
         </div>
-        <p className="slip-no-print" style={s.lead}>
-          Give this to the {roleName(account.role)} in person or through your office’s own channel. It’s shown only once.
-        </p>
+        {email?.sent ? (
+          <p className="slip-no-print" style={{ ...s.lead, ...s.sent }} role="status">
+            <Icon name="check" size={14} color={t.success} /> <span>Emailed to <strong>{email.to}</strong>. It’s shown here only once.</span>
+          </p>
+        ) : email ? (
+          <p className="slip-no-print" style={{ ...s.lead, ...s.unsent }} role="alert">
+            <Icon name="alert-triangle" size={14} color={t.danger} />
+            <span>Couldn’t email it to <strong>{email.to}</strong>. Copy it and send it yourself, or give it in person. It’s shown only once.</span>
+          </p>
+        ) : (
+          <p className="slip-no-print" style={s.lead}>
+            Give this to the {roleName(account.role)} in person or through your office’s own channel. It’s shown only once.
+          </p>
+        )}
 
         <dl style={s.rows}>
           <div style={s.row}><dt style={s.dt}>Sign in at</dt><dd style={s.dd}>{panelUrl}</dd></div>
@@ -121,6 +135,8 @@ const s = {
   head:  { display: 'flex', alignItems: 'center', gap: 10 },
   title: { ...type.dialogTitle, color: t.textPrimary, margin: 0, fontSize: 19 },
   lead:  { fontSize: 13, color: t.textSecondary, lineHeight: 1.5, margin: '8px 0 0' },
+  sent:   { display: 'flex', gap: 6, alignItems: 'baseline', overflowWrap: 'anywhere' },
+  unsent: { display: 'flex', gap: 6, alignItems: 'baseline', overflowWrap: 'anywhere', color: t.danger },
   rows:  { margin: '16px 0 0', display: 'grid', gap: 8 },
   row:   { display: 'grid', gridTemplateColumns: '108px 1fr', gap: 10, alignItems: 'baseline' },
   dt:    { ...type.label, color: t.textMuted },

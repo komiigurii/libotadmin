@@ -10,7 +10,6 @@ import { fmtDateTime, fmtDay, timeAgo } from '../utils/format';
 import { BULACAN_MUNICIPALITIES } from '../utils/municipalities';
 import { usernameProblem } from '../utils/passwordRule';
 import { actionLabel, STAFF_STATUS } from '../utils/activity';
-import { isSuperAdmin } from '../auth/roles';
 
 // A square icon-only button (the super admin's account rows).
 const sq = { width: 34, minHeight: 34, padding: 0 };
@@ -22,8 +21,8 @@ const sq = { width: 34, minHeight: 34, padding: 0 };
  *     No name and no password: the server makes a temporary password, shown
  *     once on the credential slip.
  *   - StaffTable: each account's status, last sign-in and "Last changed by …",
- *     with Reset password (a new slip), Deactivate/Reactivate, Move town and
- *     History.
+ *     with Reset password (a new slip), Deactivate/Reactivate, Move town,
+ *     History, and Unlock on a locked row (the super admin's page only).
  * Usernames are permanent and a moderator's name comes from the town, so
  * neither can be edited anywhere.
  */
@@ -165,8 +164,10 @@ export function AddAccountForm({ roles, accounts, onCancel, onMade }) {
  * accounts: staffView rows. extra: an optional { head, cell(account) } column
  * (the Moderators page adds "Requests sent"). onChanged(account) replaces a row.
  * canManage(account): whether this person may act on that row.
+ * onUnlock(account): given only to the super admin, who unlocks a locked row
+ * of any role (user rule 2026-10-23).
  */
-export function StaffTable({ accounts, extra, onChanged, canManage, caption = 'Staff accounts', townInName = false }) {
+export function StaffTable({ accounts, extra, onChanged, canManage, onUnlock, caption = 'Staff accounts', townInName = false }) {
   const [slip, setSlip] = useState(null);
   const [moving, setMoving] = useState(null);
   const [historyOf, setHistoryOf] = useState(null);
@@ -203,8 +204,12 @@ export function StaffTable({ accounts, extra, onChanged, canManage, caption = 'S
     onChanged(await accountsAPI.setActive(a.id, !off));
   });
 
+  const unlock = (a) => act(a.id, async () => {
+    await onUnlock(a);
+    notify(`${a.username} can sign in again.`, { tone: 'success' });
+  });
+
   if (!accounts.length) return null;
-  const compact = isSuperAdmin();
   return (
     <>
       <Table
@@ -238,48 +243,36 @@ export function StaffTable({ accounts, extra, onChanged, canManage, caption = 'S
               {extra && <Td align="right">{extra.cell(a)}</Td>}
               <Td>
                 <div style={s.personName}>{a.lastLoginAt ? <>Signed in <span className="sa-mono">{timeAgo(a.lastLoginAt)}</span></> : 'Never signed in'}</div>
-                {/* The super admin's rows have room (icon actions), so the
-                    whole line shows instead of being cut at 180 px. */}
-                <div style={compact ? { ...s.personSub, whiteSpace: 'normal' } : { ...s.personSub, maxWidth: 180 }}>
+                {/* The rows have room (icon actions), so the whole line
+                    shows instead of being cut at 180 px. */}
+                <div style={{ ...s.personSub, whiteSpace: 'normal' }}>
                   {a.lastChange
                     ? <span title={a.lastChange.summary}>{actionLabel(a.lastChange.action).label} <span className="sa-mono">{fmtDay(a.lastChange.at)}</span> by {a.lastChange.by || 'the system'}</span>
                     : <span>Made <span className="sa-mono">{fmtDay(a.createdAt)}</span>{a.createdBy ? ` by ${a.createdBy}` : ''}</span>}
                 </div>
               </Td>
               <Td align="right">
-                {compact ? (
-                  // The super admin's console: one row of square icon buttons,
-                  // each coloured by what it does, named for screen readers
-                  // and in the tooltip (the user's reference does the same).
-                  <div style={{ ...s.cellActions, flexWrap: 'nowrap' }}>
-                    <Button icon="history" style={sq} onClick={() => setHistoryOf(a)} aria-label={`History of ${a.username}`} title="History" />
-                    {mine && <>
-                      <Button variant="warning" icon="key" style={sq} disabled={busy === a.id || !a.active} onClick={() => reset(a)}
-                        aria-label={`Reset the password of ${a.username}`} title="Reset password" />
-                      {a.role === 'moderator' && (
-                        <Button variant="subtle" icon="move" style={sq} disabled={busy === a.id || !a.active} onClick={() => setMoving(a)}
-                          aria-label={`Move ${a.username} to another town`} title="Move to another town" />
-                      )}
-                      <Button variant={a.active ? 'danger' : 'success'} icon={a.active ? 'user-minus' : 'user-check'} style={sq}
-                        disabled={busy === a.id} onClick={() => toggle(a)}
-                        aria-label={`${a.active ? 'Deactivate' : 'Reactivate'} ${a.username}`} title={a.active ? 'Deactivate' : 'Reactivate'} />
-                    </>}
-                  </div>
-                ) : (
-                  <div style={{ ...s.cellActions, minWidth: 236 }}>
-                    <Button size="sm" icon="history" onClick={() => setHistoryOf(a)} aria-label={`History of ${a.username}`}>History</Button>
-                    {mine && <>
-                      <Button size="sm" icon="key" disabled={busy === a.id || !a.active} onClick={() => reset(a)}>Reset password</Button>
-                      {a.role === 'moderator' && (
-                        <Button size="sm" icon="move" disabled={busy === a.id || !a.active} onClick={() => setMoving(a)}>Move</Button>
-                      )}
-                      <Button size="sm" variant={a.active ? 'danger' : 'success'} icon={a.active ? 'user-minus' : 'user-check'}
-                        disabled={busy === a.id} onClick={() => toggle(a)}>
-                        {a.active ? 'Deactivate' : 'Reactivate'}
-                      </Button>
-                    </>}
-                  </div>
-                )}
+                {/* One row of square icon buttons, each coloured by what it
+                    does, named for screen readers and in the tooltip (the
+                    user's reference console does the same). */}
+                <div style={{ ...s.cellActions, flexWrap: 'nowrap' }}>
+                  <Button icon="history" style={sq} onClick={() => setHistoryOf(a)} aria-label={`History of ${a.username}`} title="History" />
+                  {onUnlock && a.status === 'locked' && (
+                    <Button variant="success" icon="unlock" style={sq} disabled={busy === a.id} onClick={() => unlock(a)}
+                      aria-label={`Unlock ${a.username}`} title="Unlock" />
+                  )}
+                  {mine && <>
+                    <Button variant="warning" icon="key" style={sq} disabled={busy === a.id || !a.active} onClick={() => reset(a)}
+                      aria-label={`Reset the password of ${a.username}`} title="Reset password" />
+                    {a.role === 'moderator' && (
+                      <Button variant="subtle" icon="move" style={sq} disabled={busy === a.id || !a.active} onClick={() => setMoving(a)}
+                        aria-label={`Move ${a.username} to another town`} title="Move to another town" />
+                    )}
+                    <Button variant={a.active ? 'danger' : 'success'} icon={a.active ? 'user-minus' : 'user-check'} style={sq}
+                      disabled={busy === a.id} onClick={() => toggle(a)}
+                      aria-label={`${a.active ? 'Deactivate' : 'Reactivate'} ${a.username}`} title={a.active ? 'Deactivate' : 'Reactivate'} />
+                  </>}
+                </div>
               </Td>
             </tr>
           );

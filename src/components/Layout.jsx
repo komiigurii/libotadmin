@@ -2,8 +2,8 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { theme as t, radius, type } from '../theme';
 import Icon from './Icon';
-import SuperBand from './SuperBand';
-import { roleLabel, isSuperAdmin } from '../auth/roles';
+import PageBand from './PageBand';
+import { roleLabel } from '../auth/roles';
 
 /*
  * Shared page furniture for the admin panel.
@@ -52,38 +52,22 @@ export function Page({ children, wide = false }) {
 }
 
 /* ── Page header ──────────────────────────────────────────────────
-   Title, one-line description, and an optional action on the right.
-   EVERY page uses this — the count sits in the pill beside the title (not as
-   "6 total" text on one page and "9 shown" on another), and actions sit on
-   the right. No small label above the title: the heading carries the page on
-   its own (the dashboard's greeting moved into its subtitle, 2026-10-21). */
-export function PageHeader({ title, subtitle, count, actions, live, stats, children }) {
+   EVERY page opens with this: the dark band (components/PageBand.jsx) with
+   the title in bold capitals, the count beside it, one line of description,
+   the actions on the right, and, where a page has them, what's live and the
+   stat strip. Every console has worn it since 2026-10-23 (the super admin's
+   first). No small label above the title: the heading carries the page on
+   its own. */
+export function PageHeader({ title, subtitle, count, actions, live, stats, statsLabel, children }) {
   // The browser tab names the page and whose console it is (mock defense
   // 2026-10-21: "title sa tab ng mod dapat mod hindi admin").
   useEffect(() => {
     if (typeof title === 'string') document.title = `${title} · Libot ${roleLabel()}`;
   }, [title]);
-  // The super admin's console opens every page with its dark band and stat
-  // strip (components/SuperBand.jsx); `live`, `stats` and `children` are for
-  // that band only.
-  if (isSuperAdmin()) {
-    return <SuperBand title={title} subtitle={subtitle} count={count} actions={actions} live={live} stats={stats}>{children}</SuperBand>;
-  }
   return (
-    <div style={s.header}>
-      <div style={{ minWidth: 0 }}>
-        <div style={s.titleRow}>
-          <h1 style={s.title}>{title}</h1>
-          {count != null && (
-            // The bare number was read out as a loose digit next to the
-            // heading; this says what it counts.
-            <span style={s.countPill} aria-label={`${count} items`}>{count}</span>
-          )}
-        </div>
-        {subtitle && <p style={s.subtitle}>{subtitle}</p>}
-      </div>
-      {actions && <div style={s.actions}>{actions}</div>}
-    </div>
+    <PageBand title={title} subtitle={subtitle} count={count} actions={actions} live={live} stats={stats} statsLabel={statsLabel}>
+      {children}
+    </PageBand>
   );
 }
 
@@ -360,8 +344,8 @@ export function Button({ variant = 'secondary', size = 'md', icon, children, sty
     <button
       type={type}
       className="modern-btn"
-      // Read by the super admin's band, which redraws outlined buttons for
-      // its dark ground (superadmin.css).
+      // Read by the page band, which redraws outlined buttons for its dark
+      // ground (console.css).
       data-variant={variant}
       style={{ ...s.btn, ...s.btnSize[size], ...s.btnVariant[variant], ...(off ? s.btnOff : null), ...style }}
       {...rest}
@@ -398,32 +382,8 @@ export function FilterTabs({ options, value, onChange, label = 'Filter' }) {
   );
 }
 
-/* ── Stat ─────────────────────────────────────────────────────────
-   A headline figure: label · value · one line of context. Shared by the
-   dashboard and Traveler Progress so a number looks the same wherever it is.
-   With `to`, the whole tile links to the page behind the number. Values are
-   proportional figures in the sans — tabular-nums look loose at this size. */
-// `emphasis` is the condition itself (e.g. `waiting > 0`), not a flag to
-// re-derive from `value` — values arrive formatted ("1,284"), which don't
-// parse back to numbers. `icon` is still accepted from older callers and no
-// longer drawn.
-export function Stat({ label, value, hint, to, emphasis }) {
-  const on = !!emphasis;
-  const body = (
-    <>
-      <div style={s.statTop}>
-        <div style={{ ...s.statValue, ...(on ? s.statValueOn : null) }}>{value ?? '—'}</div>
-        {to && <span style={s.statChevron}><Icon name="chevron-right" size={13} /></span>}
-      </div>
-      <div style={s.statLabel}>{label}</div>
-      {hint && <div style={s.statHint}>{hint}</div>}
-    </>
-  );
-  const style = { ...s.stat, ...(on ? s.statOn : null) };
-  return to
-    ? <Link to={to} className="dash-link" style={style}>{body}</Link>
-    : <div style={style}>{body}</div>;
-}
+/* Headline figures live in the page band's stat strip (PageHeader `stats`,
+   components/PageBand.jsx), so a number looks the same on every page. */
 
 /* ── List ─────────────────────────────────────────────────────────
    Item cards (a review, a request, a report) sit in one of these, 12px
@@ -577,25 +537,6 @@ const base = {
   filterTabOn:   { background: t.brandSoft, color: t.brand },
   filterCount:   { fontSize: 11, fontWeight: 700, padding: '0 6px', borderRadius: radius.pill, background: t.sidebarBg, color: t.textSecondary, lineHeight: '17px' },
   filterCountOn: { background: t.cardBg, color: t.brand },
-
-  // ── Stat ──
-  // Flat figures: the number and what it counts. The icon wells above each
-  // one are gone (2026-10-21, "quieter"); the label already says what it is.
-  stat: {
-    display: 'flex', flexDirection: 'column', padding: '16px 18px', borderRadius: radius.lg,
-    backgroundColor: t.cardBg, borderWidth: 1, borderStyle: 'solid', borderColor: t.border,
-    color: 'inherit', textDecoration: 'none', minWidth: 0,
-  },
-  // Only a figure that asks for action ("Waiting on you") earns the accent,
-  // and only while it's above zero: an amber figure and edge, not a filled tile.
-  statOn:      { borderColor: t.warning },
-  statTop:     { display: 'flex', alignItems: 'baseline', gap: 8 },
-  statChevron: { marginLeft: 'auto', color: t.textMuted, display: 'inline-flex', alignSelf: 'center' },
-  statValue:   { fontSize: 28, fontWeight: 600, letterSpacing: '-0.02em', lineHeight: 1, color: t.textPrimary },
-  statValueOn: { color: t.warning },
-  statLabel:   { fontSize: 13, fontWeight: 600, color: t.textPrimary, marginTop: 8 },
-  statHint:    { fontSize: 12, color: t.textMuted, marginTop: 3 },
-  statGrid:    { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 14 },
 
   // ── List + item card ──
   // The one layout for "a thing to review": media on the left, title row with

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { myTravelersAPI } from '../api/api';
 import {
-  Page, PageHeader, Toolbar, SearchInput, FilterTabs, Table, Th, Td, Button, StatusPill,
+  Page, PageHeader, Toolbar, SearchInput, FilterTabs, Table, Th, Td, StatusPill,
   Loading, EmptyState, ErrorBanner, Avatar, pageStyles as s,
 } from '../components/Layout';
 import { fmtDay, timeAgo } from '../utils/format';
@@ -75,7 +75,6 @@ export default function MyTravelers() {
         title="Travelers"
         count={rows.length}
         subtitle={`Travelers who have visited the ${spotsWord} in ${town || 'your municipality'}, most recent visit first. View only: warnings, suspensions and bans are handled by the administrators.`}
-        actions={<Button icon="refresh-cw" onClick={load} disabled={loading}>Refresh</Button>}
       />
 
       {error && <ErrorBanner onDismiss={() => setError('')}>{error}</ErrorBanner>}

@@ -5,29 +5,36 @@ import logo from '../assets/logo.png';
 import { useThemePref } from '../theme';
 import { useHeartbeat } from '../auth/heartbeat';
 import { clearSession, getToken } from '../auth/session';
+import { getRole } from '../auth/roles';
 import { accountsAPI, authAPI } from '../api/api';
 import { confirmAction } from './AppAlert';
 import { Button } from './Layout';
 import { fmtDay, timeAgo } from '../utils/format';
-import '../superadmin.css';
+import '../console.css';
 
 /*
- * The super admin's console frame (2026-10-23, from the user's reference: a
- * dark rail and top bar around full-width pages). The admin and moderator
- * consoles keep components/Navbar.jsx.
+ * The frame around every console (2026-10-23, from the user's reference: a
+ * dark rail and top bar around full-width pages). Built for the super admin,
+ * then given to the admin and moderator consoles the same day; each role keeps
+ * its own links.
  *
  *   rail      the brand, Jump to page (Ctrl K), the links in groups, and the
  *             account at the foot (View profile, Change password, Sign out).
  *             Folds to icons from the top bar's button (remembered), always on
  *             a tablet, and becomes a drawer on a phone.
- *   top bar   the fold button, the system's state, the bell and the theme.
+ *   top bar   the fold button, the system's state (the super admin's, or the
+ *             town you look after), the bell and the theme.
  *
- * While mounted it marks <html data-console="superadmin">, which is what
- * switches on superadmin.css: the ink shell, the page bands, the series
- * hues. public/theme-init.js sets the same mark before first paint.
+ * While mounted it marks <html data-console="<role>">, which is what switches
+ * on console.css: the ink shell, the page bands, the series hues.
+ * public/theme-init.js sets the same mark before first paint.
  */
 
-const NAV = [
+// Each console's links. `hint` and `keys` are what Jump to page searches.
+//
+// The super admin's console holds only the super admin's own work (the user,
+// 2026-10-22: "superadmin panel should only contain superadmin functions").
+const SUPER_ADMIN_NAV = [
   { group: 'Overview', items: [
     { label: 'Dashboard', path: '/dashboard', icon: 'grid', hint: 'The system’s state, waiting work and how the app is used', keys: 'home overview usage charts health' },
   ] },
@@ -39,10 +46,62 @@ const NAV = [
     { label: 'Accounts', path: '/accounts', icon: 'shield', hint: 'Admins, moderators and travelers', keys: 'staff admin moderator traveler user reset deactivate slip move town' },
     { label: 'Activity Log', path: '/activity', icon: 'history', hint: 'Who did what in the console', keys: 'audit log sign-in login history' },
   ] },
-  { group: 'Inbox', items: [
-    { label: 'Notifications', path: '/notifications', icon: 'bell', badge: 'unread', hint: 'Your bell', keys: 'bell inbox unread' },
+];
+
+// Names say what the page holds in plain words, and each page's heading uses
+// the same name. Everything about spots is in Spot Management (its Approval
+// Queue is a tab there, /spots/approvals); reviews are "Rate and Review", as
+// the paper calls them.
+const ADMIN_NAV = [
+  { group: 'Overview', items: [
+    { label: 'Dashboard', path: '/dashboard', icon: 'grid', hint: 'What’s live, what’s waiting on you and how the app is used', keys: 'home overview usage charts' },
+  ] },
+  { group: 'Content', items: [
+    { label: 'Spot Management', path: '/spots', icon: 'map-pin', badge: 'approvals', hint: 'Every spot, and the moderators’ requests in the Approval Queue', keys: 'spots add edit delete approval queue requests map ar food' },
+  ] },
+  { group: 'Community', items: [
+    { label: 'Rate and Review', path: '/comments', icon: 'message-square', hint: 'Every review travelers have left', keys: 'reviews comments filter warn suspend ban delete' },
+  ] },
+  { group: 'Travelers', items: [
+    { label: 'Traveler Progress', path: '/user-progress', icon: 'award', hint: 'The leaderboard: points, visits and badges', keys: 'leaderboard ranking points visits badges missions' },
+    { label: 'Town Badges', path: '/town-badges', icon: 'star', hint: 'The towns travelers have finished', keys: 'badge town explorer voyager goat' },
+    { label: 'Inactive Accounts', path: '/inactive-users', icon: 'clock', hint: 'Travelers away 30 days or more', keys: 'inactive archive' },
+    { label: 'Suspensions & Bans', path: '/banned-accounts', icon: 'slash', hint: 'Suspended and banned travelers, and their appeals', keys: 'suspension ban appeal' },
+  ] },
+  { group: 'Team', items: [
+    { label: 'Moderators', path: '/moderators', icon: 'users', hint: 'The town moderators’ accounts', keys: 'moderator lgu account add reset slip town' },
   ] },
 ];
+
+// A moderator's job is attractions in their municipality and the requests
+// they've sent, plus a read-only list of the travelers who visited their
+// municipality's spots (QA 2026-10-16).
+const MODERATOR_NAV = [
+  { group: 'Overview', items: [
+    { label: 'Dashboard', path: '/dashboard', icon: 'grid', hint: 'Your town’s spots and where your requests stand', keys: 'home overview' },
+  ] },
+  { group: 'Content', items: [
+    { label: 'Spot Management', path: '/spots', icon: 'map-pin', hint: 'Your town’s spots: add one or propose changes', keys: 'spots add edit delete map ar food' },
+    { label: 'My Submissions', path: '/my-review-requests', icon: 'send', hint: 'Where each request you sent stands', keys: 'requests submissions approval pending approved rejected' },
+  ] },
+  { group: 'Travelers', items: [
+    { label: 'Travelers', path: '/my-travelers', icon: 'users', hint: 'Who visited your town’s spots', keys: 'travelers visitors' },
+  ] },
+];
+
+// Every role's bell; admins and moderators also report problems from here
+// (the super admin answers them under Tickets).
+const inboxNav = (superAdmin) => ({ group: 'Inbox', items: [
+  { label: 'Notifications', path: '/notifications', icon: 'bell', badge: 'unread', hint: 'Your bell', keys: 'bell inbox unread' },
+  ...(superAdmin ? [] : [{ label: 'Report a Problem', path: '/tickets', icon: 'flag', hint: 'Tell the super admin about a problem', keys: 'ticket report problem bug help' }]),
+] });
+
+const CONSOLES = {
+  superadmin: { nav: SUPER_ADMIN_NAV, name: 'Super admin console', role: 'Super admin', jump: 'maintenance, tickets, accounts' },
+  admin:      { nav: ADMIN_NAV,       name: 'Admin Console',       role: 'Admin',       jump: 'spots, approvals, reviews' },
+  moderator:  { nav: MODERATOR_NAV,   name: 'Moderator Console',   role: 'Moderator',   jump: 'spots, submissions, travelers' },
+};
+
 const EXTRA = [
   { label: 'Change password', path: '/change-password', icon: 'key', hint: 'Your own password', keys: 'password security' },
 ];
@@ -63,7 +122,7 @@ function useDismiss(open, close, ref) {
   }, [open, close, ref]);
 }
 
-export default function SuperShell({ children }) {
+export default function ConsoleShell({ children }) {
   const navigate = useNavigate();
   const location = useLocation();
   const beat = useHeartbeat();
@@ -72,10 +131,18 @@ export default function SuperShell({ children }) {
   const [jumpOpen, setJumpOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
 
+  // Read when the frame mounts after sign-in; SessionWatcher reloads the page
+  // if the role or town changes while it's open.
+  const role = CONSOLES[getRole()] ? getRole() : 'admin';
+  const superAdmin = role === 'superadmin';
+  const kind = CONSOLES[role];
+  const city = localStorage.getItem('city') || '';
+  const scope = role === 'moderator' ? (city || 'No city assigned') : 'All of Bulacan';
+
   useLayoutEffect(() => {
-    document.documentElement.setAttribute('data-console', 'superadmin');
+    document.documentElement.setAttribute('data-console', role);
     return () => document.documentElement.removeAttribute('data-console');
-  }, []);
+  }, [role]);
 
   // Ctrl K / ⌘K, anywhere in the console.
   useEffect(() => {
@@ -112,10 +179,12 @@ export default function SuperShell({ children }) {
     navigate('/login');
   };
 
-  const counts = { unread: beat?.unread || 0, tickets: beat?.openTickets || 0 };
-  const all = NAV.flatMap((g) => g.items);
+  const nav = [...kind.nav, inboxNav(superAdmin)];
+  const counts = { unread: beat?.unread || 0, tickets: beat?.openTickets || 0, approvals: beat?.pendingApprovals || 0 };
+  const all = nav.flatMap((g) => g.items);
   const current = [...all, ...EXTRA].find((i) => isHere(i.path, location.pathname));
   const username = beat?.username || '';
+  const account = { username, role: kind.role, scope, superAdmin };
 
   return (
     <div className="sa-shell admin-shell" data-rail={rail}>
@@ -126,11 +195,11 @@ export default function SuperShell({ children }) {
         <button type="button" className="sa-icon-btn sa-drawer-close" onClick={() => setDrawer(false)} aria-label="Close menu">
           <Icon name="x" size={18} />
         </button>
-        <button type="button" className="sa-brand" onClick={() => navigate('/dashboard')} aria-label="Libot Bulacan super admin console, go to the dashboard">
+        <button type="button" className="sa-brand" onClick={() => navigate('/dashboard')} aria-label={`Libot Bulacan ${kind.name}, go to the dashboard`}>
           <img src={logo} alt="" />
           <span className="sa-brand-text sa-hide-collapsed">
             <span className="sa-brand-name">LibotBulacan</span>
-            <span className="sa-brand-sub">Super admin console</span>
+            <span className="sa-brand-sub">{kind.name}</span>
           </span>
         </button>
 
@@ -141,7 +210,7 @@ export default function SuperShell({ children }) {
         </button>
 
         <div className="sa-nav">
-          {NAV.map((g) => (
+          {nav.map((g) => (
             <div key={g.group} className="sa-group" role="group" aria-labelledby={`sa-g-${g.group}`}>
               <div id={`sa-g-${g.group}`} className="sa-group-label sa-hide-collapsed">{g.group}</div>
               {g.items.map((item) => {
@@ -170,7 +239,7 @@ export default function SuperShell({ children }) {
         </div>
 
         <AccountMenu
-          username={username}
+          account={account}
           onProfile={() => setProfileOpen(true)}
           onPassword={() => navigate('/change-password')}
           onSignOut={signOut}
@@ -186,9 +255,9 @@ export default function SuperShell({ children }) {
             aria-label={rail === 'collapsed' ? 'Show the menu labels' : 'Fold the menu to icons'} aria-pressed={rail === 'collapsed'}>
             <Icon name="sidebar" size={19} />
           </button>
-          <div className="sa-topbar-title">{current?.label || 'Super admin console'}</div>
+          <div className="sa-topbar-title">{current?.label || kind.name}</div>
           <div className="sa-topbar-space" />
-          <SystemState system={beat?.system} />
+          {superAdmin ? <SystemState system={beat?.system} /> : <StaffState system={beat?.system} scope={scope} />}
           <Link to="/notifications" className="sa-icon-btn boxed" aria-label={counts.unread ? `Notifications, ${counts.unread} unread` : 'Notifications'}>
             <Icon name="bell" size={18} />
             {counts.unread > 0 && <span className="sa-count" aria-hidden="true">{counts.unread > 99 ? '99+' : counts.unread}</span>}
@@ -198,8 +267,8 @@ export default function SuperShell({ children }) {
         {children}
       </div>
 
-      {jumpOpen && <JumpDialog items={[...all, ...EXTRA]} onClose={() => setJumpOpen(false)} onGo={(p) => { setJumpOpen(false); navigate(p); }} />}
-      {profileOpen && <ProfileDialog username={username} onClose={() => setProfileOpen(false)} onPassword={() => { setProfileOpen(false); navigate('/change-password'); }} />}
+      {jumpOpen && <JumpDialog items={[...all, ...EXTRA]} placeholder={kind.jump} onClose={() => setJumpOpen(false)} onGo={(p) => { setJumpOpen(false); navigate(p); }} />}
+      {profileOpen && <ProfileDialog account={account} onClose={() => setProfileOpen(false)} onPassword={() => { setProfileOpen(false); navigate('/change-password'); }} />}
     </div>
   );
 }
@@ -219,6 +288,30 @@ function SystemState({ system }) {
       <span className="sa-state-text">{text}</span>
       {(on || paused.length > 0) && <span className="visually-hidden">{text}</span>}
     </Link>
+  );
+}
+
+// An admin's or a moderator's: the area they look after, or, while it lasts,
+// that the console is paused for them or under maintenance (the banner above
+// the page says what that means).
+function StaffState({ system, scope }) {
+  const paused = !!system?.restricted;
+  const on = !!system?.maintenance?.on;
+  if (paused || on) {
+    const text = paused ? 'Your access is paused' : 'Maintenance on';
+    return (
+      <span className="sa-state warn" role="status">
+        <span className="sa-state-dot" aria-hidden="true" />
+        <span className="sa-state-text">{text}</span>
+        <span className="visually-hidden">{text}</span>
+      </span>
+    );
+  }
+  return (
+    <span className="sa-state sa-scope" title="The area you look after">
+      <Icon name="map-pin" size={14} />
+      <span className="sa-state-text">{scope}</span>
+    </span>
   );
 }
 
@@ -256,13 +349,17 @@ function ThemeMenu() {
   );
 }
 
-function AccountMenu({ username, onProfile, onPassword, onSignOut }) {
+// "Moderator · Malolos City"; the super admin's role says it all.
+const roleLine = (account) => (account.superAdmin ? account.role : `${account.role} · ${account.scope}`);
+
+function AccountMenu({ account, onProfile, onPassword, onSignOut }) {
+  const { username } = account;
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
   const close = useCallback(() => setOpen(false), []);
   useDismiss(open, close, ref);
   const pick = (fn) => () => { setOpen(false); fn(); };
-  const initial = (username || 'S').charAt(0).toUpperCase();
+  const initial = (username || account.role).charAt(0).toUpperCase();
   return (
     <div className="sa-account" ref={ref}>
       {open && (
@@ -270,8 +367,8 @@ function AccountMenu({ username, onProfile, onPassword, onSignOut }) {
           <div className="sa-menu-head">
             <span className="sa-avatar" aria-hidden="true">{initial}</span>
             <span style={{ minWidth: 0 }}>
-              <span style={{ display: 'block', fontWeight: 700, fontSize: 16 }}>{username || 'Super admin'}</span>
-              <span style={{ display: 'block', fontSize: 14, color: 'var(--text-muted)' }}>Super admin · All of Bulacan</span>
+              <span style={{ display: 'block', fontWeight: 700, fontSize: 16, overflowWrap: 'anywhere' }}>{username || account.role}</span>
+              <span style={{ display: 'block', fontSize: 14, color: 'var(--text-muted)' }}>{account.role} · {account.scope}</span>
             </span>
           </div>
           <button type="button" role="menuitem" className="sa-menu-item" onClick={pick(onProfile)}><Icon name="user" size={16} /> View profile</button>
@@ -283,8 +380,8 @@ function AccountMenu({ username, onProfile, onPassword, onSignOut }) {
         aria-label={`Your account${username ? `, ${username}` : ''}`}>
         <span className="sa-avatar" aria-hidden="true">{initial}</span>
         <span className="sa-account-text sa-hide-collapsed">
-          <span className="sa-account-name">{username || 'Super admin'}</span>
-          <span className="sa-account-role">Super admin</span>
+          <span className="sa-account-name">{username || account.role}</span>
+          <span className="sa-account-role">{roleLine(account)}</span>
         </span>
         <span className="sa-hide-collapsed" style={{ color: 'var(--sa-shell-muted)', display: 'inline-flex' }}><Icon name="chevrons-up-down" size={15} /></span>
       </button>
@@ -316,7 +413,7 @@ function useDialogFocus(onClose) {
   return ref;
 }
 
-function JumpDialog({ items, onClose, onGo }) {
+function JumpDialog({ items, placeholder, onClose, onGo }) {
   const [q, setQ] = useState('');
   const [sel, setSel] = useState(0);
   const ref = useDialogFocus(onClose);
@@ -350,7 +447,7 @@ function JumpDialog({ items, onClose, onGo }) {
             value={q}
             onChange={(e) => { setQ(e.target.value); setSel(0); }}
             onKeyDown={onKey}
-            placeholder="Jump to a page: maintenance, tickets, accounts…"
+            placeholder={`Jump to a page: ${placeholder}…`}
             role="combobox"
             aria-expanded="true"
             aria-controls={listId}
@@ -391,32 +488,38 @@ function JumpDialog({ items, onClose, onGo }) {
   );
 }
 
-function ProfileDialog({ username, onClose, onPassword }) {
+function ProfileDialog({ account, onClose, onPassword }) {
+  const { username, superAdmin } = account;
   const ref = useDialogFocus(onClose);
   const titleId = useId();
+  // Only the super admin can list staff accounts, which is where the dates
+  // come from; an admin's or a moderator's profile is what the session says.
   const [me, setMe] = useState(undefined);
   useEffect(() => {
+    if (!superAdmin) return undefined;
     let live = true;
     accountsAPI.getStaff({ role: 'superadmin' })
       .then((d) => { if (live) setMe((d.accounts || []).find((a) => a.username === username) || null); })
       .catch(() => { if (live) setMe(null); });
     return () => { live = false; };
-  }, [username]);
+  }, [username, superAdmin]);
 
   const rows = [
     ['Username', username || '—'],
-    ['Role', 'Super admin'],
-    ['Looks after', 'All of Bulacan'],
-    ['Account made', me ? <span className="sa-mono">{fmtDay(me.createdAt)}</span> : me === undefined ? '…' : '—'],
-    ['Last signed in', me?.lastLoginAt ? <span className="sa-mono">{timeAgo(me.lastLoginAt)}</span> : me === undefined ? '…' : '—'],
+    ['Role', account.role],
+    ['Looks after', account.scope],
+    ...(superAdmin ? [
+      ['Account made', me ? <span className="sa-mono">{fmtDay(me.createdAt)}</span> : me === undefined ? '…' : '—'],
+      ['Last signed in', me?.lastLoginAt ? <span className="sa-mono">{timeAgo(me.lastLoginAt)}</span> : me === undefined ? '…' : '—'],
+    ] : []),
   ];
   return (
     <div className="sa-dialog-backdrop" style={{ alignItems: 'center', paddingTop: 16 }} onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="sa-dialog" role="dialog" aria-modal="true" aria-labelledby={titleId} ref={ref} style={{ maxWidth: 420 }}>
         <div style={{ background: 'var(--sa-band)', color: 'var(--sa-shell-text)', padding: '22px 22px 18px', display: 'flex', alignItems: 'center', gap: 14 }}>
-          <span className="sa-avatar" style={{ width: 54, height: 54, fontSize: 24 }} aria-hidden="true">{(username || 'S').charAt(0).toUpperCase()}</span>
+          <span className="sa-avatar" style={{ width: 54, height: 54, fontSize: 24 }} aria-hidden="true">{(username || account.role).charAt(0).toUpperCase()}</span>
           <div style={{ minWidth: 0, flex: 1 }}>
-            <h2 id={titleId} style={{ margin: 0, fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 26, lineHeight: 1.05, overflowWrap: 'anywhere' }}>{username || 'Super admin'}</h2>
+            <h2 id={titleId} style={{ margin: 0, fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 26, lineHeight: 1.05, overflowWrap: 'anywhere' }}>{username || account.role}</h2>
             <p style={{ margin: '4px 0 0', fontSize: 15, color: 'var(--sa-shell-muted)' }}>Your account</p>
           </div>
           <button type="button" className="sa-icon-btn boxed" onClick={onClose} aria-label="Close" autoFocus><Icon name="x" size={16} /></button>

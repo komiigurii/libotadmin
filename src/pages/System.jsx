@@ -30,7 +30,8 @@ import { fmtDateTime, timeAgo } from '../utils/format';
  *   Access          pause admins or moderators without a full maintenance.
  *   Update notices  "an update is coming" / "an update is done", shown in the
  *                   app and on everyone's dashboard for two weeks.
- *   Tools           clear the server's cache, its health, locked accounts.
+ *   Tools           clear the server's cache, its health, locked accounts
+ *                   (every role and travelers; user rule 2026-10-23).
  *   Maintenance log every window, who started and ended it, and the summary.
  *
  * Laid out like the rest of the super admin's console (2026-10-23): the band's
@@ -76,7 +77,7 @@ export default function System() {
     }
   }, []);
   const loadLocked = useCallback(async () => {
-    try { setLocked(await systemAPI.locked()); } catch { setLocked((shown) => shown ?? []); }
+    try { setLocked(await systemAPI.locked()); } catch { setLocked((shown) => shown ?? { accounts: [], travelersUnavailable: false }); }
   }, []);
 
   useEffect(() => { load(); loadLocked(); }, [load, loadLocked]);
@@ -101,8 +102,8 @@ export default function System() {
       hint: restricted.includes(r) ? 'can’t sign in' : on ? 'can look, can’t save' : 'can sign in and save',
     })),
     { label: 'Update notice', hue: 'violet', small: true, value: state.notice ? 'Showing' : 'None', hint: state.notice ? state.notice.title : 'travelers see no notice' },
-    { label: 'Locked accounts', hue: 'blue', value: locked ? locked.length : '…', tone: locked?.length ? 'warn' : undefined,
-      hint: locked?.length ? locked.map((a) => a.username).join(', ') : 'none right now' },
+    { label: 'Locked accounts', hue: 'blue', value: locked ? locked.accounts.length : '…', tone: locked?.accounts.length ? 'warn' : undefined,
+      hint: locked?.accounts.length ? locked.accounts.map((a) => a.label).join(', ') : 'none right now' },
   ];
 
   return (
@@ -111,7 +112,6 @@ export default function System() {
         title="System"
         subtitle="Maintenance, who can use the console, update notices and the server’s tools."
         stats={stats || undefined}
-        actions={<Button icon="refresh-cw" onClick={() => { load(); loadLocked(); }}>Refresh</Button>}
       />
       {error && <ErrorBanner onDismiss={() => setError('')}>{error}</ErrorBanner>}
 
@@ -414,6 +414,8 @@ function NoticesCard() {
 
 // ── Tools ──────────────────────────────────────────────────────────────────
 
+const LOCKED_ROLE = { superadmin: 'Super admin', admin: 'Admin', moderator: 'Moderator', traveler: 'Traveler' };
+
 function ToolsCard({ locked, reloadLocked }) {
   const [cleared, setCleared] = useState(null);
   const [health, setHealth] = useState(null);
@@ -431,9 +433,22 @@ function ToolsCard({ locked, reloadLocked }) {
     setCleared(await systemAPI.clearCache());
   });
   const checkHealth = () => run('health', async () => setHealth((await systemAPI.health()).health));
+  const accounts = locked?.accounts;
   const unlock = (a) => run(`unlock-${a.id}`, async () => {
-    await systemAPI.unlock(a.id);
-    notify(`${a.username} can sign in again.`, { tone: 'success' });
+    await systemAPI.unlock(a);
+    notify(`${a.label} can sign in again.`, { tone: 'success' });
+    await reloadLocked();
+  });
+  const unlockAll = () => run('unlock-all', async () => {
+    const ok = await confirmAction(`All ${accounts.length} can try their passwords again at once. Unlock them only if you know these were their own wrong tries.`, { title: 'Unlock every locked account?', confirmText: 'Unlock all' });
+    if (!ok) return;
+    const r = await systemAPI.unlockAll();
+    notify(
+      r.failed.length
+        ? `Unlocked ${r.unlocked}. Clerk didn’t unlock ${r.failed.join(', ')}; try again.`
+        : `Unlocked ${r.unlocked} account${r.unlocked === 1 ? '' : 's'}. They can sign in again.`,
+      { tone: r.failed.length ? 'warning' : 'success' },
+    );
     await reloadLocked();
   });
 
@@ -476,22 +491,46 @@ function ToolsCard({ locked, reloadLocked }) {
             <Icon name="lock" size={16} color={t.textSecondary} />
             <strong style={x.toolName}>Locked accounts</strong>
           </div>
-          <p style={x.toolDesc}>Five wrong passwords lock a staff account for a while. Unlock one here once you know it was them.</p>
-          {!locked ? <p style={x.toolDesc}>Loading…</p>
-            : locked.length === 0 ? <p style={x.toolResult}><Icon name="check-circle" size={13} color={t.success} /> No account is locked.</p>
-              : (
-                <ul style={x.lockedList}>
-                  {locked.map((a) => (
-                    <li key={a.id} style={x.lockedItem}>
-                      <span style={{ minWidth: 0 }}>
-                        <strong style={{ color: t.textPrimary }}>{a.username}</strong>
-                        <span style={s.itemDate}> · until <span className="sa-mono">{fmtDateTime(a.lockedUntil)}</span></span>
+          <p style={x.toolDesc}>Five wrong passwords lock any account for a while: a super admin, admin or moderator here in the console, a traveler in the app. Unlock one once you know it was them.</p>
+          {!accounts ? <p style={x.toolDesc}>Loading…</p>
+            : accounts.length === 0 ? (
+              <p style={x.toolResult}>
+                <Icon name="check-circle" size={13} color={t.success} /> {locked.travelersUnavailable ? 'No staff account is locked.' : 'No account is locked.'}
+              </p>
+            ) : (
+              <ul style={x.lockedList}>
+                {accounts.map((a) => (
+                  <li key={`${a.kind}-${a.id}`} style={x.lockedItem}>
+                    <span style={{ minWidth: 0, overflowWrap: 'anywhere' }}>
+                      <strong style={{ color: t.textPrimary }}>{a.label}</strong>
+                      <span style={s.itemDate}>
+                        {' · '}{LOCKED_ROLE[a.role] || a.role}
+                        {a.lockedUntil && <> · until <span className="sa-mono">{fmtDateTime(a.lockedUntil)}</span></>}
                       </span>
-                      <Button size="sm" icon="key" onClick={() => unlock(a)} disabled={busy === `unlock-${a.id}`}>Unlock</Button>
-                    </li>
-                  ))}
-                </ul>
+                    </span>
+                    <Button size="sm" icon="unlock" onClick={() => unlock(a)} disabled={busy === `unlock-${a.id}` || busy === 'unlock-all'}>Unlock</Button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          {locked?.travelersUnavailable && (
+            <p style={x.toolResult} role="status">
+              <Icon name="alert-circle" size={13} color={t.warning} /> Couldn’t ask Clerk which travelers are locked. Staff are shown; check again in a moment.
+            </p>
+          )}
+          {/* A traveler's lock happens in Clerk and sends no live update, hence Check again. */}
+          {accounts && (
+            <div style={x.toolButtons}>
+              {accounts.length > 1 && (
+                <Button size="sm" icon="unlock" onClick={unlockAll} disabled={busy === 'unlock-all'}>
+                  {busy === 'unlock-all' ? 'Unlocking…' : `Unlock all ${accounts.length}`}
+                </Button>
               )}
+              <Button size="sm" variant="subtle" icon="refresh-cw" onClick={() => run('locked', reloadLocked)} disabled={busy === 'locked'}>
+                {busy === 'locked' ? 'Checking…' : 'Check again'}
+              </Button>
+            </div>
+          )}
         </div>
       </div>
     </Section>
@@ -577,4 +616,5 @@ const x = {
   facts:       { display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '3px 12px', margin: 0, fontSize: 12.5, color: t.textSecondary },
   lockedList:  { listStyle: 'none', margin: 0, padding: 0, width: '100%', display: 'flex', flexDirection: 'column', gap: 6 },
   lockedItem:  { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, fontSize: 13 },
+  toolButtons: { display: 'flex', gap: 8, flexWrap: 'wrap' },
 };
