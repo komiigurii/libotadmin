@@ -1,13 +1,12 @@
 import { lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-// Login + Navbar stay eager: they're the first paint for every session, so
-// code-splitting them would only buy a spinner. Every authenticated page is
-// lazy — notably Spots, which pulls in Leaflet (by far the heaviest
-// dependency here) and was previously downloaded even by moderators sitting
-// on the login screen.
+// Login + the console's frame stay eager: they're the first paint for every
+// session, so code-splitting them would only buy a spinner. Every
+// authenticated page is lazy — notably Spots, which pulls in Leaflet (by far
+// the heaviest dependency here) and was previously downloaded even by
+// moderators sitting on the login screen.
 import Login  from './pages/Login';
-import Navbar from './components/Navbar';
-import SuperShell from './components/SuperShell';
+import ConsoleShell from './components/ConsoleShell';
 const Dashboard        = lazy(() => import('./pages/Dashboard'));
 const Spots            = lazy(() => import('./pages/Spots'));
 const SpotManagement   = lazy(() => import('./pages/SpotManagement'));
@@ -86,30 +85,17 @@ const SuperAdminRoute = ({ children }) => (
   isSuperAdmin() ? children : <Navigate to="/dashboard" replace />
 );
 
-// The frame around every signed-in page. The super admin's console has its
-// own (components/SuperShell.jsx: dark rail, top bar, page bands);
-// admins and moderators keep the cream rail. A component, so the role is read
-// when the frame mounts after sign-in, not when the app first loaded.
-function ConsoleShell({ children }) {
-  if (isSuperAdmin()) {
-    return (
-      <SuperShell>
-        <SessionWatcher />
-        <main id="main" tabIndex={-1} className="sa-main">{children}</main>
-      </SuperShell>
-    );
-  }
+// The frame around every signed-in page, for every role
+// (components/ConsoleShell.jsx: dark rail, top bar, page bands; each role
+// keeps its own links). A component, so the role is read when the frame
+// mounts after sign-in, not when the app first loaded.
+function Console({ children }) {
   return (
-    <div className="admin-shell" style={shell.wrap}>
-      {/* First focusable element on the page. Without it a keyboard user tabs
-          through the entire sidebar on every page load before reaching the
-          table they came for. */}
-      <a href="#main" className="skip-link">Skip to content</a>
-      <Navbar />
+    <ConsoleShell>
       <SessionWatcher />
-      {/* id + tabIndex give the skip link somewhere to land. */}
-      <main id="main" tabIndex={-1} style={shell.main}>{children}</main>
-    </div>
+      {/* id + tabIndex give the shell's skip link somewhere to land. */}
+      <main id="main" tabIndex={-1} className="sa-main">{children}</main>
+    </ConsoleShell>
   );
 }
 
@@ -135,7 +121,7 @@ export default function App() {
           path="/*"
           element={
             <PrivateRoute>
-              <ConsoleShell>
+              <Console>
                   <MaintenanceBanner />
                   <Suspense fallback={<PageFallback />}>
                     <Routes>
@@ -181,7 +167,7 @@ export default function App() {
                       <Route path="*" element={<Navigate to="/dashboard" replace />} />
                     </Routes>
                   </Suspense>
-              </ConsoleShell>
+              </Console>
             </PrivateRoute>
           }
         />
@@ -192,8 +178,5 @@ export default function App() {
 }
 
 const shell = {
-  // A flat page: the teal haze that used to sit in the top corner was one more
-  // thing in the eye line of every screen (2026-10-21, "quieter").
-  wrap: { display: 'flex', minHeight: '100vh', background: t.bg },
-  main: { flex: 1, overflowY: 'auto', minWidth: 0 },
+  fallback: { padding: 48, textAlign: 'center', color: t.textMuted, fontSize: 15 },
 };

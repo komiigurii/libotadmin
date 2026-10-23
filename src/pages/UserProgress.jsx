@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { userProgressAPI } from '../api/api';
 import { theme as t, radius } from '../theme';
 import {
-  Page, PageHeader, Toolbar, SearchInput, FilterTabs, Table, Th, Td, Stat, StatusPill,
+  Page, PageHeader, Toolbar, SearchInput, FilterTabs, Table, Th, Td, StatusPill,
   EmptyState, Loading, ErrorBanner, Avatar, pageStyles,
 } from '../components/Layout';
 import { fmtNum, timeAgo, fmtDay } from '../utils/format';
@@ -64,33 +64,29 @@ export default function UserProgress() {
 
   const explorers = rows.filter((r) => r.spotsVisited > 0).length;
 
+  // The engagement figures in the band's strip. Six cells, so a tablet folds
+  // them to two rows of three; the week and the month share one.
+  const v = (n) => (stats ? fmtNum(n) : loading ? '…' : '—');
+  const strip = [
+    { label: 'Travelers', hue: 'teal', value: v(stats?.totalUsers), hint: 'with an account' },
+    { label: 'Explorers', value: v(stats?.explorers),
+      hint: stats?.totalUsers ? `${Math.round((stats.explorers / stats.totalUsers) * 100)}% have visited a spot` : null },
+    { label: 'Active this week', value: v(stats?.activeLast7), hint: stats ? `${fmtNum(stats.activeLast30)} this month` : null },
+    { label: 'Spot visits', hue: 'magenta', value: v(stats?.totalVisits), hint: stats ? `${stats.avgVisits} per traveler on average` : null },
+    { label: 'Badges collected', value: v(stats?.totalBadges) },
+    { label: 'Towns finished', value: v(stats ? stats.totalTownBadges ?? 0 : null), hint: 'Town badges earned' },
+  ];
+
   return (
     <Page>
       <PageHeader
         title="Traveler Progress"
         count={rows.length}
         subtitle="The traveler leaderboard, ranked as in the app by points (visits and missions); equal points share a rank — with spots visited, badges, missions and home municipality for everyone using it."
+        stats={strip}
       />
 
       {error && <ErrorBanner onDismiss={() => setError(null)}>{error}</ErrorBanner>}
-
-      {stats && (
-        // Seven figures: a narrower minimum keeps them on one row on a laptop
-        // instead of six plus one orphan.
-        <div style={{ ...s.statGrid, gridTemplateColumns: 'repeat(auto-fit, minmax(132px, 1fr))' }}>
-          <Stat label="Travelers" value={fmtNum(stats.totalUsers)} />
-          <Stat
-            label="Explorers"
-            value={fmtNum(stats.explorers)}
-            hint={stats.totalUsers ? `${Math.round((stats.explorers / stats.totalUsers) * 100)}% have visited a spot` : null}
-          />
-          <Stat label="Active this week"  value={fmtNum(stats.activeLast7)} />
-          <Stat label="Active this month" value={fmtNum(stats.activeLast30)} />
-          <Stat label="Spot visits" value={fmtNum(stats.totalVisits)} hint={`${stats.avgVisits} per traveler on average`} />
-          <Stat label="Badges collected" value={fmtNum(stats.totalBadges)} />
-          <Stat label="Towns finished" value={fmtNum(stats.totalTownBadges ?? 0)} hint="Town badges earned" />
-        </div>
-      )}
 
       <Toolbar>
         <FilterTabs
@@ -170,8 +166,8 @@ export default function UserProgress() {
   );
 }
 
-// Page shell, header, toolbar, table, person cell and stats all come from
-// components/Layout — only the rank badge is this page's own.
+// Page shell, header and its strip, toolbar, table and person cell all come
+// from components/Layout — only the rank badge is this page's own.
 const s = {
   ...pageStyles,
   rank: {

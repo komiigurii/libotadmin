@@ -1,12 +1,14 @@
-/* The super admin console's own look (2026-10-23, the user's reference: a
- * dark-banded console with stat strips, dense tables and a live health panel,
- * set up Libot's way). Only the super admin sees it: SuperShell puts
- * data-console="superadmin" on <html> while it's mounted (and
- * public/theme-init.js does before first paint), and every rule here hangs off
- * that attribute. The admin and moderator consoles are untouched.
+/* The consoles' look (2026-10-23, the user's reference: a dark-banded console
+ * with stat strips, dense tables and a live health panel, set up Libot's way).
+ * Built for the super admin first, then given to the admin and moderator
+ * consoles the same day (the user: "apply the UI of superadmin to admin and
+ * moderator"), which is why its classes start sa-. ConsoleShell puts
+ * data-console="<role>" on <html> while it's mounted (and public/theme-init.js
+ * does before first paint), and every rule here hangs off that attribute. The
+ * sign-in pages, which have no console around them, keep index.css's look.
  *
  * Same rule as index.css: no colour is written in a component. Tokens here
- * override index.css's for this console; the shell's own ones are --sa-*.
+ * override index.css's for the consoles; the shell's own ones are --sa-*.
  */
 
 /* ── Type ────────────────────────────────────────────────────────────────────
@@ -24,7 +26,7 @@
    accounts, marigold tickets, violet the system, magenta spot arrivals. Slate
    is routine sign-ins, deliberately not a hue. Text never wears these: a
    swatch beside the words carries the identity. */
-:root[data-console='superadmin'] {
+:root[data-console] {
   --bg:             #EDF1EF;
   --sidebar-bg:     #F2F6F4;
   --card-bg:        #FFFFFF;
@@ -90,7 +92,7 @@
    The paper goes to deep teal; the band lifts a step above it so it still
    reads as a band, and the rail sinks below it. */
 @media (prefers-color-scheme: dark) {
-  :root[data-console='superadmin']:not([data-theme='light']) {
+  :root[data-console]:not([data-theme='light']) {
     --bg:             #0A181A;
     --sidebar-bg:     #0E2124;
     --card-bg:        #102629;
@@ -120,7 +122,7 @@
     --sa-table-head:   #061416;
   }
 }
-:root[data-console='superadmin'][data-theme='dark'] {
+:root[data-console][data-theme='dark'] {
   --bg:             #0A181A;
   --sidebar-bg:     #0E2124;
   --card-bg:        #102629;
@@ -150,12 +152,12 @@
   --sa-table-head:   #061416;
 }
 
-[data-console='superadmin'] ::selection { background: var(--sa-selection); color: var(--text-primary); }
-[data-console='superadmin'] body { font-size: 15px; }
-[data-console='superadmin'] input::placeholder,
-[data-console='superadmin'] textarea::placeholder { color: var(--text-muted); opacity: 1; }
-[data-console='superadmin'] input,
-[data-console='superadmin'] textarea { caret-color: var(--brand); }
+[data-console] ::selection { background: var(--sa-selection); color: var(--text-primary); }
+[data-console] body { font-size: 15px; }
+[data-console] input::placeholder,
+[data-console] textarea::placeholder { color: var(--text-muted); opacity: 1; }
+[data-console] input,
+[data-console] textarea { caret-color: var(--brand); }
 
 /* ── Shell ───────────────────────────────────────────────────────────────── */
 /* flex-shrink: 0 because #root is height: 100% (App.css): a shrinking shell
@@ -292,12 +294,12 @@
 .sa-rel { position: relative; }
 
 /* Page area */
-[data-console='superadmin'] .admin-page {
+[data-console] .admin-page {
   max-width: none !important;
   padding: 16px 18px 32px !important;
   gap: 16px !important;
 }
-[data-console='superadmin'] .admin-banner { max-width: none !important; padding: 14px 18px 0 !important; }
+[data-console] .admin-banner { max-width: none !important; padding: 14px 18px 0 !important; }
 
 /* Collapsed rail: icons only. Labels are visually hidden, not removed, so the
    links keep their names for screen readers. */
@@ -389,13 +391,13 @@ a.sa-cell:hover { background: var(--sa-shell-raised); }
 .sa-mix-legend span { display: inline-flex; align-items: center; gap: 6px; }
 
 /* Table heads in the shell's ink, like the band above them. */
-[data-console='superadmin'] th[scope='col'] {
+[data-console] th[scope='col'] {
   background: var(--sa-table-head) !important;
   color: var(--sa-table-head-text) !important;
   border-bottom-color: var(--sa-table-head) !important;
   font-size: 13px !important; letter-spacing: 0.05em !important;
 }
-[data-console='superadmin'] .sa-mono, [data-console='superadmin'] time.sa-mono {
+[data-console] .sa-mono, [data-console] time.sa-mono {
   font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace; font-size: 12.5px; font-variant-numeric: tabular-nums;
 }
 
@@ -575,9 +577,12 @@ a.sa-cell:hover { background: var(--sa-shell-raised); }
   .sa-menu-btn, .sa-drawer-close { display: grid !important; }
   .sa-drawer-close { position: absolute; top: 14px; right: 12px; }
   .sa-rail-toggle, .sa-state-text { display: none !important; }
+  /* An admin's or moderator's town pill would be a bare pin here; the
+     drawer's account line says the town. */
+  .sa-scope { display: none !important; }
   .sa-topbar-title { display: block; }
   .sa-backdrop { position: fixed; inset: 0; z-index: 65; background: var(--overlay); }
-  [data-console='superadmin'] .admin-page { padding: 12px 12px 28px !important; gap: 12px !important; }
+  [data-console] .admin-page { padding: 12px 12px 28px !important; gap: 12px !important; }
   .sa-band { padding: 18px 16px 16px; border-radius: 12px; }
   .sa-band-title { font-size: 29px; }
   .sa-strip, .sa-strip[data-n='6'] { grid-template-columns: repeat(2, minmax(0, 1fr)); }

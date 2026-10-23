@@ -2,11 +2,12 @@ import { Link } from 'react-router-dom';
 import Icon from './Icon';
 
 /*
- * The band every super admin page opens with (2026-10-23, the user's
- * reference): the title in bold capitals, one line of what's live, the page's
- * actions, and the stat strip. Layout's PageHeader draws this for the super
- * admin, so pages pass `stats` and `live` to PageHeader and nothing else
- * changes for the other consoles.
+ * The band every console page opens with (2026-10-23, the user's reference;
+ * the super admin's first, then every console's): the title in bold capitals,
+ * one line of what's live, the page's actions, and the stat strip. Layout's
+ * PageHeader draws it, so pages pass `stats` and `live` to PageHeader.
+ * `statsLabel` names the strip for screen readers when its cells are the
+ * page's tabs or filters rather than figures.
  *
  * A stat: { label, value, hint, hue, to, tone, spark, current, small, flag }
  *   hue      a series hue (teal, orange, blue, marigold, violet, magenta,
@@ -17,7 +18,7 @@ import Icon from './Icon';
  *            only (the usage figures); no stat gets a made-up trend.
  *   flag     a short word beside a warning number ("Now").
  */
-export default function SuperBand({ title, subtitle, count, live, actions, stats, children }) {
+export default function PageBand({ title, subtitle, count, live, actions, stats, statsLabel, children }) {
   return (
     <section className="sa-band" aria-label={typeof title === 'string' ? title : undefined}>
       <div className="sa-band-top">
@@ -31,7 +32,7 @@ export default function SuperBand({ title, subtitle, count, live, actions, stats
         </div>
         {actions && <div className="sa-band-actions">{actions}</div>}
       </div>
-      {stats?.length > 0 && <StatStrip stats={stats} />}
+      {stats?.length > 0 && <StatStrip stats={stats} label={statsLabel} />}
       {children}
     </section>
   );

@@ -4,7 +4,6 @@ import { useLive } from '../api/live';
 import { Card, FilterTabs, Button, pageStyles as s } from './Layout';
 import { theme as t, radius, type } from '../theme';
 import { fmtNum } from '../utils/format';
-import { isSuperAdmin } from '../auth/roles';
 
 /*
  * How the app is used, day by day (mock defense 2026-10-21: "optional: graph
@@ -13,8 +12,8 @@ import { isSuperAdmin } from '../auth/roles';
  *
  * Four small charts rather than one with four lines: the measures differ a
  * lot in size (a day's active travelers dwarf its reviews), and one axis for
- * all of them would flatten three into the floor. Each is one series in the
- * one data hue, so there is no legend: the title says what it counts.
+ * all of them would flatten three into the floor. Each is one series in its
+ * own hue, so there is no legend: the title (and its swatch) says what it counts.
  * Columns, because each day is a count of its own. Hover or focus a day for
  * its number; "Show as a table" has every value without hovering.
  */
@@ -125,7 +124,6 @@ function ColumnChart({ points, label, fill = 'var(--data-1)' }) {
 }
 
 export default function UsageCharts() {
-  const superAdmin = isSuperAdmin();
   const [days, setDays] = useState(30);
   const [data, setData] = useState(null);
   const [error, setError] = useState('');
@@ -201,15 +199,14 @@ export default function UsageCharts() {
                 const points = data.series[x.key];
                 const total = points.reduce((n, p) => n + p.count, 0);
                 const best = points.reduce((m, p) => (p.count > m.count ? p : m), points[0]);
-                // The super admin's console gives each measure its own hue
-                // (superadmin.css --chart-*), matching its swatch in the
-                // dashboard's strip; elsewhere all four stay the one data hue.
+                // Each measure has its own hue (console.css --chart-*),
+                // matching its swatch in the dashboard's strip.
                 const fill = `var(--chart-${x.key}, var(--data-1))`;
                 return (
                   <section key={x.key} style={c.panel} aria-label={x.title}>
                     <div style={c.panelHead}>
                       <h3 style={c.panelTitle}>
-                        {superAdmin && <span style={{ ...c.swatch, background: fill }} aria-hidden="true" />}
+                        <span style={{ ...c.swatch, background: fill }} aria-hidden="true" />
                         {x.title}
                       </h3>
                       <span style={c.total}>

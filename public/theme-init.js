@@ -14,13 +14,14 @@
     if (p === 'light' || p === 'dark') {
       document.documentElement.setAttribute('data-theme', p);
     }
-    // The super admin's console has its own look (src/superadmin.css). Set
-    // here too so a reload doesn't flash the other consoles' look first;
-    // components/SuperShell.jsx keeps it in step after that. Not on the
-    // sign-in pages, which every role shares.
+    // The consoles' look (src/console.css) hangs off data-console. Set here
+    // too so a reload doesn't flash the sign-in pages' look first;
+    // components/ConsoleShell.jsx keeps it in step after that. Not on the
+    // sign-in pages themselves, which have no console around them.
     var path = window.location.pathname;
-    if (localStorage.getItem('role') === 'superadmin' && path !== '/login' && path !== '/set-password') {
-      document.documentElement.setAttribute('data-console', 'superadmin');
+    var role = localStorage.getItem('role');
+    if ((role === 'superadmin' || role === 'admin' || role === 'moderator') && path !== '/login' && path !== '/set-password') {
+      document.documentElement.setAttribute('data-console', role);
     }
   } catch { /* private mode — fall back to the OS preference */ }
 })();

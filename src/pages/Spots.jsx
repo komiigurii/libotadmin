@@ -7,7 +7,7 @@ import { theme as t, radius, shadow, type } from '../theme';
 import {
   Page, PageHeader, Toolbar, SearchInput, Button, StatusPill, Loading, EmptyState, ErrorBanner, pageStyles,
 } from '../components/Layout';
-import { plural } from '../utils/format';
+import { fmtNum, plural } from '../utils/format';
 import Icon from '../components/Icon';
 import { useLive } from '../api/live';
 
@@ -19,9 +19,10 @@ const modCity = () => localStorage.getItem('city') || '';
  * own add, edit or delete goes live at once (mock defense 2026-10-21: "lahat
  * nagagawa ni admin"), through the same request on the server, which keeps
  * its history. For admins this is the Spots tab of Spot Management
- * (`embedded`: no page shell, the actions sit in the toolbar).
+ * (`embedded`: no page shell, the actions sit in the toolbar, and `onCount`
+ * hears how many spots there are, for Spot Management's strip).
  */
-export default function Spots({ embedded = false }) {
+export default function Spots({ embedded = false, onCount }) {
   const [spots,    setSpots]    = useState([]);
   const [loading,  setLoading]  = useState(true);
   const [editing,  setEditing]  = useState(null);
@@ -57,6 +58,7 @@ export default function Spots({ embedded = false }) {
 
   useEffect(() => { load(); }, []);
   useLive(['spots', 'approvals'], () => load({ quiet: true }));
+  useEffect(() => { if (!loading) onCount?.(spots.length); }, [loading, spots.length, onCount]);
 
   // The dashboard's "Add a spot" action links here with ?new=1. Open the form
   // once, then drop the parameter so closing it (or reloading) doesn't reopen it.
@@ -150,16 +152,28 @@ export default function Spots({ embedded = false }) {
   );
   const Shell = embedded ? EmbeddedShell : Page;
 
+  // The band's strip (a moderator's page; an admin's is Spot Management's).
+  // Real counts from the list below; visits are arrivals, so magenta.
+  const figure = (n) => (loading ? '…' : fmtNum(n));
+  const waitingCount = spots.filter((x) => x.pendingChange || x.pendingDelete).length;
+  const stats = embedded ? undefined : [
+    { label: lockedCity ? `Spots in ${lockedCity}` : 'Your spots', value: figure(spots.length), hint: 'live in the app' },
+    { label: 'Waiting for approval', to: '/my-review-requests', value: figure(waitingCount), tone: waitingCount ? 'warn' : undefined,
+      hint: 'edits and deletions an admin hasn’t decided yet' },
+    { label: 'With an AR model', value: figure(spots.filter((x) => x.AR3DModelURL).length), hint: `of ${plural(spots.length, 'spot')}` },
+    { label: 'Visits', hue: 'magenta', value: figure(spots.reduce((n, x) => n + (x.visitCount || 0), 0)), hint: 'travelers’ arrivals at these spots' },
+  ];
+
   return (
     <Shell>
       {!embedded && (
         <PageHeader
           title="Spot Management"
-          count={spots.length}
           subtitle={isModerator
             ? `The spots${lockedCity ? ` in ${lockedCity}` : ''} you look after. Add one or propose changes — an admin approves each before it goes live.`
             : 'Every spot in the app. What you add, edit or delete goes live at once.'}
           actions={headerActions}
+          stats={stats}
         />
       )}
 
