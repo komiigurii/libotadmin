@@ -57,7 +57,7 @@ const ADMIN_NAV = [
     { label: 'Dashboard', path: '/dashboard', icon: 'grid', hint: 'What’s live, what’s waiting on you and how the app is used', keys: 'home overview usage charts' },
   ] },
   { group: 'Content', items: [
-    { label: 'Spot Management', path: '/spots', icon: 'map-pin', badge: 'approvals', hint: 'Every spot, and the moderators’ requests in the Approval Queue', keys: 'spots add edit delete approval queue requests map ar food' },
+    { label: 'Spot Management/Requests', path: '/spots', icon: 'map-pin', badge: 'approvals', hint: 'Every spot, and the moderators’ requests in the Approval Queue', keys: 'spots add edit delete approval queue requests map ar food' },
   ] },
   { group: 'Community', items: [
     { label: 'Rate and Review', path: '/comments', icon: 'message-square', hint: 'Every review travelers have left', keys: 'reviews comments filter warn suspend ban delete' },

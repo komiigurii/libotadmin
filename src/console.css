@@ -217,7 +217,7 @@
 .sa-link:hover { background: var(--sa-shell-raised); color: var(--sa-shell-text); }
 .sa-link[aria-current='page'] { background: var(--sa-shell-active); color: var(--sa-shell-text); font-weight: 700; }
 .sa-link[aria-current='page'] .sa-link-icon { color: var(--accent); }
-.sa-link-label { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sa-link-label { flex: 1; min-width: 0; white-space: normal; overflow: hidden; line-height: 1.25; }
 .sa-count {
   min-width: 22px; height: 20px; padding: 0 7px; border-radius: 999px;
   display: inline-flex; align-items: center; justify-content: center;
