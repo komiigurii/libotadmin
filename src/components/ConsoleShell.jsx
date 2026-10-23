@@ -70,7 +70,7 @@ const ADMIN_NAV = [
     { label: 'Town Badges', path: '/town-badges', icon: 'star', hint: 'The towns travelers have finished', keys: 'badge town explorer voyager goat' },
   ] },
   { group: 'Team', items: [
-    { label: 'Moderators', path: '/moderators', icon: 'users', hint: 'The town moderators’ accounts', keys: 'moderator lgu account add reset slip town' },
+    { label: 'Moderators Management', path: '/moderators', icon: 'users', hint: 'The town moderators’ accounts', keys: 'moderator lgu account add reset slip town' },
   ] },
 ];
 
