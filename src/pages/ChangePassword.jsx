@@ -129,8 +129,8 @@ export function SetPassword() {
     navigate('/login', { replace: true });
   };
   return (
-    <div className="signin" style={{ backgroundImage: `url(${loginBg})` }}>
-      <aside className="signin-rail" aria-label="Libot Bulacan">
+    <div className="signin">
+      <aside className="signin-rail" aria-label="Libot Bulacan" style={{ backgroundImage: `url(${loginBg})` }}>
         <div style={f.brand}>
           <img src={logo} alt="" style={f.logo} />
           <div style={f.wordmark}>LibotBulacan</div>
@@ -268,7 +268,7 @@ const f = {
   recentRow:  { display: 'grid', gridTemplateColumns: 'minmax(120px, auto) minmax(0, 1fr) auto', alignItems: 'center', gap: 12, padding: '9px 16px', borderBottom: `1px solid ${t.divider}`, fontSize: 15 },
   recentWhat: { display: 'inline-flex', alignItems: 'center', gap: 8, fontWeight: 700, color: t.textPrimary, whiteSpace: 'nowrap' },
   recentText: { color: t.textSecondary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
-  brand:   { display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', gap: 12 },
+  brand:   { display: 'flex', flexDirection: 'column', alignItems: 'flex-start', textAlign: 'left', gap: 12 },
   logo:     { width: 64, height: 64, objectFit: 'contain', borderRadius: 18, display: 'block' },
   // Ink comes from .signin-rail (the brand sits on the sign-in artwork).
   wordmark: { fontFamily: fonts.brand, fontWeight: 400, fontSize: 'clamp(24px, 2.4vw, 32px)', lineHeight: 1.1 },

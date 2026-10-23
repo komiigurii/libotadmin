@@ -16,10 +16,10 @@ import './Login.css';
  * and every role lands on the dashboard (the super admin's System pages are in
  * the same sidebar).
  *
- * The app's sign-in artwork (bg.png) is the whole page background, nothing
- * behind or around it, the way the phone's sign-in shows it. The emblem,
- * wordmark, console name and app slogan sit on it in dark ink (Login.css);
- * the form is a dashboard-style card.
+ * The left side is the app's sign-in artwork (bg.png) and nothing else, no
+ * teal around it, no frame. The emblem, wordmark, console name and app slogan
+ * sit on it in dark ink (Login.css); the right side is the cream panel with
+ * the form in a dashboard-style card.
  */
 
 const SLOGAN = ['Discover,', 'Explore,', 'Experience', 'Bulacan.'];
@@ -144,8 +144,8 @@ function SignInForm() {
   const locked = lockedFor > 0;
 
   return (
-    <div className="signin" style={{ backgroundImage: `url(${loginBg})` }}>
-      <aside className="signin-rail" aria-label="Libot Bulacan">
+    <div className="signin">
+      <aside className="signin-rail" aria-label="Libot Bulacan" style={{ backgroundImage: `url(${loginBg})` }}>
         {/* The sidebar's brand block, larger. */}
         <div className="signin-brand" style={s.brand}>
           <span className="signin-emblem" style={s.emblem}>
@@ -355,13 +355,14 @@ function ForgotPassword({ initialUsername, onBack }) {
 
 const s = {
   // ── Brand on the picture (the sidebar's brand block, scaled up). Colour
-  // comes from .signin-rail: one fixed ink, since the artwork doesn't theme. ──
+  // comes from .signin-rail: one fixed ink, since the artwork doesn't theme.
+  // Everything on the picture shares one left edge with the slogan. ──
   brand: {
-    display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', gap: 14,
+    display: 'flex', flexDirection: 'column', alignItems: 'flex-start', textAlign: 'left', gap: 14,
   },
   emblem: { display: 'grid', placeItems: 'center', flexShrink: 0 },
   logo: { width: 64, height: 64, objectFit: 'contain', borderRadius: 18, display: 'block' },
-  brandText: { display: 'flex', flexDirection: 'column', alignItems: 'center' },
+  brandText: { display: 'flex', flexDirection: 'column', alignItems: 'flex-start' },
   // The wordmark in Knewave, as the sidebar sets it.
   wordmark: {
     fontFamily: fonts.brand, fontWeight: 400, fontSize: 'clamp(24px, 2.4vw, 32px)',

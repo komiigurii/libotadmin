@@ -1,21 +1,18 @@
 /* Sign-in page. Kept out of App.css on purpose: it's the only page that uses
    these rules.
 
-   The app's sign-in artwork is the whole page background, as on the phone
-   (Login.jsx sets it): no teal rail, no cream panel, no frame around it.
-   Desktop: emblem, wordmark and slogan on the left, the form card on the
-   right. ≤ 860px: the brand becomes a short row on top, the slogan is
-   dropped, and the card sits under it. */
+   Desktop: the left side is the app's sign-in artwork and nothing else (the
+   rail's own background, set in Login.jsx: no teal around it, no frame), with
+   the emblem, wordmark and slogan on it; the right side is the cream panel
+   holding the form card. ≤ 860px: the left side becomes a short band of the
+   artwork on top with the brand in a row, the slogan is dropped, and the
+   panel sits under it. */
 
 .signin {
   display: grid;
   grid-template-columns: minmax(340px, 0.8fr) 1.2fr;
   min-height: 100dvh;
-  /* The image's own top colour, shown only until it loads. */
-  background-color: #A6E9E2;
-  background-size: cover;
-  background-position: center 62%;
-  background-repeat: no-repeat;
+  background: var(--bg);
 }
 
 /* Text on the picture. The artwork is the same in both themes, so this ink
@@ -24,11 +21,16 @@
 .signin-rail {
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 28px;
   padding: clamp(28px, 5vh, 52px) clamp(24px, 3.4vw, 48px);
   min-height: 0;
+  /* The image's own top colour, shown only until it loads. */
+  background-color: #A6E9E2;
+  background-size: cover;
+  background-position: center 62%;
+  background-repeat: no-repeat;
   color: #0B3034;
   text-shadow: 0 0 14px rgba(255, 255, 255, 0.85), 0 0 3px rgba(255, 255, 255, 0.7);
 }
@@ -37,6 +39,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  background: var(--bg);
   padding: clamp(28px, 6vw, 72px) 20px;
 }
 
@@ -50,15 +53,15 @@
     flex-direction: row;
     justify-content: flex-start;
     gap: 14px;
-    padding: 18px 20px 30px;
+    padding: 18px 20px;
   }
   .signin-slogan { display: none; }
-  .signin-brand { flex-direction: row !important; text-align: left !important; gap: 12px !important; }
+  .signin-brand { flex-direction: row !important; align-items: center !important; gap: 12px !important; }
   .signin-brand-text { align-items: flex-start !important; }
   .signin-emblem img { width: 40px !important; height: 40px !important; border-radius: 11px !important; }
   .signin-wordmark { font-size: 20px !important; }
   .signin-panel {
     align-items: flex-start;
-    padding: 8px 16px 40px;
+    padding: 28px 16px 40px;
   }
 }
