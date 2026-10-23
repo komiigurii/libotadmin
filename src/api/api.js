@@ -162,10 +162,15 @@ export const authAPI = {
   // carries on with the fresh token.
   changePassword: (currentPassword, newPassword, confirmPassword) =>
     api.post('/api/auth/change-password', { currentPassword, newPassword, confirmPassword }).then(r => r.data),
-  // From the sign-in page: a request to the super admin for a new slip. The
-  // answer is the same whether or not the username exists.
-  forgotPassword: (username, note) =>
-    api.post('/api/auth/forgot-password', { username, note }).then(r => r.data),
+  // From the sign-in page: a request to the super admin for a new slip, sent to
+  // an email address that is checked with a code first. The answers are the
+  // same whether or not the username exists.
+  //   forgotPassword → { requestId, email, minutes, message }: the code is mailed
+  //   verifyForgotPassword → { email, message }: the request is with the super admin
+  forgotPassword: (username, email, note) =>
+    api.post('/api/auth/forgot-password', { username, email, note }).then(r => r.data),
+  verifyForgotPassword: (requestId, code) =>
+    api.post('/api/auth/forgot-password/verify', { requestId, code }).then(r => r.data),
 };
 
 // Staff accounts (mock defense 2026-10-21). The super admin sees and manages
@@ -263,7 +268,8 @@ export const ticketsAPI = {
   create: (data) => api.post('/api/admin/tickets', data).then(r => r.data.ticket),
   reply:  (id, message) => api.post(`/api/admin/tickets/${id}/replies`, { message }).then(r => r.data.ticket),
   setStatus: (id, status) => api.patch(`/api/admin/tickets/${id}`, { status }).then(r => r.data.ticket),
-  // → { ticket, account, tempPassword, tempPasswordExpiresAt } for the slip.
+  // → { ticket, account, tempPassword, tempPasswordExpiresAt } for the slip, and
+  //   { emailedTo, emailFailed }: whether it reached the address they confirmed.
   resetPassword: (id) => api.post(`/api/admin/tickets/${id}/reset-password`).then(r => r.data),
 };
 

@@ -376,14 +376,17 @@ export function TicketDetail() {
   };
   const setStatus = (status) => run(status, async () => setTicket(await ticketsAPI.setStatus(id, status)));
   const newSlip = () => run('slip', async () => {
+    const to = ticket.contactEmail;
     const ok = await confirmAction(
-      `Make a new temporary password for ${ticket.from.username}? Their old password stops working. Give them the slip in person or through your office’s own channel.`,
-      { title: 'Make a new slip?', confirmText: 'Make a slip', tone: 'warning' },
+      to
+        ? `Make a new temporary password for ${ticket.from.username}? Their old password stops working, and the slip is emailed to ${to}. Make sure that address is really theirs.`
+        : `Make a new temporary password for ${ticket.from.username}? Their old password stops working. Give them the slip in person or through your office’s own channel.`,
+      { title: 'Make a new slip?', confirmText: to ? 'Make and email the slip' : 'Make a slip', tone: 'warning' },
     );
     if (!ok) return;
     const data = await ticketsAPI.resetPassword(id);
     setTicket(data.ticket);
-    setSlip(data);
+    setSlip({ ...data, email: data.emailedTo || data.emailFailed ? { to: data.emailedTo || to, sent: !!data.emailedTo } : null });
   });
 
   if (error) {
@@ -440,10 +443,24 @@ export function TicketDetail() {
           {superAdmin && passwordRequest && (
             <section className="sa-panel" aria-label="About password requests">
               <div className="sa-panel-head"><h2 className="sa-panel-title"><Icon name="key" size={16} /> A password request</h2></div>
-              <p style={{ ...x.note, margin: 0, padding: '12px 16px 14px' }}>
-                {ticket.from?.username} can’t sign in, so they won’t see replies here. Make a new slip and hand it to them; they
-                choose their own password at the next sign-in. The slip shows the new temporary password once.
-              </p>
+              {ticket.contactEmail ? (
+                <div style={{ padding: '12px 16px 14px' }}>
+                  <div style={x.slipTo}>
+                    <Icon name="mail" size={15} color={t.brand} />
+                    <span>Slip goes to <strong style={{ color: t.textPrimary }}>{ticket.contactEmail}</strong></span>
+                  </div>
+                  <p style={{ ...x.note, margin: '8px 0 0' }}>
+                    They confirmed this address with a code, so it’s theirs to read, but anyone who knows a username can ask. Check
+                    it really belongs to {ticket.from?.username} (for example, call their office), then make a new slip: it’s emailed
+                    there and shown to you once. They choose their own password at the next sign-in.
+                  </p>
+                </div>
+              ) : (
+                <p style={{ ...x.note, margin: 0, padding: '12px 16px 14px' }}>
+                  {ticket.from?.username} can’t sign in, so they won’t see replies here. Make a new slip and hand it to them; they
+                  choose their own password at the next sign-in. The slip shows the new temporary password once.
+                </p>
+              )}
             </section>
           )}
         </div>
@@ -479,7 +496,7 @@ export function TicketDetail() {
       </div>
       {slip && (
         <CredentialSlip kind="reset" account={slip.account} tempPassword={slip.tempPassword}
-          expiresAt={slip.tempPasswordExpiresAt} onClose={() => setSlip(null)} />
+          expiresAt={slip.tempPasswordExpiresAt} email={slip.email} onClose={() => setSlip(null)} />
       )}
     </Page>
   );
@@ -509,6 +526,7 @@ const x = {
   error:   { fontSize: 12, color: t.danger, margin: '5px 0 0', display: 'flex', alignItems: 'center', gap: 4 },
   actionsRow: { display: 'flex', gap: 8, flexWrap: 'wrap' },
   note:    { fontSize: 12.5, color: t.textMuted, lineHeight: 1.5, margin: '10px 0 0' },
+  slipTo:  { display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, color: t.textSecondary, overflowWrap: 'anywhere' },
   thread:  { listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 10 },
   message: { background: t.cardBg, borderWidth: 1, borderStyle: 'solid', borderColor: t.border, borderRadius: radius.lg, padding: '14px 16px' },
   messageSuper: { background: t.brandSoft, borderColor: 'transparent' },

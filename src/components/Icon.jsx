@@ -18,7 +18,7 @@
  */
 import {
   Aperture, Archive, ArrowClockwise, ArrowRight, ArrowsLeftRight, Bell, CaretDown, CaretLeft, CaretRight, CaretUp,
-  CaretUpDown, ChatCircleText, Check, CheckCircle, Clock, ClockCounterClockwise, Copy, Database, Desktop, Eye, EyeSlash,
+  CaretUpDown, ChatCircleText, Check, CheckCircle, Clock, ClockCounterClockwise, Copy, Database, Desktop, EnvelopeSimple, Eye, EyeSlash,
   Flag, ForkKnife, GitCommit, Hand, Image, Info, Key, List, LockSimple, LockSimpleOpen, MagnifyingGlass, MapPin, Memory, Moon, Package,
   PaperPlaneTilt, Pause, PencilSimple, Plus, Printer, Prohibit, Pulse, ShieldCheck, SidebarSimple, Timer, User,
   UserCheck, UserMinus, UserPlus, WarningCircle,
@@ -70,6 +70,7 @@ const MAP = {
   'hand':           Hand,
   'image':          Image,
   'inbox':          Tray,
+  'mail':           EnvelopeSimple,
   'info':           Info,
   'log-out':        SignOut,
   'map-pin':        MapPin,
