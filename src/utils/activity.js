@@ -19,6 +19,7 @@ export const ACTION_LABELS = {
   'traveler.ban':            { label: 'Banned',             icon: 'slash',      tone: 'danger' },
   'traveler.unban':          { label: 'Ban lifted',         icon: 'check',      tone: 'success' },
   'traveler.unlock':         { label: 'Unlocked',           icon: 'key',        tone: 'success' },
+  'traveler.restore':        { label: 'Restored from the archive', icon: 'rotate-ccw', tone: 'success' },
   'traveler.appealApproved': { label: 'Appeal approved',    icon: 'check',      tone: 'success' },
   'traveler.appealRejected': { label: 'Appeal rejected',    icon: 'x',          tone: 'danger' },
   'ticket.create':           { label: 'Ticket sent',        icon: 'flag',       tone: 'info' },
