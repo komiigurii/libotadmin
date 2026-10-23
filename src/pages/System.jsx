@@ -111,7 +111,6 @@ export default function System() {
         title="System"
         subtitle="Maintenance, who can use the console, update notices and the server’s tools."
         stats={stats || undefined}
-        actions={<Button icon="refresh-cw" onClick={() => { load(); loadLocked(); }}>Refresh</Button>}
       />
       {error && <ErrorBanner onDismiss={() => setError('')}>{error}</ErrorBanner>}
 

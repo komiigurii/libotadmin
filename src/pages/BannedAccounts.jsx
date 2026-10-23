@@ -89,7 +89,6 @@ export default function BannedAccounts() {
         title="Suspensions & Bans"
         count={users.length}
         subtitle="Accounts suspended or permanently banned for breaking the rules, and any appeals they’ve sent."
-        actions={<Button icon="refresh-cw" onClick={load} disabled={loading}>Refresh</Button>}
       />
 
       {error && <ErrorBanner onDismiss={() => setError('')}>{error}</ErrorBanner>}

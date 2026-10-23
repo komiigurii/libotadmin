@@ -175,7 +175,6 @@ export default function TownBadges() {
         title="Town Badges"
         count={withSpots.length}
         subtitle="A traveler earns a town's badge by finishing every mission at every spot in it. Finishing 1 town makes them an Explorer, 3 a Voyager, and every town with spots a GOAT Traveler."
-        actions={<Button icon="refresh-cw" onClick={load} disabled={loading}>Refresh</Button>}
       />
 
       {error && <ErrorBanner onDismiss={() => setError(null)}>{error}</ErrorBanner>}

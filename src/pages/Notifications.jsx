@@ -5,6 +5,7 @@ import { Page, PageHeader, Button, Loading, EmptyState, ErrorBanner, Table, Th, 
 import Pagination from '../components/Pagination';
 import Icon from '../components/Icon';
 import { publishHeartbeat, useHeartbeat } from '../auth/heartbeat';
+import { useLive } from '../api/live';
 import { isSuperAdmin } from '../auth/roles';
 import { theme as t, radius } from '../theme';
 import { fmtDateTime, fmtNum, timeAgo } from '../utils/format';
@@ -41,6 +42,8 @@ export default function Notifications() {
     }
   };
   useEffect(() => { load(page); }, [page]); // eslint-disable-line react-hooks/exhaustive-deps
+  // A new notice, or one read in another window.
+  useLive(['notifications'], () => load(page));
 
   const open = async (n) => {
     if (!n.readAt) {

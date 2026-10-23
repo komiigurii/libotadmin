@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useId, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ticketsAPI } from '../api/api';
+import { useLive, useLiveTick } from '../api/live';
 import {
   Page, PageHeader, Toolbar, SearchInput, FilterTabs, Button, StatusPill, Tag, Loading, EmptyState, ErrorBanner,
   Table, Th, Td, pageStyles as s,
@@ -68,11 +69,12 @@ function TicketQueue() {
     return () => clearTimeout(timer);
   }, [query]);
 
-  const load = useCallback(async () => {
+  // `quiet`: a live update; a failure keeps the list shown.
+  const load = useCallback(async ({ quiet = false } = {}) => {
     try {
       setData(await ticketsAPI.list({ page, limit: 25, ...(status ? { status } : {}), ...(category ? { category } : {}), ...(search ? { q: search } : {}) }));
       setError('');
-    } catch (err) { setError(errorOf(err)); }
+    } catch (err) { if (!quiet) setError(errorOf(err)); }
   }, [page, status, category, search]);
   useEffect(() => { load(); }, [load]);
 
@@ -86,6 +88,8 @@ function TicketQueue() {
     setCounts({ open, inProgress, resolved, all, passwords });
   }, []);
   useEffect(() => { loadCounts(); }, [loadCounts]);
+  // New tickets, replies and status changes, from anyone.
+  useLive(['tickets'], () => { load({ quiet: true }); loadCounts(); });
 
   const pick = (s, c = category) => { setStatus(s); setCategory(c); setPage(1); };
   const n = (v) => (v == null ? '…' : fmtNum(v));
@@ -104,7 +108,6 @@ function TicketQueue() {
         title="Tickets"
         subtitle="Problems admins and moderators reported, and password requests from the sign-in page. Newest activity first."
         stats={stats}
-        actions={<Button icon="refresh-cw" onClick={() => { load(); loadCounts(); }}>Refresh</Button>}
       />
       {error && <ErrorBanner onDismiss={() => setError('')}>{error}</ErrorBanner>}
 
@@ -190,13 +193,15 @@ function ReportProblem() {
     return () => clearTimeout(timer);
   }, [query]);
 
-  const load = useCallback(async () => {
+  // `quiet`: a live update (the super admin answered); a failure keeps the list.
+  const load = useCallback(async ({ quiet = false } = {}) => {
     try {
       setData(await ticketsAPI.list({ page, limit: 20, ...(status ? { status } : {}), ...(search ? { q: search } : {}) }));
       setError('');
-    } catch (err) { setError(errorOf(err)); }
+    } catch (err) { if (!quiet) setError(errorOf(err)); }
   }, [page, status, search]);
   useEffect(() => { load(); }, [load]);
+  useLive(['tickets'], () => load({ quiet: true }));
 
   return (
     <Page>
@@ -332,11 +337,17 @@ export function TicketDetail() {
   const [slip, setSlip] = useState(null);
   const replyId = useId();
 
+  // A reply or a status change from the other side shows as it happens; the
+  // reply being typed stays. Once this ticket is shown, a failed reload keeps it.
+  const changed = useLiveTick(['tickets']);
+  const shownId = useRef(null);
   useEffect(() => {
     let live = true;
-    ticketsAPI.get(id).then((tk) => { if (live) setTicket(tk); }).catch((err) => { if (live) setError(errorOf(err)); });
+    ticketsAPI.get(id)
+      .then((tk) => { if (live) { setTicket(tk); shownId.current = id; } })
+      .catch((err) => { if (live && shownId.current !== id) setError(errorOf(err)); });
     return () => { live = false; };
-  }, [id]);
+  }, [id, changed]);
 
   const run = async (key, fn) => {
     setBusy(key);

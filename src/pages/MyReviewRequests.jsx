@@ -139,7 +139,6 @@ export default function MyReviewRequests() {
         title="My Submissions"
         count={requests.length}
         subtitle="Every request you’ve sent — new spots, edits, deletions and food spot locations — where each one stands, and exactly what changed."
-        actions={<Button icon="refresh-cw" onClick={load} disabled={loading}>Refresh</Button>}
       />
 
       <Toolbar>

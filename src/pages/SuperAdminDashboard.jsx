@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { systemAPI, ticketsAPI, accountsAPI, activityAPI } from '../api/api';
-import { Page, PageHeader, ErrorBanner, Button, StatusPill } from '../components/Layout';
+import { Page, PageHeader, ErrorBanner, StatusPill } from '../components/Layout';
 import UsageCharts from '../components/UsageCharts';
 import Icon from '../components/Icon';
 import { fmtNum as fmt, plural, timeAgo, fmtDateTime } from '../utils/format';
@@ -60,18 +60,13 @@ const counts = (pts) => (pts || []).map((p) => p.count);
 
 export default function SuperAdminDashboard() {
   const [data, setData] = useState(null);
-  const [refreshing, setRefreshing] = useState(false);
   const health = useHealthSamples();
 
-  // `quiet`: a live update, which doesn't turn the button to "Refreshing…".
-  const refresh = useCallback(async ({ quiet = false } = {}) => {
-    if (!quiet) setRefreshing(true);
-    setData(await load());
-    if (!quiet) setRefreshing(false);
-  }, []);
+  const refresh = useCallback(async () => { setData(await load()); }, []);
   useEffect(() => { refresh(); }, [refresh]);
-  // Seven requests a time, so at most every 5 s however busy it gets.
-  useLive(['system', 'tickets', 'staff', 'travelers', 'activity', 'progress', 'reviews'], () => { forgetUsage(); refresh({ quiet: true }); }, { gap: 5000 });
+  // Live updates, no Refresh button. Seven requests a time, so at most every
+  // 5 s however busy it gets.
+  useLive(['system', 'tickets', 'staff', 'travelers', 'activity', 'progress', 'reviews'], () => { forgetUsage(); refresh(); }, { gap: 5000 });
 
   const loading = data === null;
   const sys = data?.system;
@@ -131,12 +126,11 @@ export default function SuperAdminDashboard() {
         title="Dashboard"
         live={live}
         stats={stats}
-        actions={<Button icon="refresh-cw" onClick={refresh} disabled={refreshing}>{refreshing ? 'Refreshing…' : 'Refresh'}</Button>}
       />
 
       {data?.failed?.length > 0 && <ErrorBanner>Couldn’t load {data.failed.join(', ')}. Everything else is current.</ErrorBanner>}
 
-      <div className="sa-grid sa-split sa-dash" style={{ opacity: refreshing && !loading ? 0.7 : 1, transition: 'opacity 0.2s' }}>
+      <div className="sa-grid sa-split sa-dash">
         <div className="sa-col">
           <section className="sa-panel sa-o-attention" aria-labelledby="dash-attention">
             <div className="sa-panel-head dark">

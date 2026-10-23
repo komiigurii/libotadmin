@@ -1,5 +1,6 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
-import { loadUsage } from '../utils/usage';
+import { loadUsage, forgetUsage } from '../utils/usage';
+import { useLive } from '../api/live';
 import { Card, FilterTabs, Button, pageStyles as s } from './Layout';
 import { theme as t, radius, type } from '../theme';
 import { fmtNum } from '../utils/format';
@@ -132,15 +133,23 @@ export default function UsageCharts() {
   const [asTable, setAsTable] = useState(false);
   const tableId = useId();
 
+  // Sign-ups, first arrivals and reviews as they happen. A live reload keeps
+  // the charts up while it loads, and keeps them if it fails.
+  const [changed, setChanged] = useState(0);
+  useLive(['travelers', 'progress', 'reviews'], () => { forgetUsage(); setChanged((n) => n + 1); });
+  const seen = useRef(changed);
+
   useEffect(() => {
     let live = true;
-    setLoading(true);
+    const quiet = seen.current !== changed;
+    seen.current = changed;
+    if (!quiet) setLoading(true);
     loadUsage(days)
       .then((d) => { if (live) { setData(d); setError(''); } })
-      .catch(() => { if (live) setError('Couldn’t load the usage figures.'); })
+      .catch(() => { if (live && !quiet) setError('Couldn’t load the usage figures.'); })
       .finally(() => { if (live) setLoading(false); });
     return () => { live = false; };
-  }, [days]);
+  }, [days, changed]);
 
   const sinceText = data?.activeSince && data.series.active[0].day < data.activeSince
     ? `Kept since ${dayLabel(data.activeSince, { month: 'short', day: 'numeric', year: 'numeric' })}.`

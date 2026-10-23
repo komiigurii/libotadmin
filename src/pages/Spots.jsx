@@ -9,6 +9,7 @@ import {
 } from '../components/Layout';
 import { plural } from '../utils/format';
 import Icon from '../components/Icon';
+import { useLive } from '../api/live';
 
 const role = () => localStorage.getItem('role');
 const modCity = () => localStorage.getItem('city') || '';
@@ -34,9 +35,12 @@ export default function Spots({ embedded = false }) {
   const isModerator = role() === 'moderator';
   const lockedCity = isModerator ? modCity() : '';
 
-  const load = async () => {
-    setLoading(true);
-    setError('');
+  // `quiet`: a live update — no spinner, and a failure keeps the list shown.
+  const load = async ({ quiet = false } = {}) => {
+    if (!quiet) {
+      setLoading(true);
+      setError('');
+    }
     try {
       // The admin list, not the public one: only it carries the pending edit /
       // deletion behind the "waiting for approval" labels on each card.
@@ -46,12 +50,13 @@ export default function Spots({ embedded = false }) {
       console.error('Failed to load spots:', err);
       // A failed request is not an empty list — say so instead of showing
       // "No spots yet" when the server simply couldn't be reached.
-      setError('Couldn’t load spots.');
+      if (!quiet) setError('Couldn’t load spots.');
     }
-    setLoading(false);
+    if (!quiet) setLoading(false);
   };
 
   useEffect(() => { load(); }, []);
+  useLive(['spots', 'approvals'], () => load({ quiet: true }));
 
   // The dashboard's "Add a spot" action links here with ?new=1. Open the form
   // once, then drop the parameter so closing it (or reloading) doesn't reopen it.
@@ -138,12 +143,11 @@ export default function Spots({ embedded = false }) {
     return name.includes(q) || cat.includes(q);
   });
 
-  const headerActions = <>
-    <Button icon="refresh-cw" onClick={load} disabled={loading}>Refresh</Button>
+  const headerActions = (
     <Button variant="primary" icon="plus" onClick={() => { setEditing(null); setShowForm(true); }}>
       Add spot
     </Button>
-  </>;
+  );
   const Shell = embedded ? EmbeddedShell : Page;
 
   return (

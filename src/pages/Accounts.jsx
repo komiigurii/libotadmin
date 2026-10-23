@@ -129,10 +129,7 @@ export default function Accounts() {
         title="Accounts"
         subtitle="Make admin and moderator accounts, reset their passwords or turn them off, and look up any traveler. Nothing is ever deleted."
         stats={stats}
-        actions={<>
-          <Button icon="refresh-cw" onClick={() => { loadStaff(); loadTravelerCounts(); }}>Refresh</Button>
-          {canMake.length > 0 && <Button variant="primary" icon="user-plus" onClick={() => { showStaff(''); setAdding(true); }}>Add account</Button>}
-        </>}
+        actions={canMake.length > 0 && <Button variant="primary" icon="user-plus" onClick={() => { showStaff(''); setAdding(true); }}>Add account</Button>}
       />
 
       <div className="sa-grid sa-rail-split">

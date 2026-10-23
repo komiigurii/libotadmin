@@ -2,10 +2,11 @@ import { useEffect, useMemo, useState } from 'react';
 import { userProgressAPI } from '../api/api';
 import { theme as t, radius } from '../theme';
 import {
-  Page, PageHeader, Toolbar, SearchInput, FilterTabs, Table, Th, Td, Stat, Button, StatusPill,
+  Page, PageHeader, Toolbar, SearchInput, FilterTabs, Table, Th, Td, Stat, StatusPill,
   EmptyState, Loading, ErrorBanner, Avatar, pageStyles,
 } from '../components/Layout';
 import { fmtNum, timeAgo, fmtDay } from '../utils/format';
+import { useLive } from '../api/live';
 
 // Traveler Progress — the traveler leaderboard, plus the engagement figures
 // that give the ranking some context. Read-only by design: this module is for
@@ -25,23 +26,30 @@ export default function UserProgress() {
   const [search,  setSearch]  = useState('');
   const [onlyExplorers, setOnlyExplorers] = useState(false);
 
-  const load = async () => {
-    setLoading(true);
-    setError(null);
+  // `quiet`: a live update — no spinner, and a failure keeps the board shown.
+  const load = async ({ quiet = false } = {}) => {
+    if (!quiet) {
+      setLoading(true);
+      setError(null);
+    }
     try {
       const data = await userProgressAPI.getAll();
       setRows(data?.leaderboard || []);
       setStats(data?.stats || null);
     } catch (err) {
       console.error('[UserProgress]', err);
-      setError('Couldn’t load traveler progress.');
-      setRows([]);
-      setStats(null);
+      if (!quiet) {
+        setError('Couldn’t load traveler progress.');
+        setRows([]);
+        setStats(null);
+      }
     }
-    setLoading(false);
+    if (!quiet) setLoading(false);
   };
 
   useEffect(() => { load(); }, []);
+  // Points and visits as travelers earn them, and names, photos and standing.
+  useLive(['progress', 'travelers'], () => load({ quiet: true }));
 
   // Filtering is derived, never stored — so the rank column always shows the
   // traveler's real standing rather than their position in a filtered list.
@@ -62,7 +70,6 @@ export default function UserProgress() {
         title="Traveler Progress"
         count={rows.length}
         subtitle="The traveler leaderboard, ranked as in the app by points (visits and missions); equal points share a rank — with spots visited, badges, missions and home municipality for everyone using it."
-        actions={<Button icon="refresh-cw" onClick={load} disabled={loading}>Refresh</Button>}
       />
 
       {error && <ErrorBanner onDismiss={() => setError(null)}>{error}</ErrorBanner>}

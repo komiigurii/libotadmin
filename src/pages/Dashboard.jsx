@@ -5,13 +5,14 @@ import {
 } from '../api/api';
 import { theme as t, radius, type } from '../theme';
 import {
-  Page, PageHeader, Card, Avatar, ErrorBanner, Stat, Button, ApprovalPill, pageStyles,
+  Page, PageHeader, Card, Avatar, ErrorBanner, Stat, ApprovalPill, pageStyles,
 } from '../components/Layout';
 import { fmtNum as fmt, plural, timeAgo } from '../utils/format';
 import Icon from '../components/Icon';
 import UsageCharts from '../components/UsageCharts';
 import SuperAdminDashboard from './SuperAdminDashboard';
 import { isSuperAdmin } from '../auth/roles';
+import { useLive } from '../api/live';
 
 /*
  * The landing page for admins and moderators: what's live, what's waiting on
@@ -136,16 +137,15 @@ function StaffDashboard() {
   const city = localStorage.getItem('city') || '';
 
   const [data, setData] = useState(null);
-  const [refreshing, setRefreshing] = useState(false);
 
   const load = useCallback(async () => {
-    setRefreshing(true);
-    const next = await (isModerator ? loadModerator() : loadAdmin());
-    setData(next);
-    setRefreshing(false);
+    setData(await (isModerator ? loadModerator() : loadAdmin()));
   }, [isModerator]);
 
   useEffect(() => { load(); }, [load]);
+  // Live updates, no Refresh button. Six requests a time for an admin, so at
+  // most every 5 s.
+  useLive(isModerator ? ['spots', 'approvals'] : ['spots', 'approvals', 'missions', 'progress', 'travelers'], load, { gap: 5000 });
 
   const loading = data === null;
   const stats = data?.progress?.stats;
@@ -169,7 +169,6 @@ function StaffDashboard() {
           subtitle={`${greeting()}. ${isModerator
             ? `Here are the spots you look after${city ? ` in ${city}` : ''}, and where each request you’ve sent for approval stands.`
             : 'Here’s what’s live in the app, what’s waiting on you, and how travelers are using it.'}`}
-          actions={<Button icon="refresh-cw" onClick={load} disabled={refreshing}>{refreshing ? 'Refreshing…' : 'Refresh'}</Button>}
         />
       </div>
 
@@ -177,12 +176,11 @@ function StaffDashboard() {
         <ErrorBanner>Couldn&rsquo;t load {data.failed.join(', ')}. Everything else below is current.</ErrorBanner>
       )}
 
-      {/* ── KPI row ── The previous numbers stay (dimmed) while a refresh runs,
-          instead of flashing back to placeholders. */}
+      {/* ── KPI row ── */}
       <section
         aria-label="Key figures"
         className="dash-reveal"
-        style={{ ...s.statGrid, ...reveal(1), opacity: refreshing && !loading ? 0.6 : 1, transition: 'opacity 0.2s' }}
+        style={{ ...s.statGrid, ...reveal(1) }}
       >
         {isModerator ? (
           <>
