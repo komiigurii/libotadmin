@@ -137,12 +137,13 @@ export default function MyReviewRequests() {
     <Page>
       <PageHeader
         title="My Submissions"
-        count={requests.length}
+        count={loading ? '…' : requests.length}
       />
 
       <Toolbar>
         <FilterTabs
           label="Filter by status"
+          pending={loading}
           value={statusFilter}
           onChange={setStatusFilter}
           options={[
@@ -157,7 +158,7 @@ export default function MyReviewRequests() {
       {error && <ErrorBanner>{error}</ErrorBanner>}
 
       {loading ? (
-        <Loading label="Loading your submissions…" />
+        <Loading label="Loading your submissions…" kind="list" />
       ) : visible.length === 0 ? (
         <EmptyState
           icon="send"

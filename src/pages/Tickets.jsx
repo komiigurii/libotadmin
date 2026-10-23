@@ -137,7 +137,7 @@ function TicketQueue() {
             <span style={x.scope}>{statusLabel}{category ? ` · ${CATEGORY[category].label}` : ''}{data ? ` · ${fmtNum(data.total)}` : ''}</span>
             <SearchInput value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search by title, username or ticket number…" />
           </Toolbar>
-          {!data ? <Loading label="Loading tickets…" />
+          {!data ? <Loading label="Loading tickets…" cols={7} />
             : data.tickets.length === 0 ? (
               <EmptyState icon="inbox" title={status === 'open' ? 'Nothing open' : 'No tickets here'}
                 subtitle="New ones show here, and in your bell." />
@@ -239,7 +239,7 @@ function ReportProblem() {
         <SearchInput value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search your tickets by title or number…" />
       </Toolbar>
 
-      {!data ? <Loading label="Loading tickets…" />
+      {!data ? <Loading label="Loading tickets…" cols={6} />
         : data.tickets.length === 0 ? (
           <EmptyState icon="inbox" title={status === 'open' ? 'Nothing open' : 'No tickets here'}
             subtitle="Use New ticket to report a problem." />
@@ -395,7 +395,7 @@ export function TicketDetail() {
       </Page>
     );
   }
-  if (!ticket) return <Page><Loading label="Loading the ticket…" /></Page>;
+  if (!ticket) return <Page><Loading label="Loading the ticket…" kind="thread" /></Page>;
 
   const cat = CATEGORY[ticket.category] || CATEGORY.other;
   const st = TICKET_STATUS[ticket.status] || TICKET_STATUS.open;

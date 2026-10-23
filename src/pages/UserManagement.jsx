@@ -129,7 +129,7 @@ function AllUsersPanel() {
       </Toolbar>
 
       {loading ? (
-        <Loading label="Loading all users…" />
+        <Loading label="Loading all users…" cols={6} media="avatar" />
       ) : filtered.length === 0 ? (
         <EmptyState
           icon="users"
@@ -258,7 +258,7 @@ function BannedAccountsPanel() {
       )}
 
       {loading ? (
-        <Loading label="Loading suspended and banned accounts…" />
+        <Loading label="Loading suspended and banned accounts…" cols={5} media="avatar" />
       ) : users.length === 0 ? (
         <EmptyState
           icon="check"
@@ -431,7 +431,7 @@ function InactiveUsersPanel() {
       {error && <ErrorBanner onDismiss={() => setError(null)}>{error}</ErrorBanner>}
 
       {loading ? (
-        <Loading label="Loading inactive accounts…" />
+        <Loading label="Loading inactive accounts…" cols={6} media="avatar" />
       ) : users.length === 0 ? (
         <EmptyState
           icon="check"
@@ -571,6 +571,7 @@ function TravelerProgressPanel() {
       <Toolbar>
         <FilterTabs
           label="Show"
+          pending={loading}
           value={onlyExplorers ? 'explorers' : ''}
           onChange={val => setOnlyExplorers(val === 'explorers')}
           options={[
@@ -586,7 +587,7 @@ function TravelerProgressPanel() {
       </Toolbar>
 
       {loading ? (
-        <Loading label="Loading the traveler leaderboard…" />
+        <Loading label="Loading the traveler leaderboard…" cols={9} media="avatar" />
       ) : visible.length === 0 ? (
         <EmptyState
           icon="users"

@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { systemAPI, ticketsAPI, accountsAPI, activityAPI } from '../api/api';
-import { Page, PageHeader, ErrorBanner, StatusPill } from '../components/Layout';
+import { Page, PageHeader, ErrorBanner, StatusPill, Loading } from '../components/Layout';
+import { Bone } from '../components/Skeleton';
 import UsageCharts from '../components/UsageCharts';
 import Icon from '../components/Icon';
 import { fmtNum as fmt, plural, timeAgo, fmtDateTime } from '../utils/format';
@@ -113,7 +114,7 @@ export default function SuperAdminDashboard() {
   const lastPing = health.samples[health.samples.length - 1];
   const live = (
     <>
-      <span>Refreshed <b className="sa-mono">{data ? fmtDateTime(data.at) : '…'}</b></span>
+      <span>Refreshed <b className="sa-mono">{data ? fmtDateTime(data.at) : <Bone inline w={104} h={13} />}</b></span>
       {lastPing?.ok && <span>Database <b className="sa-mono">{lastPing.pingMs} ms</b></span>}
       {health.latest && <span>Server up <b className="sa-mono">{uptimeText(health.latest.uptimeSeconds)}</b></span>}
       <span>{sys?.maintenance?.on ? 'Maintenance is on' : 'App, website and console open'}</span>
@@ -135,7 +136,7 @@ export default function SuperAdminDashboard() {
           <section className="sa-panel sa-o-attention" aria-labelledby="dash-attention">
             <div className="sa-panel-head dark">
               <h2 id="dash-attention" className="sa-panel-title">Needs your attention</h2>
-              <span className="sa-panel-meta">{loading ? '…' : waiting ? `${fmt(waiting)} waiting` : 'All clear'}</span>
+              <span className="sa-panel-meta">{loading ? <Bone inline w={72} h={11} /> : waiting ? `${fmt(waiting)} waiting` : 'All clear'}</span>
             </div>
             <ul style={d.list}>
               {attention.map((r) => (
@@ -151,8 +152,8 @@ export default function SuperAdminDashboard() {
                       </span>
                       <span style={d.rowDetail}>{r.detail}</span>
                     </span>
-                    {r.count === null ? <StatusPill tone="warning" icon="alert-triangle">Now</StatusPill>
-                      : loading ? <span style={d.muted}>…</span>
+                    {loading ? <Bone w={34} h={26} r={8} />
+                      : r.count === null ? <StatusPill tone="warning" icon="alert-triangle">Now</StatusPill>
                         : r.count === 0 ? <span style={d.clear}><Icon name="check" size={12} weight="bold" /> Clear</span>
                           : <span style={d.badge}>{fmt(r.count)}</span>}
                     <span className="dash-chevron" style={d.chevron}><Icon name="chevron-right" size={14} /></span>
@@ -169,7 +170,7 @@ export default function SuperAdminDashboard() {
               <h2 id="dash-activity" className="sa-panel-title">Recent activity</h2>
               <Link to="/activity">Activity Log <Icon name="chevron-right" size={13} /></Link>
             </div>
-            {loading ? <p style={d.pad}>Loading…</p>
+            {loading ? <Loading label="Loading recent activity…" kind="rows" rows={6} />
               : !data.activity ? <p style={d.pad}>Couldn’t load the activity log.</p>
                 : data.activity.length === 0 ? <p style={d.pad}>Nothing yet.</p>
                   : (
@@ -195,7 +196,7 @@ export default function SuperAdminDashboard() {
         </div>
 
         <div className="sa-col">
-          <HealthPanel health={health} maintenanceOn={!!sys?.maintenance?.on} />
+          <HealthPanel health={health} maintenanceOn={sys ? !!sys.maintenance?.on : null} />
           <StaffPanel staff={staff} loading={loading} />
           <SystemNotes sys={sys} loading={loading} />
           <section className="sa-panel" aria-labelledby="dash-actions">
@@ -241,7 +242,7 @@ function HealthPanel({ health, maintenanceOn }) {
           <div style={{ marginTop: 6 }}><StatusPill tone={verdict.tone} icon={verdict.icon}>{verdict.word}</StatusPill></div>
         </div>
         <div style={d.bigNum}>
-          {last?.ok && last.pingMs != null ? <>{last.pingMs}<span style={d.unit}>ms</span></> : '—'}
+          {!last ? <Bone w={64} h={34} r={8} /> : last.ok && last.pingMs != null ? <>{last.pingMs}<span style={d.unit}>ms</span></> : '—'}
         </div>
       </div>
       <PingChart samples={samples} />
@@ -250,12 +251,12 @@ function HealthPanel({ health, maintenanceOn }) {
         <span className="sa-mono">{avg != null ? `avg ${avg} ms · max ${max} ms` : error || 'waiting for the first answer'}</span>
       </div>
       <dl style={d.facts}>
-        <div style={d.fact}><dt style={d.factK}><Icon name="timer" size={15} /> Server up</dt><dd style={d.factV} className="sa-mono">{latest ? uptimeText(latest.uptimeSeconds) : '…'}</dd></div>
-        <div style={d.fact}><dt style={d.factK}><Icon name="cpu" size={15} /> Memory</dt><dd style={d.factV} className="sa-mono">{latest ? `${latest.memoryMb.rss} MB` : '…'}</dd></div>
-        <div style={d.fact}><dt style={d.factK}><Icon name="git-commit" size={15} /> Version</dt><dd style={d.factV} className="sa-mono">{latest ? latest.commit || 'local build' : '…'}</dd></div>
+        <div style={d.fact}><dt style={d.factK}><Icon name="timer" size={15} /> Server up</dt><dd style={d.factV} className="sa-mono">{latest ? uptimeText(latest.uptimeSeconds) : <Bone inline w={72} h={12} />}</dd></div>
+        <div style={d.fact}><dt style={d.factK}><Icon name="cpu" size={15} /> Memory</dt><dd style={d.factV} className="sa-mono">{latest ? `${latest.memoryMb.rss} MB` : <Bone inline w={56} h={12} />}</dd></div>
+        <div style={d.fact}><dt style={d.factK}><Icon name="git-commit" size={15} /> Version</dt><dd style={d.factV} className="sa-mono">{latest ? latest.commit || 'local build' : <Bone inline w={64} h={12} />}</dd></div>
         <div style={d.fact}>
           <dt style={d.factK}><Icon name="tool" size={15} /> Maintenance</dt>
-          <dd style={d.factV}>{maintenanceOn ? <StatusPill tone="warning" icon="tool">On</StatusPill> : <StatusPill tone="success" icon="check">Off</StatusPill>}</dd>
+          <dd style={d.factV}>{maintenanceOn == null ? <Bone inline w={52} h={22} r={999} /> : maintenanceOn ? <StatusPill tone="warning" icon="tool">On</StatusPill> : <StatusPill tone="success" icon="check">Off</StatusPill>}</dd>
         </div>
       </dl>
     </section>
@@ -321,7 +322,7 @@ function SystemNotes({ sys, loading }) {
         </h2>
         <Link to="/system" className="sa-panel-link">System Maintenance <Icon name="chevron-right" size={13} /></Link>
       </div>
-      {loading ? <p style={d.pad}>Loading…</p> : !sys ? <p style={d.pad}>Couldn’t load the system’s state.</p> : (
+      {loading ? <Loading label="Loading the system’s state…" kind="rows" rows={2} /> : !sys ? <p style={d.pad}>Couldn’t load the system’s state.</p> : (
         <dl style={d.facts}>
           <div style={d.note}>
             <dt style={d.noteK}>Update notice showing</dt>
@@ -358,7 +359,7 @@ function StaffPanel({ staff, loading }) {
         <h2 id="dash-staff" className="sa-panel-title">Staff sign-ins</h2>
         <Link to="/accounts">Account Management <Icon name="chevron-right" size={13} /></Link>
       </div>
-      {loading ? <p style={d.pad}>Loading…</p>
+      {loading ? <Loading label="Loading staff sign-ins…" kind="rows" media="avatar" rows={5} />
         : !staff ? <p style={d.pad}>Couldn’t load the staff accounts.</p>
           : rows.length === 0 ? <p style={d.pad}>No admin or moderator accounts yet.</p>
             : (
@@ -394,7 +395,6 @@ const d = {
   chevron:  { display: 'inline-flex', flexShrink: 0, color: 'var(--text-muted)' },
   badge:    { flexShrink: 0, minWidth: 30, textAlign: 'center', fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 19, lineHeight: 1, padding: '5px 10px 4px', borderRadius: 8, background: 'var(--accent)', color: 'var(--on-accent)' },
   clear:    { flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 15, fontWeight: 700, color: 'var(--success)' },
-  muted:    { fontSize: 15, color: 'var(--text-muted)' },
   pad:      { margin: 0, padding: '14px 16px', fontSize: 15, color: 'var(--text-muted)' },
 
   actTime:  { color: 'var(--text-muted)', whiteSpace: 'nowrap' },

@@ -173,7 +173,7 @@ export default function TownBadges() {
     <Page>
       <PageHeader
         title="Town Badges"
-        count={withSpots.length}
+        count={loading ? '…' : withSpots.length}
       />
 
       {error && <ErrorBanner onDismiss={() => setError(null)}>{error}</ErrorBanner>}
@@ -191,6 +191,7 @@ export default function TownBadges() {
       <Toolbar>
         <FilterTabs
           label="Show"
+          pending={loading}
           value={show}
           onChange={setShow}
           options={[
@@ -201,7 +202,7 @@ export default function TownBadges() {
       </Toolbar>
 
       {loading ? (
-        <Loading label="Loading the town badges…" />
+        <Loading label="Loading the town badges…" kind="tiles" />
       ) : visible.length === 0 ? (
         <EmptyState icon="map-pin" title="No town has spots yet" subtitle="A town's badge can be earned once it has at least one spot." />
       ) : (

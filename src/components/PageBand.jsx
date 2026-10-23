@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import Icon from './Icon';
+import { Bone } from './Skeleton';
 
 /*
  * The band every console page opens with (2026-10-23, the user's reference;
@@ -17,7 +18,13 @@ import Icon from './Icon';
  *   spark    daily counts, oldest first, drawn as small columns. Real series
  *            only (the usage figures); no stat gets a made-up trend.
  *   flag     a short word beside a warning number ("Now").
+ *
+ * A value of '…' is the pages' word for "still loading": the cell draws a
+ * skeleton bone the size of its number instead, and a hint of null (one
+ * that comes with the data) a short line under it. An undefined hint is a
+ * cell that has none, so it gets no line. A `count` of '…' is a bone too.
  */
+const PENDING = '…';
 export default function PageBand({ title, subtitle, count, live, actions, stats, statsLabel, children }) {
   return (
     <section className="sa-band" aria-label={typeof title === 'string' ? title : undefined}>
@@ -25,7 +32,9 @@ export default function PageBand({ title, subtitle, count, live, actions, stats,
         <div style={{ minWidth: 0, flex: '1 1 420px' }}>
           <h1 className="sa-band-title">
             {title}
-            {count != null && <span className="sa-band-count" aria-label={`${count} items`}>{count}</span>}
+            {count != null && (count === PENDING
+              ? <Bone inline w={34} h={18} r={999} style={{ marginLeft: 10, verticalAlign: '0.35em' }} />
+              : <span className="sa-band-count" aria-label={`${count} items`}>{count}</span>)}
           </h1>
           {subtitle && <p className="sa-band-sub">{subtitle}</p>}
           {live && <div className="sa-band-live">{live}</div>}
@@ -49,6 +58,7 @@ export function StatStrip({ stats, label = 'Figures' }) {
 }
 
 function Cell({ label, value, hint, hue, to, tone, spark, current, small, flag, onClick }) {
+  const pending = value === PENDING;
   const body = (
     <>
       <span className="sa-cell-label">
@@ -56,11 +66,14 @@ function Cell({ label, value, hint, hue, to, tone, spark, current, small, flag, 
         {label}
       </span>
       <span className="sa-cell-row">
-        <span className={`sa-cell-value${small ? ' small' : ''}`}>{value ?? '—'}</span>
+        <span className={`sa-cell-value${small ? ' small' : ''}`}>
+          {pending ? <><Bone w={small ? 76 : 58} h={small ? 22 : 30} /><span className="sk-sr">Loading</span></> : value ?? '—'}
+        </span>
         {flag && <span className="sa-cell-flag"><Icon name="alert-triangle" size={13} weight="bold" />{flag}</span>}
         {spark?.length > 1 && !flag && <Spark points={spark} hue={hue} label={`${label}, day by day`} />}
       </span>
-      {hint && <span className="sa-cell-hint">{hint}</span>}
+      {hint ? <span className="sa-cell-hint">{hint}</span>
+        : pending && hint === null && <span className="sa-cell-hint"><Bone w="64%" h={10} style={{ marginTop: 3 }} /></span>}
     </>
   );
   const cls = `sa-cell${tone ? ` ${tone}` : ''}`;

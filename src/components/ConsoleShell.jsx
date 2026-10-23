@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import Icon from './Icon';
+import { Bone, Loading } from './Skeleton';
 import logo from '../assets/logo.png';
 import { useThemePref } from '../theme';
 import { publishHeartbeat, useHeartbeat } from '../auth/heartbeat';
@@ -386,7 +387,7 @@ function BellMenu({ unread }) {
             )}
           </div>
           {error && <p className="sa-bell-note danger" role="alert">{error}</p>}
-          {!data ? (!error && <p className="sa-bell-note">Loading…</p>)
+          {!data ? (!error && <Loading label="Loading notifications…" kind="rows" rows={4} />)
             : data.notifications.length === 0 ? (
               <div className="sa-bell-empty">
                 <Icon name="bell" size={24} />
@@ -628,8 +629,8 @@ function ProfileDialog({ account, onClose, onPassword }) {
     ['Role', account.role],
     ['Looks after', account.scope],
     ...(superAdmin ? [
-      ['Account made', me ? <span className="sa-mono">{fmtDay(me.createdAt)}</span> : me === undefined ? '…' : '—'],
-      ['Last signed in', me?.lastLoginAt ? <span className="sa-mono">{timeAgo(me.lastLoginAt)}</span> : me === undefined ? '…' : '—'],
+      ['Account made', me ? <span className="sa-mono">{fmtDay(me.createdAt)}</span> : me === undefined ? <Bone inline w={88} h={13} /> : '—'],
+      ['Last signed in', me?.lastLoginAt ? <span className="sa-mono">{timeAgo(me.lastLoginAt)}</span> : me === undefined ? <Bone inline w={72} h={13} /> : '—'],
     ] : []),
   ];
   return (

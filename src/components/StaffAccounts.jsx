@@ -393,7 +393,7 @@ function AccountDrawer({ account: a, onClose }) {
           ['Requests sent', a.requests ? `${a.requests.total ?? 0}${a.requests.pending ? ` · ${a.requests.pending} waiting` : ''}` : null],
         ]} />
         <DetailSection title="History">
-          {error ? <p style={f.error}>{error}</p> : entries ? <HistoryList entries={entries} /> : <Loading label="Loading history…" />}
+          {error ? <p style={f.error}>{error}</p> : entries ? <HistoryList entries={entries} /> : <Loading label="Loading history…" kind="rows" media="avatar" rows={4} flush />}
         </DetailSection>
       </div>
     </Drawer>

@@ -9,6 +9,7 @@ import { AddAccountForm, StaffTable } from '../components/StaffAccounts';
 import { notify, confirmAction, promptAction } from '../components/AppAlert';
 import CredentialSlip from '../components/CredentialSlip';
 import Pagination from '../components/Pagination';
+import { Bone } from '../components/Skeleton';
 import Drawer from '../components/Drawer';
 import TravelerDrawer, { Standing } from '../components/TravelerDrawer';
 import { Facts, DetailSection, DetailText, detailStyles as d } from '../components/Details';
@@ -188,6 +189,8 @@ export default function Accounts() {
 
   const nStaff = (fn) => (staffLoading ? null : accounts.filter(fn).length);
   const n = (v) => (v == null ? '…' : fmtNum(v));
+  // The filter list's counts: a bone until they load (the strip draws its '…' as one).
+  const nList = (v) => (v == null ? <Bone inline w={18} h={11} /> : fmtNum(v));
   const onSlip = nStaff((a) => staffMatches(a, 'firstSignIn'));
   const inTrouble = travelerCounts && travelerCounts.suspended != null && travelerCounts.banned != null ? travelerCounts.suspended + travelerCounts.banned : null;
   const nLocked = locked?.accounts.length;
@@ -219,7 +222,7 @@ export default function Accounts() {
               <button key={o.value || 'all'} type="button" className="sa-filter"
                 aria-pressed={view === 'staff' && role === o.value && !staffStatus} onClick={() => showStaff(o.value)}>
                 <Icon name={o.icon} size={15} /> {o.label}
-                <span className="sa-filter-n">{n(nStaff((a) => !o.value || a.role === o.value))}</span>
+                <span className="sa-filter-n">{nList(nStaff((a) => !o.value || a.role === o.value))}</span>
               </button>
             ))}
           </div>
@@ -232,7 +235,7 @@ export default function Accounts() {
                 <button key={o.value} type="button" className="sa-filter"
                   aria-pressed={view === 'staff' && staffStatus === o.value} onClick={() => showStaff('', o.value)}>
                   <Icon name={o.icon} size={15} /> {o.label}
-                  <span className={`sa-filter-n${flag ? ' flag' : ''}`}>{n(c)}</span>
+                  <span className={`sa-filter-n${flag ? ' flag' : ''}`}>{nList(c)}</span>
                 </button>
               );
             })}
@@ -335,11 +338,11 @@ function StaffView({ accounts, all, title, canMake, loading, error, onDismissErr
       )}
 
       <Toolbar>
-        <span style={a.scope}>{title || 'All staff'} · {fmtNum(visible.length)}</span>
+        <span style={a.scope}>{title || 'All staff'} · {loading ? <Bone inline w={20} h={12} /> : fmtNum(visible.length)}</span>
         <SearchInput value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search by username or municipality…" />
       </Toolbar>
 
-      {loading ? <Loading label="Loading accounts…" />
+      {loading ? <Loading label="Loading accounts…" cols={5} media="avatar" />
         : visible.length === 0 ? <EmptyState icon="users" title="No accounts match" subtitle="Try another filter or search." />
           : (
             <StaffTable
@@ -401,7 +404,7 @@ function TravelersView({ status, title, onShowDeleted }) {
 
       {error && <ErrorBanner onDismiss={() => setError('')}>{error}</ErrorBanner>}
 
-      {!data ? <Loading label="Loading travelers…" />
+      {!data ? <Loading label="Loading travelers…" cols={7} media="avatar" />
         : data.travelers.length === 0 ? <EmptyState icon="users" title="No travelers match" subtitle="Try another filter or search." />
           : (
             <>
@@ -528,7 +531,7 @@ function LockedView({ locked, kind, title, error, onDismissError, reload, onUnlo
         </p>
       )}
 
-      {!locked ? (!error && <Loading label="Loading locked accounts…" />)
+      {!locked ? (!error && <Loading label="Loading locked accounts…" cols={4} media="avatar" />)
         : shown.length === 0 ? <EmptyState icon="unlock" title={nobody} subtitle="Accounts locked by wrong passwords show here until they’re unlocked or their lock runs out." />
           : (
             <Table
@@ -622,7 +625,7 @@ function ArchivedView({ reason, title }) {
 
       {error && <ErrorBanner onDismiss={() => setError('')}>{error}</ErrorBanner>}
 
-      {!data ? <Loading label="Loading archived accounts…" />
+      {!data ? <Loading label="Loading archived accounts…" cols={5} media="avatar" />
         : data.archived.length === 0 ? <EmptyState icon="archive" title="Nothing archived here" subtitle="Banned, inactive and deleted accounts show here, kept and hidden." />
           : (
             <>

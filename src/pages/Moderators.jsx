@@ -58,7 +58,7 @@ export default function Moderators() {
     <Page>
       <PageHeader
         title="Moderators"
-        count={mods.length}
+        count={loading ? '…' : mods.length}
         actions={!adding && <Button variant="primary" icon="plus" onClick={() => setAdding(true)}>Add moderator</Button>}
       />
 
@@ -84,7 +84,7 @@ export default function Moderators() {
       )}
 
       {loading ? (
-        <Loading label="Loading moderator accounts…" />
+        <Loading label="Loading moderator accounts…" cols={5} media="avatar" />
       ) : mods.length === 0 ? (
         <EmptyState icon="users" title="No moderator accounts" subtitle="Use Add moderator to make the first one." />
       ) : visible.length === 0 ? (

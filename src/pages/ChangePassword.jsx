@@ -7,7 +7,8 @@ import { useHeartbeat } from '../auth/heartbeat';
 import { actionLabel, groupOf, GROUP_HUE } from '../utils/activity';
 import { fmtDateTime, timeAgo } from '../utils/format';
 import { theme as t, radius, fonts, type } from '../theme';
-import { Page, PageHeader, Button } from '../components/Layout';
+import { Page, PageHeader, Button, Loading } from '../components/Layout';
+import { Bone } from '../components/Skeleton';
 import { notify } from '../components/AppAlert';
 import Icon from '../components/Icon';
 import logo from '../assets/logo.png';
@@ -187,7 +188,7 @@ function MyAccount() {
   const role = getRole();
   const city = localStorage.getItem('city') || '';
   const rows = [
-    ['Username', beat?.username ? <span style={{ fontFamily: fonts.mono }}>{beat.username}</span> : '…'],
+    ['Username', beat?.username ? <span style={{ fontFamily: fonts.mono }}>{beat.username}</span> : <Bone inline w={96} h={13} />],
     ['Role', roleLabel(role)],
     ['Looks after', role === 'moderator' ? (city || 'No city assigned') : 'All of Bulacan'],
   ];
@@ -235,7 +236,7 @@ function MyRecentActivity() {
         <h2 id="my-activity" className="sa-panel-title">Your account lately</h2>
         <Link to="/activity">Activity Log <Icon name="chevron-right" size={13} /></Link>
       </div>
-      {entries === undefined ? <p style={f.pad}>Loading…</p>
+      {entries === undefined ? <Loading label="Loading your activity…" kind="rows" rows={5} />
         : entries === null ? <p style={f.pad}>Couldn’t load your activity.</p>
           : entries.length === 0 ? <p style={f.pad}>Nothing logged for this account yet.</p>
             : (

@@ -6,6 +6,7 @@ import { theme as t, radius, shadow, type } from '../theme';
 import { uploadAPI, missionAPI, categoryAPI, spotAPI, municipalityAPI } from '../api/api';
 import { notify, confirmAction } from './AppAlert';
 import Icon from './Icon';
+import { Loading } from './Skeleton';
 import VisitingHoursField from './VisitingHoursField';
 import { spotHasAR } from '../utils/spotHasAR';
 import { insideBoundary } from '../utils/geo';
@@ -1158,7 +1159,7 @@ function MapLegend({ mode, spotPinned, arCount, missionPinned, otherCount = 0, m
 // `neighbours` is every other spot with its distance and arrival radius,
 // nearest first; null while they load, false if they couldn't be.
 function SpotOverlapNote({ neighbours, arrivalRadius }) {
-  if (neighbours === null) return <p style={styles.overlapMuted}>Checking the spots nearby…</p>;
+  if (neighbours === null) return <Loading label="Checking the spots nearby…" kind="line" />;
   if (neighbours === false) {
     return <p style={styles.overlapMuted}>Couldn’t load the other spots, so overlaps can’t be checked right now.</p>;
   }
@@ -2391,7 +2392,7 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
                 renderFoodFields(true)
               ) : loadingMission ? (
                 <section style={styles.section}>
-                  <div style={styles.emptyNote}>Checking for a food mission…</div>
+                  <Loading label="Checking for a food mission…" kind="form" rows={3} />
                 </section>
               ) : !locationMission ? (
                 <section style={styles.section}>

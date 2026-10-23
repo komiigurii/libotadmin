@@ -27,12 +27,19 @@ const System           = lazy(() => import('./pages/System'));
 import SessionWatcher from './components/SessionWatcher';
 import MaintenanceBanner from './components/MaintenanceBanner';
 import { AppAlertProvider } from './components/AppAlert';
+import { Page, Loading } from './components/Layout';
 import { theme as t } from './theme';
 import { hasValidSession, getToken, clearSession, mustChangePassword } from './auth/session';
 import { isAdminOnly, isModeratorRole, isSuperAdmin } from './auth/roles';
 import './App.css';
 
+// While a page's code downloads: the outline of a page, in the console.
 function PageFallback() {
+  return <Page><Loading label="Opening the page…" kind="page" /></Page>;
+}
+
+// Set password has no console around it, so no band to sketch.
+function PlainFallback() {
   return <div style={shell.fallback}>Loading…</div>;
 }
 
@@ -108,7 +115,7 @@ export default function App() {
           element={
             <SignedIn>
               <SessionWatcher />
-              <Suspense fallback={<PageFallback />}>
+              <Suspense fallback={<PlainFallback />}>
                 <SetPasswordRoute />
               </Suspense>
             </SignedIn>

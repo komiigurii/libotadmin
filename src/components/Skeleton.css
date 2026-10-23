@@ -1,0 +1,146 @@
+/* Skeletons (components/Skeleton.jsx): what's loading, drawn as muted bars
+ * in the shape it will have. The metrics below are the real pieces' own
+ * (Layout's table cells and item cards, the dashboards' panel rows, Spots'
+ * photo cards), so nothing moves when the data replaces them.
+ *
+ * Same rule as index.css: colours are tokens, with the dark theme's under
+ * the media query and under an explicit data-theme. */
+
+:root {
+  --sk-base:  #E2E9E6;
+  --sk-shine: rgba(255, 255, 255, 0.72);
+  /* On the ink: the page bands, table heads and dark panel heads. */
+  --sk-ink-base:  rgba(234, 244, 242, 0.12);
+  --sk-ink-shine: rgba(234, 244, 242, 0.16);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --sk-base:  #1C3739;
+    --sk-shine: rgba(234, 244, 242, 0.07);
+  }
+}
+:root[data-theme='dark'] {
+  --sk-base:  #1C3739;
+  --sk-shine: rgba(234, 244, 242, 0.07);
+}
+
+/* The sheen is fixed to the screen, not to each bone: one band of light
+   crosses every bone on the page together, then rests a moment. */
+.sk-bone {
+  display: block; flex-shrink: 0; max-width: 100%;
+  border-radius: 6px;
+  background-color: var(--sk-base);
+  background-image: linear-gradient(100deg, transparent 45%, var(--sk-shine) 50%, transparent 55%);
+  background-size: 200vw 100%;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+  animation: sk-sweep 2.2s ease-in-out infinite;
+}
+.sk-bone-inline { display: inline-block; vertical-align: middle; }
+@keyframes sk-sweep {
+  0%       { background-position: -130vw 0; }
+  75%, 100% { background-position: 30vw 0; }
+}
+.sa-band .sk-bone,
+.sa-panel-head.dark .sk-bone,
+th[scope='col'] .sk-bone {
+  --sk-base: var(--sk-ink-base);
+  --sk-shine: var(--sk-ink-shine);
+}
+
+.sk-sr {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden;
+  clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+.sk-hint { margin: 12px 0 0; text-align: center; font-size: 15px; color: var(--text-muted); }
+.sa-panel .sk-hint { margin: 0; padding: 0 16px 14px; }
+
+/* Shared bits */
+.sk-inline { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.sk-lines { display: flex; flex-direction: column; gap: 7px; flex: 1; min-width: 0; }
+.sk-page { display: flex; flex-direction: column; gap: 16px; }
+.sk-panel-body { padding: 14px 16px 16px; display: flex; flex-direction: column; gap: 14px; }
+
+/* A table, as Layout's Table draws one */
+.sk-card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; }
+.sk-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.sk-table th {
+  padding: 13px 16px; text-align: left;
+  background: var(--sidebar-bg); border-bottom: 1px solid var(--divider);
+}
+.sk-table td { padding: 12px 16px; border-bottom: 1px solid var(--divider); height: 32px; }
+.sk-table tr:last-child td { border-bottom: none; }
+
+/* Item cards (Layout's list): media, title line, text, facts, a button */
+.sk-list { display: flex; flex-direction: column; gap: 12px; }
+.sk-item {
+  display: flex; align-items: flex-start; gap: 14px; padding: 16px 18px;
+  background: var(--card-bg); border: 1px solid var(--border); border-radius: 14px;
+}
+.sk-item-main { flex: 1 1 260px; min-width: 0; display: flex; flex-direction: column; gap: 10px; }
+
+/* Rows in a panel (the dashboards) or a drawer */
+.sk-rows { list-style: none; margin: 0; padding: 0; }
+.sk-row { display: flex; align-items: center; gap: 12px; padding: 11px 16px; border-bottom: 1px solid var(--divider); }
+.sk-row:last-child { border-bottom: none; }
+.sk-row > .sk-inline { flex: 1; }
+/* A drawer's rows have no panel edge to inset from. */
+.sk-rows-flush .sk-row { padding-left: 0; padding-right: 0; }
+
+/* Spot Management's photo cards */
+.sk-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; }
+.sk-spot {
+  display: flex; flex-direction: column; overflow: hidden;
+  background: var(--card-bg); border: 1px solid var(--border); border-radius: 14px;
+}
+.sk-spot-body { padding: 14px 16px; display: flex; flex-direction: column; gap: 12px; }
+.sk-foot {
+  padding-top: 10px; border-top: 1px solid var(--divider);
+  display: flex; justify-content: space-between; align-items: center; gap: 8px;
+}
+
+/* Town badge cards */
+.sk-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(340px, 100%), 1fr)); gap: 14px; }
+.sk-tile {
+  display: flex; gap: 16px; padding: 16px;
+  background: var(--card-bg); border: 1px solid var(--border); border-radius: 14px;
+}
+
+/* A drawer's facts, two across */
+.sk-facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.sk-fact {
+  display: flex; flex-direction: column; gap: 8px; padding: 11px 12px;
+  background: var(--sidebar-bg); border: 1px solid var(--border); border-radius: 10px;
+}
+
+/* The usage charts: a title, a total, a month of columns */
+.sk-charts { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 18px 24px; }
+.sk-chart-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 12px; }
+.sk-columns {
+  height: 132px; display: flex; align-items: flex-end; gap: 3px;
+  padding-left: 30px; border-bottom: 1px solid var(--divider);
+}
+.sk-columns .sk-bone { flex: 1; min-width: 1px; }
+
+/* Content coverage: meters, then bars */
+.sk-meters { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 24px; padding: 14px 16px 16px; }
+
+/* A ticket's messages */
+.sk-message {
+  display: flex; flex-direction: column; gap: 9px; padding: 14px 16px;
+  background: var(--card-bg); border: 1px solid var(--border); border-radius: 14px;
+}
+
+@media (max-width: 720px) {
+  .sk-item > .sk-bone:last-child { display: none; }
+  .sk-tile > .sk-bone:first-child { width: 72px !important; height: 72px !important; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sk-bone { animation: none; background-image: none; }
+}
+
+/* Windows High Contrast drops backgrounds; the bones keep a visible fill. */
+@media (forced-colors: active) {
+  .sk-bone { forced-color-adjust: none; background: GrayText; }
+}

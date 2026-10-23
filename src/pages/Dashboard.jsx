@@ -5,8 +5,9 @@ import {
 } from '../api/api';
 import { theme as t } from '../theme';
 import {
-  Page, PageHeader, Avatar, ErrorBanner, ApprovalPill,
+  Page, PageHeader, Avatar, ErrorBanner, ApprovalPill, Loading,
 } from '../components/Layout';
+import { Bone } from '../components/Skeleton';
 import { fmtNum as fmt, plural, timeAgo, fmtDateTime } from '../utils/format';
 import { loadUsage } from '../utils/usage';
 import Icon from '../components/Icon';
@@ -207,7 +208,7 @@ function StaffDashboard() {
 
   const live = (
     <>
-      <span>Refreshed <b className="sa-mono">{data ? fmtDateTime(data.at) : '…'}</b></span>
+      <span>Refreshed <b className="sa-mono">{data ? fmtDateTime(data.at) : <Bone inline w={104} h={13} />}</b></span>
       <span>{isModerator ? <>Looking after <b>{city || 'no town yet'}</b></> : <>Looking after <b>all of Bulacan</b></>}</span>
     </>
   );
@@ -283,7 +284,7 @@ function Panel({ id, title, dark, meta, to, linkLabel, className = '', children 
 }
 
 function Count({ count, loading }) {
-  if (loading) return <span style={d.muted}>…</span>;
+  if (loading) return <Bone w={34} h={26} r={8} />;
   if (count == null) return <span style={d.muted}>Couldn&rsquo;t load</span>;
   if (count === 0) return <span style={d.clear}><Icon name="check" size={12} weight="bold" /> Clear</span>;
   return <span style={d.badge}>{fmt(count)}</span>;
@@ -299,7 +300,7 @@ function AttentionPanel({ attention, loading }) {
   const total = sumKnown(rows.map((r) => r.count));
   return (
     <Panel id="dash-attention" title="Needs your attention" dark className="sa-o-attention"
-      meta={loading ? '…' : total ? `${fmt(total)} waiting` : total === 0 ? 'All clear' : null}>
+      meta={loading ? <Bone inline w={72} h={11} /> : total ? `${fmt(total)} waiting` : total === 0 ? 'All clear' : null}>
       <ul style={d.list}>
         {rows.map((r) => (
           <li key={r.to} style={d.li}>
@@ -331,7 +332,7 @@ function SubmissionsPanel({ submissions, loading }) {
   return (
     <Panel id="dash-submissions" title="Your recent submissions" dark className="sa-o-attention" to="/my-review-requests" linkLabel="My Submissions">
       {loading ? (
-        <p style={d.pad}>Loading…</p>
+        <Loading label="Loading your submissions…" kind="rows" media="icon" rows={5} />
       ) : submissions == null ? (
         <p style={d.pad}>Couldn&rsquo;t load your submissions.</p>
       ) : recent.length === 0 ? (
@@ -367,7 +368,7 @@ function VisitorsPanel({ travelers, loading }) {
   return (
     <Panel id="dash-visitors" title="Recent visitors" dark className="sa-o-health" to="/my-travelers" linkLabel="Travelers">
       {loading ? (
-        <p style={d.pad}>Loading…</p>
+        <Loading label="Loading recent visitors…" kind="rows" media="avatar" rows={5} />
       ) : travelers == null ? (
         <p style={d.pad}>Couldn&rsquo;t load your town&rsquo;s travelers.</p>
       ) : rows.length === 0 ? (
@@ -442,7 +443,7 @@ function CoveragePanel({ spots, loading, scope }) {
   return (
     <Panel id="dash-coverage" title={`Content coverage${scope ? ` · ${scope}` : ''}`} to="/spots" linkLabel="Spot Management">
       {loading ? (
-        <p style={d.pad}>Loading…</p>
+        <Loading label="Loading content coverage…" kind="meters" />
       ) : spots == null ? (
         <p style={d.pad}>Couldn&rsquo;t load spots.</p>
       ) : total === 0 ? (
@@ -496,7 +497,7 @@ function TopTravelers({ rows, loading, failed }) {
   return (
     <Panel id="dash-travelers" title="Top travelers" dark className="sa-o-activity" to="/user-progress" linkLabel="Leaderboard">
       {loading ? (
-        <p style={d.pad}>Loading…</p>
+        <Loading label="Loading the top travelers…" kind="rows" media="avatar" rows={5} />
       ) : failed ? (
         <p style={d.pad}>Couldn&rsquo;t load the leaderboard.</p>
       ) : top.length === 0 ? (
