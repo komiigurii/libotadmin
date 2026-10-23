@@ -63,11 +63,8 @@ const ADMIN_NAV = [
     { label: 'Rate and Review', path: '/comments', icon: 'message-square', hint: 'Every review travelers have left', keys: 'reviews comments filter warn suspend ban delete' },
   ] },
   { group: 'Travelers', items: [
-    { label: 'Traveler Progress', path: '/user-progress', icon: 'award', hint: 'The leaderboard: points, visits and badges', keys: 'leaderboard ranking points visits badges missions' },
-    { label: 'Town Badges', path: '/town-badges', icon: 'star', hint: 'The towns travelers have finished', keys: 'badge town explorer voyager goat' },
-    { label: 'Inactive Accounts', path: '/inactive-users', icon: 'clock', hint: 'Travelers away 30 days or more', keys: 'inactive archive' },
-    { label: 'Suspensions & Bans', path: '/banned-accounts', icon: 'slash', hint: 'Suspended and banned travelers, and their appeals', keys: 'suspension ban appeal' },
     { label: 'User Management', path: '/user-management', icon: 'user', hint: 'Manage user accounts and permissions', keys: 'user management accounts permissions' },
+    { label: 'Town Badges', path: '/town-badges', icon: 'star', hint: 'The towns travelers have finished', keys: 'badge town explorer voyager goat' },
   ] },
   { group: 'Team', items: [
     { label: 'Moderators', path: '/moderators', icon: 'users', hint: 'The town moderators’ accounts', keys: 'moderator lgu account add reset slip town' },

@@ -12,9 +12,7 @@ const Spots            = lazy(() => import('./pages/Spots'));
 const SpotManagement   = lazy(() => import('./pages/SpotManagement'));
 const Comments         = lazy(() => import('./pages/Comments'));
 const MyReviewRequests = lazy(() => import('./pages/MyReviewRequests'));
-const InactiveUsers    = lazy(() => import('./pages/InactiveUsers'));
-const BannedAccounts   = lazy(() => import('./pages/BannedAccounts'));
-const UserProgress     = lazy(() => import('./pages/UserProgress'));
+const UserManagement   = lazy(() => import('./pages/UserManagement'));
 const Moderators       = lazy(() => import('./pages/Moderators'));
 const MyTravelers      = lazy(() => import('./pages/MyTravelers'));
 const TownBadges      = lazy(() => import('./pages/TownBadges'));
@@ -139,10 +137,8 @@ export default function App() {
                       <Route path="/reported-comments"  element={<Navigate to="/comments" replace />} />
                       {/* Admin-only, like the backend: moderators work only on
                           attractions and their own requests. */}
-                      <Route path="/inactive-users"     element={<AdminRoute><InactiveUsers /></AdminRoute>} />
-                      <Route path="/banned-accounts"    element={<AdminRoute><BannedAccounts /></AdminRoute>} />
+                      <Route path="/user-management"     element={<AdminRoute><UserManagement /></AdminRoute>} />
                       <Route path="/comments"           element={<AdminRoute><Comments /></AdminRoute>} />
-                      <Route path="/user-progress"      element={<AdminRoute><UserProgress /></AdminRoute>} />
                       <Route path="/moderators"         element={<AdminRoute><Moderators /></AdminRoute>} />
                       <Route path="/town-badges"        element={<AdminRoute><TownBadges /></AdminRoute>} />
 

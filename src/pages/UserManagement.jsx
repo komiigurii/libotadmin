@@ -1,15 +1,16 @@
-import { Fragment, useEffect, useState } from 'react';
-import { bannedAccountsAPI, appealAPI, inactiveUsersAPI } from '../api/api';
+import { Fragment, useEffect, useMemo, useState } from 'react';
+import { bannedAccountsAPI, appealAPI, inactiveUsersAPI, userProgressAPI } from '../api/api';
 import { notify, confirmAction } from '../components/AppAlert';
 import {
-  Page, PageHeader, Toolbar, SearchInput, Table, Th, Td, Button, StatusPill,
-  Loading, EmptyState, ErrorBanner, Avatar, pageStyles as s,
+  Page, PageHeader, Toolbar, SearchInput, FilterTabs, Table, Th, Td, Button, StatusPill,
+  Loading, EmptyState, ErrorBanner, Avatar, pageStyles,
 } from '../components/Layout';
-import { fmtDateTime, fmtDay } from '../utils/format';
+import { fmtNum, fmtDateTime, fmtDay, timeAgo } from '../utils/format';
 import { standingLabel } from '../utils/standing';
+import { theme as t, radius } from '../theme';
 import { useLive } from '../api/live';
 
-// ─── Helpers ────────────────────────────────────────────────────────────────
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function remaining(expiresAt) {
   const ms = new Date(expiresAt) - Date.now();
@@ -24,9 +25,33 @@ const APPEAL_STATUS = {
   rejected:  { tone: 'neutral', icon: 'x',              label: 'Appeal rejected' },
 };
 
-const TAB = { BANS: 'bans', INACTIVE: 'inactive' };
+const MEDAL     = { 1: '#F2CE1B', 2: '#C7D0D2', 3: '#CD8B54' };
+const MEDAL_INK = '#2C2810';
 
-// ─── Tab styles ─────────────────────────────────────────────────────────────
+const TAB = { ALL: 'all', BANS: 'bans', INACTIVE: 'inactive', PROGRESS: 'progress' };
+
+// ─── Shared: traveler cell ────────────────────────────────────────────────────
+// Used in every panel so name / email / join date always look the same.
+
+function TravelerCell({ src, name, email, createdAt, pills }) {
+  return (
+    <div style={pageStyles.person}>
+      <Avatar src={src} name={name} size={32} />
+      <div style={{ minWidth: 0 }}>
+        <div style={pageStyles.personName}>
+          {name || 'Unknown'}
+          {pills}
+        </div>
+        <div style={pageStyles.personSub}>{email}</div>
+        {createdAt && (
+          <div style={pageStyles.personSub}>Joined {fmtDay(createdAt)}</div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Tab bar ──────────────────────────────────────────────────────────────────
 
 const tabBarStyle = {
   display: 'flex',
@@ -43,14 +68,106 @@ function tabStyle(active) {
     color: active ? 'var(--color-primary, #2563eb)' : 'var(--color-muted, #6b7280)',
     background: 'none',
     border: 'none',
-    borderBottom: active ? '2px solid var(--color-primary, #2563eb)' : '2px solid transparent',
+    borderBottom: active
+      ? '2px solid var(--color-primary, #2563eb)'
+      : '2px solid transparent',
     cursor: 'pointer',
     marginBottom: -1,
     transition: 'color 0.15s, border-color 0.15s',
   };
 }
 
-// ─── BannedAccounts panel ───────────────────────────────────────────────────
+// ─── All Users panel ──────────────────────────────────────────────────────────
+
+function AllUsersPanel() {
+  const [rows,    setRows]    = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error,   setError]   = useState(null);
+  const [search,  setSearch]  = useState('');
+
+  const load = async ({ quiet = false } = {}) => {
+    if (!quiet) { setLoading(true); setError(null); }
+    try {
+      const data = await userProgressAPI.getAll();
+      setRows(data?.leaderboard || []);
+    } catch (err) {
+      console.error('[AllUsers]', err);
+      if (!quiet) { setError("Couldn't load the user list."); setRows([]); }
+    }
+    if (!quiet) setLoading(false);
+  };
+
+  useEffect(() => { load(); }, []);
+  useLive(['travelers', 'progress'], () => load({ quiet: true }));
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return rows;
+    return rows.filter(r =>
+      [r.name, r.email, r.municipality].some(v => (v || '').toLowerCase().includes(q))
+    );
+  }, [rows, search]);
+
+  return (
+    <>
+      {error && <ErrorBanner onDismiss={() => setError(null)}>{error}</ErrorBanner>}
+
+      <Toolbar>
+        <SearchInput
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          placeholder="Search by name, email or municipality…"
+        />
+      </Toolbar>
+
+      {loading ? (
+        <Loading label="Loading all users…" />
+      ) : filtered.length === 0 ? (
+        <EmptyState
+          icon="users"
+          title={rows.length === 0 ? 'No users yet' : 'No users match'}
+          subtitle={rows.length === 0 ? 'Users appear here once they sign up.' : 'Try a different search.'}
+        />
+      ) : (
+        <Table
+          caption="All users"
+          head={<>
+            <Th>Traveler</Th>
+            <Th>Municipality</Th>
+            <Th align="right">Points</Th>
+            <Th align="right">Spots visited</Th>
+            <Th align="right">Badges</Th>
+            <Th align="right">Last active</Th>
+          </>}
+        >
+          {filtered.map(r => (
+            <tr key={r.clerkUserId}>
+              <Td>
+                <TravelerCell
+                  src={r.profileImage}
+                  name={r.name}
+                  email={r.email}
+                  createdAt={r.createdAt}
+                  pills={<>
+                    {r.titleName && <StatusPill tone="info"   icon="star" >{r.titleName}</StatusPill>}
+                    {r.isBanned  && <StatusPill tone="danger" icon="slash">Banned</StatusPill>}
+                  </>}
+                />
+              </Td>
+              <Td muted={!r.municipality}>{r.municipality || '—'}</Td>
+              <Td align="right" strong>{fmtNum(r.points)}</Td>
+              <Td align="right">{r.spotsVisited}</Td>
+              <Td align="right">{r.badges}</Td>
+              <Td align="right" muted>{r.lastActiveAt ? timeAgo(r.lastActiveAt) : 'Never'}</Td>
+            </tr>
+          ))}
+        </Table>
+      )}
+    </>
+  );
+}
+
+// ─── Suspensions & Bans panel ─────────────────────────────────────────────────
 
 function BannedAccountsPanel() {
   const [users,      setUsers]      = useState([]);
@@ -109,7 +226,10 @@ function BannedAccountsPanel() {
 
   const filtered = users.filter(u => {
     const q = search.toLowerCase();
-    return (u.name?.toLowerCase() || '').includes(q) || (u.email?.toLowerCase() || '').includes(q);
+    return (
+      (u.name?.toLowerCase()  || '').includes(q) ||
+      (u.email?.toLowerCase() || '').includes(q)
+    );
   });
 
   return (
@@ -157,31 +277,35 @@ function BannedAccountsPanel() {
               <Fragment key={u.clerkUserId}>
                 <tr>
                   <Td>
-                    <div style={s.person}>
-                      <Avatar src={u.profileImage} name={u.name} size={32} />
-                      <div style={{ minWidth: 0 }}>
-                        <div style={s.personName}>{u.name || 'Unknown'}</div>
-                        <div style={s.personSub}>{u.email}</div>
-                        {u.createdAt && <div style={s.personSub}>Joined {fmtDay(u.createdAt)}</div>}
-                      </div>
-                    </div>
+                    <TravelerCell
+                      src={u.profileImage}
+                      name={u.name}
+                      email={u.email}
+                      createdAt={u.createdAt}
+                    />
                   </Td>
-                  <Td><span style={s.clampCell} title={u.banReason}>{u.banReason || '—'}</span></Td>
+                  <Td>
+                    <span style={pageStyles.clampCell} title={u.banReason}>
+                      {u.banReason || '—'}
+                    </span>
+                  </Td>
                   {/* "Warning 3 · Suspension 1": every warning ever given (QA
                       2026-10-16), not warningCount, which restarts after two. */}
                   <Td muted={!standingLabel({ warnings: u.warningsGiven ?? u.warningCount, suspensions: u.suspensionCount })}>
                     {standingLabel({ warnings: u.warningsGiven ?? u.warningCount, suspensions: u.suspensionCount }) || 'No warnings'}
                   </Td>
                   <Td>
-                    <div style={s.pillStack}>
+                    <div style={pageStyles.pillStack}>
                       {u.isPermanent
-                        ? <StatusPill tone="danger"  icon="slash">{remaining(u.suspendedUntil)}</StatusPill>
+                        ? <StatusPill tone="danger"  icon="slash">Permanent ban</StatusPill>
                         : <StatusPill tone="warning" icon="clock">{remaining(u.suspendedUntil)}</StatusPill>}
-                      {appeal && <StatusPill tone={appeal.tone} icon={appeal.icon}>{appeal.label}</StatusPill>}
+                      {appeal && (
+                        <StatusPill tone={appeal.tone} icon={appeal.icon}>{appeal.label}</StatusPill>
+                      )}
                     </div>
                   </Td>
                   <Td align="right">
-                    <div style={s.cellActions}>
+                    <div style={pageStyles.cellActions}>
                       {hasAppeal && (
                         <Button
                           size="sm"
@@ -191,7 +315,12 @@ function BannedAccountsPanel() {
                           {expanded ? 'Hide appeal' : 'View appeal'}
                         </Button>
                       )}
-                      <Button size="sm" variant="subtle" disabled={busy} onClick={() => handleUnban(u.clerkUserId)}>
+                      <Button
+                        size="sm"
+                        variant="subtle"
+                        disabled={busy}
+                        onClick={() => handleUnban(u.clerkUserId)}
+                      >
                         Unban
                       </Button>
                     </div>
@@ -200,28 +329,42 @@ function BannedAccountsPanel() {
 
                 {expanded && (
                   <tr>
-                    <td colSpan={5} style={s.panel}>
-                      <p style={s.panelLabel}>Appeal sent {fmtDateTime(u.appealedAt)}</p>
-                      <p style={{ ...s.itemText, margin: 0, whiteSpace: 'pre-wrap' }}>
+                    <td colSpan={5} style={pageStyles.panel}>
+                      <p style={pageStyles.panelLabel}>Appeal sent {fmtDateTime(u.appealedAt)}</p>
+                      <p style={{ ...pageStyles.itemText, margin: 0, whiteSpace: 'pre-wrap' }}>
                         {u.appealText || '(No appeal text provided.)'}
                       </p>
                       {u.appealDeadline && (
-                        <p style={s.panelNote}>
-                          {new Date(u.appealDeadline) < new Date() ? 'Appeals for this ban closed on ' : 'Appeals for this ban close on '}
+                        <p style={pageStyles.panelNote}>
+                          {new Date(u.appealDeadline) < new Date()
+                            ? 'Appeals for this ban closed on '
+                            : 'Appeals for this ban close on '}
                           {fmtDay(u.appealDeadline)}. The account stays archived until you decide; it is never deleted.
                         </p>
                       )}
                       {u.appealStatus === 'submitted' ? (
-                        <div style={s.buttonRow}>
-                          <Button variant="success" icon="check" disabled={busy} onClick={() => handleAppealDecision(u.clerkUserId, 'approved')}>
+                        <div style={pageStyles.buttonRow}>
+                          <Button
+                            variant="success"
+                            icon="check"
+                            disabled={busy}
+                            onClick={() => handleAppealDecision(u.clerkUserId, 'approved')}
+                          >
                             Approve &amp; unban
                           </Button>
-                          <Button variant="danger" icon="x" disabled={busy} onClick={() => handleAppealDecision(u.clerkUserId, 'rejected')}>
+                          <Button
+                            variant="danger"
+                            icon="x"
+                            disabled={busy}
+                            onClick={() => handleAppealDecision(u.clerkUserId, 'rejected')}
+                          >
                             Reject
                           </Button>
                         </div>
                       ) : (
-                        <p style={s.panelNote}>This appeal has already been {u.appealStatus}.</p>
+                        <p style={pageStyles.panelNote}>
+                          This appeal has already been {u.appealStatus}.
+                        </p>
                       )}
                     </td>
                   </tr>
@@ -235,7 +378,7 @@ function BannedAccountsPanel() {
   );
 }
 
-// ─── InactiveUsers panel ────────────────────────────────────────────────────
+// ─── Inactive Accounts panel ──────────────────────────────────────────────────
 
 // Admin only: moderators work on attractions and their own requests.
 function InactiveUsersPanel() {
@@ -302,30 +445,36 @@ function InactiveUsersPanel() {
             return (
               <tr key={u.clerkUserId}>
                 <Td>
-                  <div style={s.person}>
-                    <Avatar src={u.profileImage} name={u.name} size={32} />
-                    <div style={{ minWidth: 0 }}>
-                      <div style={s.personName}>{u.name || 'Unknown'}</div>
-                      <div style={s.personSub}>{u.email}</div>
-                      {u.createdAt && <div style={s.personSub}>Joined {fmtDay(u.createdAt)}</div>}
-                    </div>
-                  </div>
+                  <TravelerCell
+                    src={u.profileImage}
+                    name={u.name}
+                    email={u.email}
+                    createdAt={u.createdAt}
+                  />
                 </Td>
                 <Td muted>{fmtDay(u.lastActiveAt)}</Td>
                 <Td>
                   {u.daysInactive == null
                     ? <StatusPill tone="neutral" icon="clock">Never active</StatusPill>
-                    : <StatusPill tone={u.daysInactive >= 45 ? 'danger' : 'warning'} icon="clock">{u.daysInactive} days</StatusPill>}
+                    : <StatusPill tone={u.daysInactive >= 45 ? 'danger' : 'warning'} icon="clock">
+                        {u.daysInactive} days
+                      </StatusPill>}
                 </Td>
                 <Td align="right">{u.commentCount}</Td>
                 <Td>
                   {u.status === 'archived'
-                    ? <StatusPill tone="neutral"  icon="archive">Archived</StatusPill>
-                    : <StatusPill tone="warning"  icon="clock">Pending archival</StatusPill>}
+                    ? <StatusPill tone="neutral" icon="archive">Archived</StatusPill>
+                    : <StatusPill tone="warning" icon="clock">Pending archival</StatusPill>}
                 </Td>
                 <Td align="right">
                   {u.status !== 'pending' ? '—' : (
-                    <Button size="sm" variant="success" icon="archive" disabled={busy} onClick={() => archive(u.clerkUserId)}>
+                    <Button
+                      size="sm"
+                      variant="success"
+                      icon="archive"
+                      disabled={busy}
+                      onClick={() => archive(u.clerkUserId)}
+                    >
                       Approve archival
                     </Button>
                   )}
@@ -339,40 +488,197 @@ function InactiveUsersPanel() {
   );
 }
 
-// ─── Default export ─────────────────────────────────────────────────────────
+// ─── Traveler Progress panel ──────────────────────────────────────────────────
+
+// Read-only leaderboard — actions on accounts live in the other tabs.
+const rankStyle = {
+  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+  minWidth: 26, height: 26, borderRadius: radius.pill,
+  background: t.sidebarBg, color: t.textSecondary,
+  fontWeight: 700, fontSize: 12.5, padding: '0 8px',
+  fontVariantNumeric: 'tabular-nums',
+};
+
+function TravelerProgressPanel() {
+  const [rows,    setRows]    = useState([]);
+  const [stats,   setStats]   = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error,   setError]   = useState(null);
+  const [search,  setSearch]  = useState('');
+  const [onlyExplorers, setOnlyExplorers] = useState(false);
+
+  const load = async ({ quiet = false } = {}) => {
+    if (!quiet) { setLoading(true); setError(null); }
+    try {
+      const data = await userProgressAPI.getAll();
+      setRows(data?.leaderboard || []);
+      setStats(data?.stats || null);
+    } catch (err) {
+      console.error('[TravelerProgress]', err);
+      if (!quiet) { setError("Couldn't load traveler progress."); setRows([]); setStats(null); }
+    }
+    if (!quiet) setLoading(false);
+  };
+
+  useEffect(() => { load(); }, []);
+  useLive(['progress', 'travelers'], () => load({ quiet: true }));
+
+  // Filtering is derived, never stored — so rank always shows the real standing.
+  const visible = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return rows.filter(r => {
+      if (onlyExplorers && r.spotsVisited === 0) return false;
+      if (!q) return true;
+      return [r.name, r.email, r.municipality].some(v => (v || '').toLowerCase().includes(q));
+    });
+  }, [rows, search, onlyExplorers]);
+
+  const explorers = rows.filter(r => r.spotsVisited > 0).length;
+
+  const v = n => (stats ? fmtNum(n) : loading ? '…' : '—');
+  const strip = [
+    { label: 'Travelers',       hue: 'teal',   value: v(stats?.totalUsers),  hint: 'with an account' },
+    { label: 'Explorers',                       value: v(stats?.explorers),
+      hint: stats?.totalUsers
+        ? `${Math.round((stats.explorers / stats.totalUsers) * 100)}% have visited a spot`
+        : null },
+    { label: 'Active this week',                value: v(stats?.activeLast7),
+      hint: stats ? `${fmtNum(stats.activeLast30)} this month` : null },
+    { label: 'Spot visits',     hue: 'magenta', value: v(stats?.totalVisits),
+      hint: stats ? `${stats.avgVisits} per traveler on average` : null },
+    { label: 'Badges collected',                value: v(stats?.totalBadges) },
+    { label: 'Towns finished',                  value: v(stats ? stats.totalTownBadges ?? 0 : null),
+      hint: 'Town badges earned' },
+  ];
+
+  return (
+    <>
+      {error && <ErrorBanner onDismiss={() => setError(null)}>{error}</ErrorBanner>}
+
+      <Toolbar>
+        <FilterTabs
+          label="Show"
+          value={onlyExplorers ? 'explorers' : ''}
+          onChange={val => setOnlyExplorers(val === 'explorers')}
+          options={[
+            { value: '',          label: 'All travelers',  count: rows.length },
+            { value: 'explorers', label: 'Visited a spot', count: explorers },
+          ]}
+        />
+        <SearchInput
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          placeholder="Search by name, email or municipality…"
+        />
+      </Toolbar>
+
+      {loading ? (
+        <Loading label="Loading the traveler leaderboard…" />
+      ) : visible.length === 0 ? (
+        <EmptyState
+          icon="users"
+          title={rows.length === 0 ? 'No travelers yet' : 'No travelers match'}
+          subtitle={rows.length === 0
+            ? 'Rankings appear once someone visits a spot.'
+            : 'Try a different search or filter.'}
+        />
+      ) : (
+        <Table
+          caption="Traveler leaderboard"
+          head={<>
+            <Th width={64}>Rank</Th>
+            <Th>Traveler</Th>
+            <Th>Municipality</Th>
+            <Th align="right">Points</Th>
+            <Th align="right">Spots visited</Th>
+            <Th align="right">Badges</Th>
+            <Th align="right">Towns</Th>
+            <Th align="right">Missions</Th>
+            <Th align="right">Last active</Th>
+          </>}
+        >
+          {visible.map(r => (
+            <tr key={r.clerkUserId}>
+              <Td>
+                <span style={{
+                  ...rankStyle,
+                  ...(MEDAL[r.rank] ? { background: MEDAL[r.rank], color: MEDAL_INK } : {}),
+                }}>
+                  {r.rank}
+                </span>
+              </Td>
+              <Td>
+                <TravelerCell
+                  src={r.profileImage}
+                  name={r.name}
+                  email={r.email}
+                  createdAt={r.createdAt}
+                  pills={<>
+                    {r.titleName && <StatusPill tone="info"   icon="star" >{r.titleName}</StatusPill>}
+                    {r.isBanned  && <StatusPill tone="danger" icon="slash">Banned</StatusPill>}
+                  </>}
+                />
+              </Td>
+              <Td muted={!r.municipality}>{r.municipality || '—'}</Td>
+              <Td align="right" strong>{fmtNum(r.points)}</Td>
+              <Td align="right">{r.spotsVisited}</Td>
+              <Td align="right">{r.badges}</Td>
+              <Td align="right">{r.townsFinished ?? 0}</Td>
+              <Td align="right">{r.missionsCompleted}</Td>
+              <Td align="right" muted>{r.lastActiveAt ? timeAgo(r.lastActiveAt) : 'Never'}</Td>
+            </tr>
+          ))}
+        </Table>
+      )}
+    </>
+  );
+}
+
+// ─── Default export ───────────────────────────────────────────────────────────
+
+const TAB_META = {
+  [TAB.ALL]: {
+    label:    'All Users',
+    title:    'All Users',
+    subtitle: 'Every traveler with an account, with their points, spots visited and last activity.',
+  },
+  [TAB.BANS]: {
+    label:    'Suspended & Banned',
+    title:    'Suspensions & Bans',
+    subtitle: "Accounts suspended or permanently banned for breaking the rules, and any appeals they've sent.",
+  },
+  [TAB.INACTIVE]: {
+    label:    'Inactive',
+    title:    'Inactive Accounts',
+    subtitle: "Travelers who haven't opened the app in 30 days or more. Archiving keeps their record for good; it is never deleted.",
+  },
+  [TAB.PROGRESS]: {
+    label:    'Leaderboard',
+    title:    'Traveler Progress',
+    subtitle: 'The traveler leaderboard, ranked by points (visits and missions); equal points share a rank.',
+  },
+};
 
 export default function UserManagement() {
-  const [tab, setTab] = useState(TAB.BANS);
-
-  const headers = {
-    [TAB.BANS]: {
-      title:    'Suspensions & Bans',
-      subtitle: "Accounts suspended or permanently banned for breaking the rules, and any appeals they've sent.",
-    },
-    [TAB.INACTIVE]: {
-      title:    'Inactive Accounts',
-      subtitle: "Travelers who haven't opened the app in 30 days or more. Archiving keeps their record for good; it is never deleted.",
-    },
-  };
+  const [tab, setTab] = useState(TAB.ALL);
+  const meta = TAB_META[tab];
 
   return (
     <Page>
-      <PageHeader
-        title={headers[tab].title}
-        subtitle={headers[tab].subtitle}
-      />
+      <PageHeader title={meta.title} subtitle={meta.subtitle} />
 
       <div style={tabBarStyle}>
-        <button style={tabStyle(tab === TAB.BANS)}     onClick={() => setTab(TAB.BANS)}>
-          Suspensions &amp; Bans
-        </button>
-        <button style={tabStyle(tab === TAB.INACTIVE)} onClick={() => setTab(TAB.INACTIVE)}>
-          Inactive Accounts
-        </button>
+        {Object.values(TAB).map(key => (
+          <button key={key} style={tabStyle(tab === key)} onClick={() => setTab(key)}>
+            {TAB_META[key].label}
+          </button>
+        ))}
       </div>
 
+      {tab === TAB.ALL      && <AllUsersPanel />}
       {tab === TAB.BANS     && <BannedAccountsPanel />}
-      {tab === TAB.INACTIVE && <InactiveUsersPanel  />}
+      {tab === TAB.INACTIVE && <InactiveUsersPanel />}
+      {tab === TAB.PROGRESS && <TravelerProgressPanel />}
     </Page>
   );
 }
