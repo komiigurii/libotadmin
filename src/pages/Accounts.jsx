@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { accountsAPI } from '../api/api';
+import { accountsAPI, systemAPI } from '../api/api';
 import {
   Page, PageHeader, Toolbar, SearchInput, Button, StatusPill, Table, Th, Td, Avatar,
   Loading, EmptyState, ErrorBanner, pageStyles as s,
@@ -21,6 +21,7 @@ import { useLive, useLiveTick } from '../api/live';
  * Account Creation"):
  *   Staff     admins and moderators: make one (credential slip), reset a
  *             password, deactivate, move a moderator, see each account's history.
+ *             A locked account of any role, super admins too, can be unlocked.
  *   Travelers every app account, paged and searchable, with when it joined, its
  *             standing, and an overview of one traveler.
  *
@@ -184,6 +185,7 @@ export default function Accounts() {
               setAdding={setAdding}
               onMade={loadStaff}
               onChanged={(acc) => setAccounts((prev) => prev.map((a) => (a.id === acc.id ? acc : a)))}
+              onUnlock={async (acc) => { await systemAPI.unlock({ kind: 'staff', id: acc.id }); await loadStaff({ quiet: true }); }}
             />
           ) : (
             <TravelersView status={travelerStatus} title={TRAVELER_STATUSES.find((o) => o.value === travelerStatus)?.label} />
@@ -194,7 +196,7 @@ export default function Accounts() {
   );
 }
 
-function StaffView({ accounts, all, title, canMake, loading, error, onDismissError, adding, setAdding, onMade, onChanged }) {
+function StaffView({ accounts, all, title, canMake, loading, error, onDismissError, adding, setAdding, onMade, onChanged, onUnlock }) {
   const [search, setSearch] = useState('');
   const [slip, setSlip] = useState(null);
 
@@ -229,6 +231,7 @@ function StaffView({ accounts, all, title, canMake, loading, error, onDismissErr
               accounts={visible}
               canManage={(acc) => canMake.includes(acc.role)}
               onChanged={onChanged}
+              onUnlock={onUnlock}
             />
           )}
 

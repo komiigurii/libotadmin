@@ -81,7 +81,7 @@ export default function SuperAdminDashboard() {
   const openOnly = data?.tickets?.total ?? null;
   const ticketsHint = data?.tickets ? `${fmt(openOnly)} open · ${fmt(Math.max(0, waitingTickets - openOnly))} being worked on` : null;
   const passwordRequests = data?.tickets?.tickets?.filter((tk) => tk.category === 'passwordReset').length || 0;
-  const lockedCount = data?.locked ? data.locked.length : null;
+  const lockedCount = data?.locked ? data.locked.accounts.length : null;
   const series = data?.usage?.series;
   const activeToday = series?.active?.length ? series.active[series.active.length - 1].count : null;
 
@@ -89,7 +89,7 @@ export default function SuperAdminDashboard() {
     sys?.maintenance?.on && { icon: 'tool', label: 'Maintenance is on', detail: `Since ${timeAgo(sys.maintenance.startedAt)}. Admins and moderators can’t save. End it when the work is done.`, to: '/system', tone: 'warning', count: null },
     sys?.restrictedRoles?.length > 0 && { icon: 'pause', label: `${sys.restrictedRoles.map((r) => (r === 'admin' ? 'Admins' : 'Moderators')).join(' and ')} paused`, detail: 'They can’t use the console until you let them back in.', to: '/system', tone: 'warning', count: null },
     { icon: 'flag', hue: 'marigold', label: 'Tickets waiting', detail: ticketsHint ? `${ticketsHint}${passwordRequests ? `, ${plural(passwordRequests, 'password request')}` : ''}` : 'Problems admins and moderators reported', to: '/tickets', count: waitingTickets },
-    { icon: 'lock', hue: 'blue', label: 'Locked accounts', detail: 'Too many wrong passwords; unlock on the System page', to: '/system#tools', count: lockedCount },
+    { icon: 'lock', hue: 'blue', label: 'Locked accounts', detail: 'Staff and travelers with too many wrong passwords; unlock on the System page', to: '/system#tools', count: lockedCount },
     { icon: 'key', hue: 'blue', label: 'Waiting for a first sign-in', detail: 'Accounts still on their slip’s temporary password', to: '/accounts?status=firstSignIn', count: onSlip },
   ].filter(Boolean);
   const waiting = loading ? null

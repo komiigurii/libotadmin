@@ -288,8 +288,15 @@ export const systemAPI = {
   hideNotice:   (id) => api.post(`/api/system/notices/${id}/hide`).then(r => r.data),
   clearCache:   () => api.post('/api/system/tools/clear-cache').then(r => r.data),
   health:       () => api.get('/api/system/tools/health').then(r => r.data),
-  locked:       () => api.get('/api/system/tools/locked').then(r => r.data.accounts || []),
-  unlock:       (id) => api.post(`/api/system/tools/unlock/${id}`).then(r => r.data),
+  // → { accounts, travelersUnavailable }: staff of every role and travelers
+  // (Clerk's lock), each with `kind`, `label` and `role`.
+  locked:       () => api.get('/api/system/tools/locked').then(r => ({ accounts: r.data.accounts || [], travelersUnavailable: !!r.data.travelersUnavailable })),
+  // `account`: a row of locked().accounts.
+  unlock:       (account) => api.post(account.kind === 'traveler'
+    ? `/api/system/tools/unlock/traveler/${account.id}`
+    : `/api/system/tools/unlock/${account.id}`).then(r => r.data),
+  // → { unlocked, failed: [labels], travelersUnavailable }
+  unlockAll:    () => api.post('/api/system/tools/unlock/all').then(r => r.data),
 };
 
 export default api;

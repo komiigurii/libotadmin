@@ -21,8 +21,8 @@ const sq = { width: 34, minHeight: 34, padding: 0 };
  *     No name and no password: the server makes a temporary password, shown
  *     once on the credential slip.
  *   - StaffTable: each account's status, last sign-in and "Last changed by …",
- *     with Reset password (a new slip), Deactivate/Reactivate, Move town and
- *     History.
+ *     with Reset password (a new slip), Deactivate/Reactivate, Move town,
+ *     History, and Unlock on a locked row (the super admin's page only).
  * Usernames are permanent and a moderator's name comes from the town, so
  * neither can be edited anywhere.
  */
@@ -164,8 +164,10 @@ export function AddAccountForm({ roles, accounts, onCancel, onMade }) {
  * accounts: staffView rows. extra: an optional { head, cell(account) } column
  * (the Moderators page adds "Requests sent"). onChanged(account) replaces a row.
  * canManage(account): whether this person may act on that row.
+ * onUnlock(account): given only to the super admin, who unlocks a locked row
+ * of any role (user rule 2026-10-23).
  */
-export function StaffTable({ accounts, extra, onChanged, canManage, caption = 'Staff accounts', townInName = false }) {
+export function StaffTable({ accounts, extra, onChanged, canManage, onUnlock, caption = 'Staff accounts', townInName = false }) {
   const [slip, setSlip] = useState(null);
   const [moving, setMoving] = useState(null);
   const [historyOf, setHistoryOf] = useState(null);
@@ -200,6 +202,11 @@ export function StaffTable({ accounts, extra, onChanged, canManage, caption = 'S
     );
     if (!ok) return;
     onChanged(await accountsAPI.setActive(a.id, !off));
+  });
+
+  const unlock = (a) => act(a.id, async () => {
+    await onUnlock(a);
+    notify(`${a.username} can sign in again.`, { tone: 'success' });
   });
 
   if (!accounts.length) return null;
@@ -250,6 +257,10 @@ export function StaffTable({ accounts, extra, onChanged, canManage, caption = 'S
                     user's reference console does the same). */}
                 <div style={{ ...s.cellActions, flexWrap: 'nowrap' }}>
                   <Button icon="history" style={sq} onClick={() => setHistoryOf(a)} aria-label={`History of ${a.username}`} title="History" />
+                  {onUnlock && a.status === 'locked' && (
+                    <Button variant="success" icon="unlock" style={sq} disabled={busy === a.id} onClick={() => unlock(a)}
+                      aria-label={`Unlock ${a.username}`} title="Unlock" />
+                  )}
                   {mine && <>
                     <Button variant="warning" icon="key" style={sq} disabled={busy === a.id || !a.active} onClick={() => reset(a)}
                       aria-label={`Reset the password of ${a.username}`} title="Reset password" />
