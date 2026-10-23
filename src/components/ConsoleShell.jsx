@@ -42,11 +42,11 @@ const SUPER_ADMIN_NAV = [
     { label: 'Dashboard', path: '/dashboard', icon: 'grid', hint: 'The system’s state, waiting work and how the app is used', keys: 'home overview usage charts health' },
   ] },
   { group: 'System', items: [
-    { label: 'System', path: '/system', icon: 'tool', hint: 'Maintenance, who can sign in, update notices, tools', keys: 'maintenance pause restrict notice update cache health log' },
+    { label: 'System Maintenance', path: '/system', icon: 'tool', hint: 'Maintenance, who can sign in, update notices, tools', keys: 'maintenance pause restrict notice update cache health log' },
     { label: 'Tickets', path: '/tickets', icon: 'flag', badge: 'tickets', hint: 'Problems and password requests from staff', keys: 'report problem password forgot slip' },
   ] },
   { group: 'Accounts', items: [
-    { label: 'Accounts', path: '/accounts', icon: 'shield', hint: 'Admins, moderators and travelers', keys: 'staff admin moderator traveler user reset deactivate slip move town unlock locked' },
+    { label: 'Accounts Management', path: '/accounts', icon: 'shield', hint: 'Admins, moderators and travelers', keys: 'staff admin moderator traveler user reset deactivate slip move town unlock locked' },
     { label: 'Activity Log', path: '/activity', icon: 'history', hint: 'Who did what in the console', keys: 'audit log sign-in login history' },
   ] },
 ];
