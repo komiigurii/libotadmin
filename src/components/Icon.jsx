@@ -17,7 +17,7 @@
  * copy has to deep-import one module per icon.
  */
 import {
-  Aperture, Archive, ArrowClockwise, ArrowRight, ArrowsLeftRight, Bell, CaretDown, CaretLeft, CaretRight, CaretUp,
+  Aperture, Archive, ArrowClockwise, ArrowCounterClockwise, ArrowRight, ArrowsLeftRight, Bell, CaretDown, CaretLeft, CaretRight, CaretUp,
   CaretUpDown, ChatCircleText, Check, CheckCircle, Clock, ClockCounterClockwise, Copy, Database, Desktop, EnvelopeSimple, Eye, EyeSlash,
   Flag, ForkKnife, GitCommit, Hand, Image, Info, Key, List, LockSimple, LockSimpleOpen, MagnifyingGlass, MapPin, Memory, Moon, Package,
   PaperPlaneTilt, Pause, PencilSimple, Plus, Printer, Prohibit, Pulse, ShieldCheck, SidebarSimple, Timer, User,
@@ -81,6 +81,7 @@ const MAP = {
   'pause':          Pause,
   'plus':           Plus,
   'refresh-cw':     ArrowClockwise,
+  'rotate-ccw':     ArrowCounterClockwise,
   'send':           PaperPlaneTilt,
   'slash':          Prohibit,
   'sparkle':        Sparkle,

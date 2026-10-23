@@ -187,6 +187,10 @@ export const accountsAPI = {
   // Super admin only.
   getTravelers:  (params = {}) => api.get('/api/admin/accounts/travelers', { params }).then(r => r.data),
   getTraveler:   (id)          => api.get(`/api/admin/accounts/travelers/${encodeURIComponent(id)}`).then(r => r.data),
+  // Archived travelers (banned, inactive, deleted): params reason, q, page, limit.
+  getArchived:   (params = {}) => api.get('/api/admin/accounts/archived', { params }).then(r => r.data),
+  // → { clerkUserId, newSignIn }: a deleted account comes back under a new Clerk id.
+  restore:       (id, note)    => api.post(`/api/admin/accounts/archived/${encodeURIComponent(id)}/restore`, { note }).then(r => r.data),
 };
 
 // The activity log (super admin): who did what, newest first.
