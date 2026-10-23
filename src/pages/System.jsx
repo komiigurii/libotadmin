@@ -2,16 +2,18 @@ import { useCallback, useEffect, useId, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { systemAPI } from '../api/api';
 import {
-  Page, PageHeader, Button, StatusPill, Table, Th, Td, Loading, ErrorBanner, FilterTabs,
+  Page, PageHeader, Button, StatusPill, Table, Th, Td, Row, Loading, ErrorBanner, FilterTabs,
   pageStyles as s,
 } from '../components/Layout';
 import Pagination from '../components/Pagination';
+import MaintenanceDrawer from '../components/MaintenanceDrawer';
 import { notify, confirmAction, promptAction } from '../components/AppAlert';
 import Icon from '../components/Icon';
 import { publishHeartbeat } from '../auth/heartbeat';
 import { useLive, useLiveTick } from '../api/live';
 import { theme as t, radius, fonts } from '../theme';
 import { fmtDateTime, timeAgo } from '../utils/format';
+import { clockText, useCountdown } from '../utils/signOut';
 
 /*
  * System — the super admin's control page (mock defense 2026-10-21; the
@@ -24,14 +26,17 @@ import { fmtDateTime, timeAgo } from '../utils/format';
  * (routes/system.js), inside the console instead of on a page of their own,
  * because the super admin can do everything an admin can as well.
  *
- *   Maintenance     admins and moderators can look but not save, and are told
- *                   in their bell. Travelers aren't affected (user rule
+ *   Maintenance     admins and moderators get a pop-up with the message and a
+ *                   countdown, then are signed out until it ends (user,
+ *                   2026-10-23: a pop-up, not the bell, and a delay before the
+ *                   sign-out). Travelers aren't affected (user rule
  *                   2026-10-23). Ending it asks what was done, for the log.
- *   Access          pause admins or moderators without a full maintenance.
+ *   Access          pause admins or moderators without a full maintenance:
+ *                   the same pop-up, with its own message and countdown.
  *   Update notices  "an update is coming" / "an update is done", shown in the
  *                   app and on everyone's dashboard for two weeks.
- *   Tools           clear the server's cache, its health, locked accounts
- *                   (every role and travelers; user rule 2026-10-23).
+ *   Tools           clear the server's cache, its health. Locked accounts
+ *                   are unlocked on the Accounts page (user, 2026-10-23).
  *   Maintenance log every window, who started and ended it, and the summary.
  *
  * Laid out like the rest of the super admin's console (2026-10-23): the band's
@@ -48,6 +53,27 @@ const toLocalInput = (d) => {
 const fromLocalInput = (v) => (v ? new Date(v).toISOString() : null);
 const errorOf = (err) => err?.response?.data?.message || 'Couldn’t reach the server. Try again.';
 
+// How long the pop-up gives staff before they're signed out (the server takes these).
+const SIGN_OUT_MINUTES = [1, 2, 5, 10];
+const minutesLabel = (n) => `${n} minute${n === 1 ? '' : 's'}`;
+
+function SignOutAfter({ id, value, onChange }) {
+  return (
+    <select id={id} value={value} onChange={(e) => onChange(Number(e.target.value))} style={s.select}>
+      {SIGN_OUT_MINUTES.map((n) => <option key={n} value={n}>{minutesLabel(n)}</option>)}
+    </select>
+  );
+}
+
+// "in 1:42", or "at 3:15 PM" once it's past: when the countdown signs staff out.
+function SignOutWhen({ at }) {
+  const left = useCountdown(at ? new Date(at).getTime() : null);
+  if (!at) return null;
+  return left
+    ? <>signed out in <span className="sa-mono">{clockText(left)}</span></>
+    : <>signed out since <span className="sa-mono">{fmtDateTime(at)}</span></>;
+}
+
 function minutesText(total) {
   const mins = Math.max(1, total);
   if (mins < 60) return `${mins} min`;
@@ -60,7 +86,6 @@ const duration = (from, to) => minutesText(Math.round((new Date(to) - new Date(f
 
 export default function System() {
   const [state, setState] = useState(null);
-  const [locked, setLocked] = useState(null);
   const [error, setError] = useState('');
   const location = useLocation();
 
@@ -71,18 +96,15 @@ export default function System() {
       setState(data);
       setError('');
       // The banner and the rail follow at once, not at the next heartbeat.
-      publishHeartbeat({ system: { maintenance: data.maintenance, restricted: false, restrictedRoles: data.restrictedRoles, notice: data.notice } });
+      publishHeartbeat({ system: { maintenance: data.maintenance, restricted: false, restrictedRoles: data.restrictedRoles, pauses: data.pauses, notice: data.notice, signOut: null } });
     } catch (err) {
       if (!quiet) setError(errorOf(err));
     }
   }, []);
-  const loadLocked = useCallback(async () => {
-    try { setLocked(await systemAPI.locked()); } catch { setLocked((shown) => shown ?? { accounts: [], travelersUnavailable: false }); }
-  }, []);
 
-  useEffect(() => { load(); loadLocked(); }, [load, loadLocked]);
-  // Another window of the console, and accounts locking or unlocking.
-  useLive(['system', 'staff'], () => { load({ quiet: true }); loadLocked(); });
+  useEffect(() => { load(); }, [load]);
+  // Another window of the console.
+  useLive(['system'], () => load({ quiet: true }));
 
   // The dashboard's quick actions link to a card here (/system#tools).
   const ready = !!state;
@@ -92,18 +114,16 @@ export default function System() {
 
   const on = state?.maintenance?.on;
   const restricted = state?.restrictedRoles || [];
-  const roleState = (r) => (restricted.includes(r) ? 'Paused' : on ? 'Read-only' : 'Working');
+  const roleState = (r) => (restricted.includes(r) ? 'Paused' : on ? 'Signed out' : 'Working');
   const stats = state && [
     { label: 'Maintenance', hue: 'violet', small: true, value: on ? 'On' : 'Off', tone: on ? 'warn' : 'good',
       hint: on ? `since ${timeAgo(state.maintenance.startedAt)}` : state.lastMaintenance ? `last ended ${timeAgo(state.lastMaintenance.endedAt)}` : 'never run' },
     { label: 'App and website', small: true, value: 'Open', tone: 'good', hint: 'maintenance never closes them' },
     ...['admin', 'moderator'].map((r) => ({
       label: r === 'admin' ? 'Admins' : 'Moderators', hue: 'blue', small: true, value: roleState(r), tone: roleState(r) === 'Working' ? 'good' : 'warn',
-      hint: restricted.includes(r) ? 'can’t sign in' : on ? 'can look, can’t save' : 'can sign in and save',
+      hint: restricted.includes(r) ? 'can’t sign in' : on ? 'can’t sign in until it ends' : 'can sign in and save',
     })),
     { label: 'Update notice', hue: 'violet', small: true, value: state.notice ? 'Showing' : 'None', hint: state.notice ? state.notice.title : 'travelers see no notice' },
-    { label: 'Locked accounts', hue: 'blue', value: locked ? locked.accounts.length : '…', tone: locked?.accounts.length ? 'warn' : undefined,
-      hint: locked?.accounts.length ? locked.accounts.map((a) => a.label).join(', ') : 'none right now' },
   ];
 
   return (
@@ -122,8 +142,8 @@ export default function System() {
               <NoticesCard />
             </div>
             <div className="sa-col">
-              <AccessCard restricted={restricted} maintenanceOn={on} onChanged={load} />
-              <ToolsCard locked={locked} reloadLocked={loadLocked} />
+              <AccessCard restricted={restricted} pauses={state.pauses || {}} maintenanceOn={on} onChanged={load} />
+              <ToolsCard />
             </div>
           </div>
           <MaintenanceLog key={on ? 'on' : 'off'} />
@@ -160,19 +180,20 @@ function MaintenanceCard({ state, onChanged }) {
   const m = state.maintenance;
   const [message, setMessage] = useState(m.message || '');
   const [endAt, setEndAt] = useState(toLocalInput(m.expectedEndAt));
+  const [signOutMinutes, setSignOutMinutes] = useState(2);
   const [busy, setBusy] = useState(false);
-  const ids = { msg: useId(), end: useId() };
+  const ids = { msg: useId(), end: useId(), wait: useId() };
 
   const startIt = async () => {
     const ok = await confirmAction(
-      'Admins and moderators can look around the console but can’t save, and each is told in their bell. Travelers aren’t affected: the app and the website keep working.',
+      `Admins and moderators get a pop-up with your message and are signed out after ${minutesLabel(signOutMinutes)}. They can’t sign in until you end it. Travelers aren’t affected: the app and the website keep working.`,
       { title: 'Start maintenance now?', confirmText: 'Start maintenance', tone: 'warning' },
     );
     if (!ok) return;
     setBusy(true);
     try {
-      await systemAPI.startMaintenance({ message: message.trim(), expectedEndAt: fromLocalInput(endAt) });
-      notify('Maintenance is on.', { tone: 'success' });
+      await systemAPI.startMaintenance({ message: message.trim(), expectedEndAt: fromLocalInput(endAt), signOutMinutes });
+      notify(`Maintenance is on. Admins and moderators are signed out in ${minutesLabel(signOutMinutes)}.`, { tone: 'success' });
       await onChanged();
     } catch (err) { notify(errorOf(err), { tone: 'danger' }); }
     setBusy(false);
@@ -190,14 +211,14 @@ function MaintenanceCard({ state, onChanged }) {
 
   const endIt = async () => {
     const summary = await promptAction(
-      'Admins and moderators can save again once you end it. Say what was done; it goes in the maintenance log and to the staff.',
+      'Admins and moderators can sign in again once you end it. Say what was done; it goes in the maintenance log and to the staff’s bell.',
       { title: 'End maintenance?', label: 'What was done', placeholder: 'e.g. Moved the database to a bigger plan. Nothing was lost.', minLength: 10, maxLength: 2000, confirmText: 'End maintenance' },
     );
     if (summary == null) return;
     setBusy(true);
     try {
       await systemAPI.endMaintenance(summary);
-      notify('Maintenance is over. Staff can save again.', { tone: 'success' });
+      notify('Maintenance is over. Staff can sign in again.', { tone: 'success' });
       setMessage('');
       setEndAt('');
       await onChanged();
@@ -212,15 +233,15 @@ function MaintenanceCard({ state, onChanged }) {
       tone={m.on ? 'warning' : undefined}
       meta={m.on ? <StatusPill tone="warning" icon="tool">On</StatusPill> : <StatusPill tone="success" icon="check">Off</StatusPill>}
       description={m.on
-        ? <>On since <span className="sa-mono">{fmtDateTime(m.startedAt)}</span>{m.startedBy?.username ? `, started by ${m.startedBy.username}` : ''}. Staff can look but not save; travelers aren’t affected.</>
-        : 'For work on the console: while it’s on, admins and moderators can look but not save. The app and the website keep working for travelers. Starts now and lasts until you end it.'}
+        ? <>On since <span className="sa-mono">{fmtDateTime(m.startedAt)}</span>{m.startedBy?.username ? `, started by ${m.startedBy.username}` : ''}. Admins and moderators are <SignOutWhen at={m.signOutAt} />; travelers aren’t affected.</>
+        : 'For work on the console: admins and moderators get a pop-up with your message and a countdown, then are signed out until you end it. The app and the website keep working for travelers.'}
     >
       <div style={x.formGrid}>
         <div style={{ minWidth: 0 }}>
-          <label htmlFor={ids.msg} style={s.panelLabel}>Message staff see <span style={x.optional}>(optional)</span></label>
+          <label htmlFor={ids.msg} style={s.panelLabel}>Message in the pop-up <span style={x.optional}>(optional)</span></label>
           <textarea id={ids.msg} value={message} onChange={(e) => setMessage(e.target.value)} maxLength={300} rows={3}
             placeholder="e.g. Moving the database to a bigger plan." style={s.textarea} />
-          <p style={x.hint}>Shown to admins and moderators in their banner and bell.</p>
+          <p style={x.hint}>Admins and moderators see it in the pop-up, and on the sign-in page until it ends.</p>
         </div>
         <div style={{ minWidth: 0 }}>
           <label htmlFor={ids.end} style={s.panelLabel}>Expected back <span style={x.optional}>(optional)</span></label>
@@ -228,6 +249,13 @@ function MaintenanceCard({ state, onChanged }) {
             min={toLocalInput(new Date())} style={s.select} />
           <p style={x.hint}>Shown with the message, in Philippine time.</p>
         </div>
+        {!m.on && (
+          <div style={{ minWidth: 0 }}>
+            <label htmlFor={ids.wait} style={s.panelLabel}>Sign staff out after</label>
+            <SignOutAfter id={ids.wait} value={signOutMinutes} onChange={setSignOutMinutes} />
+            <p style={x.hint}>Time to save what they’re doing. The pop-up counts it down.</p>
+          </div>
+        )}
       </div>
       <div style={s.buttonRow}>
         {m.on ? (
@@ -246,66 +274,120 @@ function MaintenanceCard({ state, onChanged }) {
 // ── Access ─────────────────────────────────────────────────────────────────
 
 const ROLE_TEXT = {
-  admin: { name: 'Admins', on: 'Admins can sign in and work as usual.', off: 'Admins can’t sign in, and open sessions are paused. Moderators are not affected.' },
-  moderator: { name: 'Moderators', on: 'Moderators can sign in and work as usual.', off: 'Moderators can’t sign in, and open sessions are paused. Admins are not affected.' },
+  admin: { name: 'Admins', on: 'Admins can sign in and work as usual.', off: 'Admins can’t sign in. Moderators are not affected.' },
+  moderator: { name: 'Moderators', on: 'Moderators can sign in and work as usual.', off: 'Moderators can’t sign in. Admins are not affected.' },
 };
 
-function AccessCard({ restricted, maintenanceOn, onChanged }) {
+function AccessCard({ restricted, pauses, maintenanceOn, onChanged }) {
   const [busy, setBusy] = useState('');
-  const toggle = async (role) => {
-    const pausing = !restricted.includes(role);
-    const ok = await confirmAction(
-      pausing
-        ? `${ROLE_TEXT[role].name} are signed out of their work until you let them back in. They’re told in their bell.`
-        : `${ROLE_TEXT[role].name} can use the console again.`,
-      { title: pausing ? `Pause ${ROLE_TEXT[role].name.toLowerCase()}’ access?` : `Let ${ROLE_TEXT[role].name.toLowerCase()} back in?`, confirmText: pausing ? 'Pause access' : 'Let them in', tone: pausing ? 'warning' : 'info' },
-    );
-    if (!ok) return;
-    setBusy(role);
+  // The role whose switch was just turned off: its pause form is open.
+  const [pausing, setPausing] = useState('');
+
+  const save = async (roles) => {
+    setBusy(roles.role);
     try {
-      await systemAPI.setRestricted(pausing ? [...restricted, role] : restricted.filter((r) => r !== role));
+      await systemAPI.setRestricted(roles.list, roles.popup);
+      setPausing('');
       await onChanged();
     } catch (err) { notify(errorOf(err), { tone: 'danger' }); }
     setBusy('');
   };
 
-  // One card per kind of staff account, each with its switch: on = they can
+  const toggle = async (role) => {
+    if (!restricted.includes(role)) { setPausing(pausing === role ? '' : role); return; }
+    const ok = await confirmAction(`${ROLE_TEXT[role].name} can sign in and use the console again. They’re told in their bell.`,
+      { title: `Let ${ROLE_TEXT[role].name.toLowerCase()} back in?`, confirmText: 'Let them in', tone: 'info' });
+    if (ok) save({ role, list: restricted.filter((r) => r !== role) });
+  };
+
+  // One row per kind of staff account, each with its switch: on = they can
   // use the console (the user's reference has a card per portal).
   return (
     <Section
       title="Who can use the console"
-      description={`Pause one kind of staff account without closing the app, e.g. moderators while their pages change.${maintenanceOn ? ' During maintenance all staff are read-only anyway.' : ''}`}
+      description={`Pause one kind of staff account without closing the app, e.g. moderators while their pages change. They get a pop-up with your message and a countdown, then are signed out.${maintenanceOn ? ' During maintenance every admin and moderator is signed out anyway.' : ''}`}
     >
       <div className="sa-rows" style={x.accessGrid}>
         {['admin', 'moderator'].map((role) => {
           const paused = restricted.includes(role);
+          const pause = pauses[role];
           const labelId = `access-${role}`;
           return (
-            <div key={role} style={{ ...x.accessRow, ...(paused ? x.accessPaused : null) }}>
-              <span style={x.accessIcon}><Icon name={role === 'admin' ? 'shield' : 'map-pin'} size={18} /></span>
-              <div style={{ minWidth: 0, flex: 1 }}>
-                <div style={x.accessName}>
-                  <span id={labelId}>{ROLE_TEXT[role].name}</span>
-                  <StatusPill tone={paused ? 'warning' : 'success'} icon={paused ? 'pause' : 'check'}>{paused ? 'Paused' : 'Can sign in'}</StatusPill>
+            <div key={role} style={{ ...x.accessItem, ...(paused ? x.accessPaused : null) }}>
+              <div style={x.accessRow}>
+                <span style={x.accessIcon}><Icon name={role === 'admin' ? 'shield' : 'map-pin'} size={18} /></span>
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  <div style={x.accessName}>
+                    <span id={labelId}>{ROLE_TEXT[role].name}</span>
+                    <StatusPill tone={paused ? 'warning' : 'success'} icon={paused ? 'pause' : 'check'}>{paused ? 'Paused' : 'Can sign in'}</StatusPill>
+                  </div>
+                  <p style={x.accessDesc}>
+                    {paused ? ROLE_TEXT[role].off : ROLE_TEXT[role].on}
+                    {paused && pause?.signOutAt && <> Open sessions: <SignOutWhen at={pause.signOutAt} />.</>}
+                  </p>
+                  {paused && pause?.message && <p style={x.accessQuote}>“{pause.message}”</p>}
                 </div>
-                <p style={x.accessDesc}>{paused ? ROLE_TEXT[role].off : ROLE_TEXT[role].on}</p>
+                <button
+                  type="button"
+                  role="switch"
+                  className="sa-switch"
+                  aria-checked={!paused && pausing !== role}
+                  aria-labelledby={labelId}
+                  aria-describedby={`${labelId}-hint`}
+                  disabled={busy === role}
+                  onClick={() => toggle(role)}
+                />
+                <span id={`${labelId}-hint`} className="visually-hidden">{paused ? 'Turn on to let them back in' : 'Turn off to pause their access'}</span>
               </div>
-              <button
-                type="button"
-                role="switch"
-                className="sa-switch"
-                aria-checked={!paused}
-                aria-labelledby={labelId}
-                aria-describedby={`${labelId}-hint`}
-                disabled={busy === role}
-                onClick={() => toggle(role)}
-              />
-              <span id={`${labelId}-hint`} className="visually-hidden">{paused ? 'Turn on to let them back in' : 'Turn off to pause their access'}</span>
+              {pausing === role && !paused && (
+                <PauseForm
+                  role={role}
+                  busy={busy === role}
+                  onCancel={() => setPausing('')}
+                  onPause={(popup) => save({ role, list: [...restricted, role], popup })}
+                />
+              )}
             </div>
           );
         })}
       </div>
     </Section>
+  );
+}
+
+// Under a switch just turned off: what their pop-up says, and how long before
+// they're signed out (user, 2026-10-23: "there will also be a message in there").
+function PauseForm({ role, busy, onCancel, onPause }) {
+  const [message, setMessage] = useState('');
+  const [signOutMinutes, setSignOutMinutes] = useState(2);
+  const ids = { msg: useId(), wait: useId() };
+  const name = ROLE_TEXT[role].name;
+
+  const submit = (e) => {
+    e.preventDefault();
+    onPause({ message: message.trim(), signOutMinutes });
+  };
+
+  return (
+    <form onSubmit={submit} style={x.pauseForm} aria-label={`Pause ${name.toLowerCase()}’ access`}>
+      <div style={x.formGrid}>
+        <div style={{ minWidth: 0 }}>
+          <label htmlFor={ids.msg} style={s.panelLabel}>Message in the pop-up <span style={x.optional}>(optional)</span></label>
+          <textarea id={ids.msg} value={message} onChange={(e) => setMessage(e.target.value)} maxLength={300} rows={2} autoFocus
+            placeholder={role === 'moderator' ? 'e.g. Your spot pages are being changed. Back by 3 PM.' : 'e.g. The approval queue is being fixed.'}
+            style={s.textarea} />
+        </div>
+        <div style={{ minWidth: 0 }}>
+          <label htmlFor={ids.wait} style={s.panelLabel}>Sign them out after</label>
+          <SignOutAfter id={ids.wait} value={signOutMinutes} onChange={setSignOutMinutes} />
+          <p style={x.hint}>{name} signed in now get a pop-up and can save until then. Nobody can sign in meanwhile.</p>
+        </div>
+      </div>
+      <div style={s.buttonRow}>
+        <Button type="submit" variant="warning" icon="pause" disabled={busy}>{busy ? 'Pausing…' : `Pause ${name.toLowerCase()}`}</Button>
+        <Button type="button" variant="subtle" onClick={onCancel} disabled={busy}>Cancel</Button>
+      </div>
+    </form>
   );
 }
 
@@ -413,9 +495,7 @@ function NoticesCard() {
 
 // ── Tools ──────────────────────────────────────────────────────────────────
 
-const LOCKED_ROLE = { superadmin: 'Super admin', admin: 'Admin', moderator: 'Moderator', traveler: 'Traveler' };
-
-function ToolsCard({ locked, reloadLocked }) {
+function ToolsCard() {
   const [cleared, setCleared] = useState(null);
   const [health, setHealth] = useState(null);
   const [busy, setBusy] = useState('');
@@ -432,24 +512,6 @@ function ToolsCard({ locked, reloadLocked }) {
     setCleared(await systemAPI.clearCache());
   });
   const checkHealth = () => run('health', async () => setHealth((await systemAPI.health()).health));
-  const accounts = locked?.accounts;
-  const unlock = (a) => run(`unlock-${a.id}`, async () => {
-    await systemAPI.unlock(a);
-    notify(`${a.label} can sign in again.`, { tone: 'success' });
-    await reloadLocked();
-  });
-  const unlockAll = () => run('unlock-all', async () => {
-    const ok = await confirmAction(`All ${accounts.length} can try their passwords again at once. Unlock them only if you know these were their own wrong tries.`, { title: 'Unlock every locked account?', confirmText: 'Unlock all' });
-    if (!ok) return;
-    const r = await systemAPI.unlockAll();
-    notify(
-      r.failed.length
-        ? `Unlocked ${r.unlocked}. Clerk didn’t unlock ${r.failed.join(', ')}; try again.`
-        : `Unlocked ${r.unlocked} account${r.unlocked === 1 ? '' : 's'}. They can sign in again.`,
-      { tone: r.failed.length ? 'warning' : 'success' },
-    );
-    await reloadLocked();
-  });
 
   return (
     <Section id="tools" title="Tools" description="Everyday fixes that used to need a developer’s machine.">
@@ -484,53 +546,6 @@ function ToolsCard({ locked, reloadLocked }) {
             </div>
           )}
         </div>
-
-        <div style={x.tool}>
-          <div style={x.toolHead}>
-            <Icon name="lock" size={16} color={t.textSecondary} />
-            <strong style={x.toolName}>Locked accounts</strong>
-          </div>
-          <p style={x.toolDesc}>Five wrong passwords lock any account for a while: a super admin, admin or moderator here in the console, a traveler in the app. Unlock one once you know it was them.</p>
-          {!accounts ? <p style={x.toolDesc}>Loading…</p>
-            : accounts.length === 0 ? (
-              <p style={x.toolResult}>
-                <Icon name="check-circle" size={13} color={t.success} /> {locked.travelersUnavailable ? 'No staff account is locked.' : 'No account is locked.'}
-              </p>
-            ) : (
-              <ul style={x.lockedList}>
-                {accounts.map((a) => (
-                  <li key={`${a.kind}-${a.id}`} style={x.lockedItem}>
-                    <span style={{ minWidth: 0, overflowWrap: 'anywhere' }}>
-                      <strong style={{ color: t.textPrimary }}>{a.label}</strong>
-                      <span style={s.itemDate}>
-                        {' · '}{LOCKED_ROLE[a.role] || a.role}
-                        {a.lockedUntil && <> · until <span className="sa-mono">{fmtDateTime(a.lockedUntil)}</span></>}
-                      </span>
-                    </span>
-                    <Button size="sm" icon="unlock" onClick={() => unlock(a)} disabled={busy === `unlock-${a.id}` || busy === 'unlock-all'}>Unlock</Button>
-                  </li>
-                ))}
-              </ul>
-            )}
-          {locked?.travelersUnavailable && (
-            <p style={x.toolResult} role="status">
-              <Icon name="alert-circle" size={13} color={t.warning} /> Couldn’t ask Clerk which travelers are locked. Staff are shown; check again in a moment.
-            </p>
-          )}
-          {/* A traveler's lock happens in Clerk and sends no live update, hence Check again. */}
-          {accounts && (
-            <div style={x.toolButtons}>
-              {accounts.length > 1 && (
-                <Button size="sm" icon="unlock" onClick={unlockAll} disabled={busy === 'unlock-all'}>
-                  {busy === 'unlock-all' ? 'Unlocking…' : `Unlock all ${accounts.length}`}
-                </Button>
-              )}
-              <Button size="sm" variant="subtle" icon="refresh-cw" onClick={() => run('locked', reloadLocked)} disabled={busy === 'locked'}>
-                {busy === 'locked' ? 'Checking…' : 'Check again'}
-              </Button>
-            </div>
-          )}
-        </div>
       </div>
     </Section>
   );
@@ -541,6 +556,7 @@ function ToolsCard({ locked, reloadLocked }) {
 function MaintenanceLog() {
   const [data, setData] = useState(null);
   const [page, setPage] = useState(1);
+  const [open, setOpen] = useState(null);
   // A window ending adds its row (a failed reload keeps the rows shown).
   const changed = useLiveTick(['system']);
   useEffect(() => {
@@ -563,7 +579,7 @@ function MaintenanceLog() {
             <>
               <Table bare caption="Maintenance log" head={<><Th>Started</Th><Th>Length</Th><Th>By</Th><Th>What was done</Th></>}>
                 {data.logs.map((l) => (
-                  <tr key={l._id}>
+                  <Row key={l._id} onOpen={() => setOpen(l)} label={`Maintenance started ${fmtDateTime(l.startedAt)}`}>
                     <Td style={{ whiteSpace: 'nowrap' }}><span className="sa-mono">{fmtDateTime(l.startedAt)}</span></Td>
                     <Td muted style={{ whiteSpace: 'nowrap' }}>{l.endedAt ? <span className="sa-mono">{duration(l.startedAt, l.endedAt)}</span> : <StatusPill tone="warning" icon="clock">Going on</StatusPill>}</Td>
                     <Td muted>{l.startedBy?.username || '—'}{l.endedBy?.username && l.endedBy.username !== l.startedBy?.username ? ` → ${l.endedBy.username}` : ''}</Td>
@@ -572,12 +588,13 @@ function MaintenanceLog() {
                         {l.summary || (l.endedAt ? '—' : l.message || 'Not ended yet')}
                       </span>
                     </Td>
-                  </tr>
+                  </Row>
                 ))}
               </Table>
               {data.pages > 1 && <div style={{ padding: '10px 16px' }}><Pagination page={data.page} pages={data.pages} onChange={setPage} label="Maintenance log pages" /></div>}
             </>
           )}
+      {open && <MaintenanceDrawer log={open} length={open.endedAt ? duration(open.startedAt, open.endedAt) : null} onClose={() => setOpen(null)} />}
     </Section>
   );
 }
@@ -596,8 +613,12 @@ const x = {
 
   accessGrid:  { display: 'flex', flexDirection: 'column', margin: '0 -8px' },
   // Rows divided by hairlines (sa-rows), not cards inside the card.
-  accessRow:   { display: 'flex', alignItems: 'center', gap: 14, padding: '12px 8px' },
+  accessItem:  { padding: '12px 8px' },
+  accessRow:   { display: 'flex', alignItems: 'center', gap: 14 },
   accessPaused: { background: t.warningBg, borderRadius: radius.sm },
+  accessQuote: { fontSize: 13, color: t.textPrimary, margin: '4px 0 0', lineHeight: 1.45, overflowWrap: 'anywhere' },
+  // Lines up with the role's name, past the icon.
+  pauseForm:   { marginTop: 12, marginLeft: 'clamp(0px, 6vw, 52px)', paddingTop: 12, borderTop: `1px dashed ${t.divider}` },
   accessIcon:  { width: 38, height: 38, borderRadius: radius.md, display: 'grid', placeItems: 'center', flexShrink: 0, background: 'var(--s-blue-soft)', color: t.textPrimary },
   accessName:  { display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', fontSize: 14, fontWeight: 700, color: t.textPrimary },
   accessDesc:  { fontSize: 12.5, color: t.textMuted, margin: '3px 0 0', lineHeight: 1.45 },
@@ -613,7 +634,4 @@ const x = {
   toolDesc:    { fontSize: 12.5, color: t.textMuted, lineHeight: 1.45, margin: 0 },
   toolResult:  { fontSize: 12.5, color: t.textSecondary, lineHeight: 1.45, margin: 0, display: 'flex', gap: 6, alignItems: 'flex-start' },
   facts:       { display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '3px 12px', margin: 0, fontSize: 12.5, color: t.textSecondary },
-  lockedList:  { listStyle: 'none', margin: 0, padding: 0, width: '100%', display: 'flex', flexDirection: 'column', gap: 6 },
-  lockedItem:  { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, fontSize: 13 },
-  toolButtons: { display: 'flex', gap: 8, flexWrap: 'wrap' },
 };

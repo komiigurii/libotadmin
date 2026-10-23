@@ -24,18 +24,30 @@ import { connectLive, disconnectLive, subscribeLive } from '../api/live';
  *   - it holds the live connection (api/live.js) while signed in, and asks at
  *     once when the server says the session ended or the bell, tickets, the
  *     approval queue or the system's state changed. The 45 s check stays, for
- *     a network that blocks the live connection.
+ *     a network that blocks the live connection;
+ *   - maintenance or a paused role signs admins and moderators out after a
+ *     countdown (components/SignOutPopup.jsx shows it). The server says how
+ *     long is left; that becomes a time on this computer's clock (`at`), so a
+ *     clock that's off doesn't matter, and the session is asked again the
+ *     moment it runs out, which signs the window out.
  */
 const EVERY_MS = 45_000;
 
 export default function SessionWatcher() {
   useEffect(() => {
     let stopped = false;
+    let signOutTimer = null;
 
     const check = async () => {
       if (stopped || document.visibilityState !== 'visible' || !getToken()) return;
       try {
         const s = await authAPI.session();
+        const signOut = s.system?.signOut;
+        clearTimeout(signOutTimer);
+        if (signOut) {
+          signOut.at = Date.now() + signOut.inMs;
+          signOutTimer = setTimeout(check, signOut.inMs + 300);
+        }
         publishHeartbeat(s);
         const role = localStorage.getItem('role');
         const city = localStorage.getItem('city') || '';
@@ -74,6 +86,7 @@ export default function SessionWatcher() {
     return () => {
       stopped = true;
       clearInterval(timer);
+      clearTimeout(signOutTimer);
       document.removeEventListener('visibilitychange', onVisible);
       window.removeEventListener('focus', onVisible);
       window.removeEventListener('storage', onStorage);

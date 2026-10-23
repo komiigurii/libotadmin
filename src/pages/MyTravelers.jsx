@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import { myTravelersAPI } from '../api/api';
 import {
-  Page, PageHeader, Toolbar, SearchInput, FilterTabs, Table, Th, Td, StatusPill,
+  Page, PageHeader, Toolbar, SearchInput, FilterTabs, Table, Th, Td, Row, StatusPill,
   Loading, EmptyState, ErrorBanner, Avatar, pageStyles as s,
 } from '../components/Layout';
-import { fmtDay, timeAgo } from '../utils/format';
+import Drawer from '../components/Drawer';
+import { Facts, DetailSection, VisitList, detailStyles as d } from '../components/Details';
+import { fmtDay, fmtNum, timeAgo } from '../utils/format';
 import { standingLabel } from '../utils/standing';
 import { useLive } from '../api/live';
 
@@ -12,7 +14,7 @@ import { useLive } from '../api/live';
 // their municipality (QA 2026-10-16: user management within their
 // municipality), whoever they are and wherever they live. Read-only, as decided
 // with the team: warnings, suspensions and bans stay with the administrators.
-// No emails.
+// No emails. A row opens the traveler's visits here and their standing.
 
 const STATUS = {
   active:    { tone: 'success', icon: 'check',  label: 'Active' },
@@ -30,6 +32,8 @@ export default function MyTravelers() {
   const [error,     setError]     = useState('');
   const [search,    setSearch]    = useState('');
   const [filter,    setFilter]    = useState('');
+  const [openId,    setOpenId]    = useState(null);
+  const opened = openId && rows.find((r) => r.id === openId);
 
   // `quiet`: a live update — no spinner, and a failure keeps the list shown.
   const load = async ({ quiet = false } = {}) => {
@@ -120,7 +124,7 @@ export default function MyTravelers() {
           {visible.map((r) => {
             const st = STATUS[r.status] || STATUS.active;
             return (
-              <tr key={r.id}>
+              <Row key={r.id} onOpen={() => setOpenId(r.id)} label={`Details of ${r.name}`}>
                 <Td>
                   <div style={s.person}>
                     <Avatar src={r.profileImage} name={r.name} size={32} />
@@ -143,11 +147,44 @@ export default function MyTravelers() {
                     {standingLabel(r) && <StatusPill tone="neutral" icon="alert-triangle">{standingLabel(r)}</StatusPill>}
                   </div>
                 </Td>
-              </tr>
+              </Row>
             );
           })}
         </Table>
       )}
+
+      {opened && <TravelerDetails r={opened} town={town} spotCount={spotCount} onClose={() => setOpenId(null)} />}
     </Page>
+  );
+}
+
+// What the list knows about one traveler, laid out whole: each spot here with
+// when they were last there, and their standing. Still no email.
+function TravelerDetails({ r, town, spotCount, onClose }) {
+  const st = STATUS[r.status] || STATUS.active;
+  const visits = r.visits || (r.spotNames || []).map((spot) => ({ spot }));
+  return (
+    <Drawer title={r.name} subtitle={r.homeMunicipality ? `Lives in ${r.homeMunicipality}` : 'Home town not given'} onClose={onClose}>
+      <div style={d.stack}>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          <StatusPill tone={st.tone} icon={st.icon}>{st.label}</StatusPill>
+          {standingLabel(r) && <StatusPill tone="neutral" icon="alert-triangle">{standingLabel(r)}</StatusPill>}
+        </div>
+        <Facts items={[
+          [`Spots visited in ${town}`, `${r.spotsVisited} of ${spotCount}`],
+          ['Last visit', r.lastVisitAt ? fmtDay(r.lastVisitAt) : '—'],
+          ['Points', fmtNum(r.points)],
+          ['Lives in', r.homeMunicipality || '—'],
+          ['Warnings', fmtNum(r.warnings)],
+          ['Suspensions', fmtNum(r.suspensions)],
+        ]} />
+        {visits.length > 0 && (
+          <DetailSection title={`Visits to ${town}’s spots`}>
+            <VisitList visits={visits} />
+          </DetailSection>
+        )}
+        <p style={d.note}>View only: warnings, suspensions and bans are handled by the administrators.</p>
+      </div>
+    </Drawer>
   );
 }

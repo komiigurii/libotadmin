@@ -2,10 +2,12 @@ import { Fragment, useCallback, useEffect, useRef, useState } from 'react';
 import { activityAPI } from '../api/api';
 import { useLiveTick } from '../api/live';
 import {
-  Page, PageHeader, Toolbar, SearchInput, Table, Th, Td,
+  Page, PageHeader, Toolbar, SearchInput, Table, Th, Td, Row,
   Loading, EmptyState, ErrorBanner, pageStyles as s,
 } from '../components/Layout';
 import Pagination from '../components/Pagination';
+import Drawer from '../components/Drawer';
+import { Facts, DetailSection, DetailText, detailStyles as d } from '../components/Details';
 import { theme as t } from '../theme';
 import { fmtDateTime, fmtNum } from '../utils/format';
 import { actionLabel, ACTION_GROUPS, GROUP_HUE, MIX_ORDER, groupOf } from '../utils/activity';
@@ -18,7 +20,7 @@ import { actionLabel, ACTION_GROUPS, GROUP_HUE, MIX_ORDER, groupOf } from '../ut
  *
  * The band (2026-10-23) counts each kind and filters by it; the bar under the
  * counts is each kind's share of everything logged, in the same hues as the
- * tags in the table. Rows are grouped by day.
+ * tags in the table. Rows are grouped by day; a row opens the whole entry.
  */
 
 const PAGE_SIZE = 30;
@@ -43,6 +45,7 @@ export default function ActivityLog() {
   const [query, setQuery] = useState('');
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
+  const [open, setOpen] = useState(null);
 
   useEffect(() => {
     const timer = setTimeout(() => { setSearch(query.trim()); setPage(1); }, 300);
@@ -141,7 +144,7 @@ export default function ActivityLog() {
                         const act = actionLabel(e.action);
                         const g = groupOf(e.action);
                         return (
-                          <tr key={e._id}>
+                          <Row key={e._id} onOpen={() => setOpen(e)} label={`${act.label}, ${fmtDateTime(e.at)}`}>
                             <Td><time className="sa-mono" dateTime={e.at} title={fmtDateTime(e.at)} style={{ color: t.textSecondary }}>{clock(e.at)}</time></Td>
                             <Td>
                               {e.actor?.username
@@ -155,7 +158,7 @@ export default function ActivityLog() {
                               </span>
                             </Td>
                             <Td><span style={{ ...s.clampCell, maxWidth: 'none' }} title={e.summary}>{e.summary || e.target?.label || '—'}</span></Td>
-                          </tr>
+                          </Row>
                         );
                       })}
                     </Fragment>
@@ -168,7 +171,43 @@ export default function ActivityLog() {
               </div>
             </>
           )}
+
+      {open && <EntryDrawer e={open} onClose={() => setOpen(null)} />}
     </Page>
+  );
+}
+
+const TARGET = { account: 'Staff account', traveler: 'Traveler', spot: 'Spot', request: 'Request', system: 'System', ticket: 'Ticket' };
+const DETAIL_NAME = {
+  note: 'Note', reason: 'Reason', message: 'Message shown', summary: 'What was done', fields: 'Fields changed',
+  from: 'From', to: 'To', role: 'Kind of account', roles: 'Roles', municipality: 'Municipality',
+  signOutMinutes: 'Signed out after (minutes)', formerClerkUserId: 'Former sign-in',
+};
+const detailName = (k) => DETAIL_NAME[k] || k.replace(/([A-Z])/g, ' $1').replace(/^./, (c) => c.toUpperCase());
+const detailValue = (v) => (Array.isArray(v) ? v.join(', ') : v && typeof v === 'object' ? JSON.stringify(v) : String(v));
+
+// One entry whole: who, when to the second, what it was about, and the
+// details the server kept with it (short ones as facts, long text in full).
+function EntryDrawer({ e, onClose }) {
+  const act = actionLabel(e.action);
+  const details = Object.entries(e.details || {}).filter(([, v]) => v != null && v !== '');
+  const isLong = (v) => typeof v === 'string' && v.length > 40;
+  return (
+    <Drawer title={act.label} subtitle={fmtDateTime(e.at)} onClose={onClose}>
+      <div style={d.stack}>
+        <Facts items={[
+          ['Who', e.actor?.username ? `${e.actor.username}${e.actor.role ? ` (${ROLE[e.actor.role] || e.actor.role})` : ''}` : 'Someone signing in'],
+          ['Kind', ACTION_GROUPS.find((x) => x.value === groupOf(e.action))?.label || null],
+          ['About', e.target?.label ? `${e.target.label}${TARGET[e.target.type] ? ` · ${TARGET[e.target.type]}` : ''}` : null],
+          ['IP address', e.ip || null],
+          ...details.filter(([, v]) => !isLong(v)).map(([k, v]) => [detailName(k), detailValue(v)]),
+        ]} />
+        {e.summary && <DetailSection title="What happened"><DetailText>{e.summary}</DetailText></DetailSection>}
+        {details.filter(([, v]) => isLong(v)).map(([k, v]) => (
+          <DetailSection key={k} title={detailName(k)}><DetailText>{v}</DetailText></DetailSection>
+        ))}
+      </div>
+    </Drawer>
   );
 }
 

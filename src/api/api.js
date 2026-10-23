@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { getToken, isExpired, endSession, SESSION_CHECK_EVENT } from '../auth/session';
+import { getToken, isExpired, endSession } from '../auth/session';
 
 // A time limit, so a dead connection ends in an error instead of a page that
 // says "Loading…" forever. 60 s outlasts the sleeping server waking up (30–60 s).
@@ -24,10 +24,11 @@ api.interceptors.request.use((config) => {
 });
 
 // A 401 on any call made with a token means the server no longer accepts it
-// (expired, signed in somewhere else, password reset, deactivated, or
-// JWT_SECRET was rotated); the server's `code` says which, for the sign-in
-// page. Sign-in is excluded: a 401 there is just a wrong password. So is
-// sign-out, which clears the session itself.
+// (expired, signed in somewhere else, password reset, deactivated, the
+// maintenance or pause countdown ran out, or JWT_SECRET was rotated); the
+// server's `code` says which, for the sign-in page. Sign-in is excluded: a 401
+// there is just a wrong password. So is sign-out, which clears the session
+// itself.
 //
 // A 403 `mustChangePassword` means the account still has its temporary
 // password: everything waits until its holder chooses their own.
@@ -37,16 +38,14 @@ api.interceptors.response.use(
     const url = err?.config?.url || '';
     const isSignInOrOut = url.includes('/api/auth/admin-login') || url.includes('/api/auth/admin-logout');
     const status = err?.response?.status;
-    const code = err?.response?.data?.code;
+    const body = err?.response?.data || {};
+    const code = body.code;
     if (status === 401 && getToken() && !isSignInOrOut) {
-      endSession(code || 'expired');
+      const held = code === 'maintenance' || code === 'restricted';
+      endSession(code || 'expired', held ? { note: body.note || '', expectedEndAt: body.expectedEndAt || null } : null);
     } else if (status === 403 && code === 'mustChangePassword' && window.location.pathname !== '/set-password') {
       localStorage.setItem('mustChangePassword', '1');
       window.location.assign('/set-password');
-    } else if (status === 503 && (code === 'maintenance' || code === 'restricted')) {
-      // Maintenance started, or this role was paused: the session check
-      // brings the banner up now instead of at the next heartbeat.
-      window.dispatchEvent(new Event(SESSION_CHECK_EVENT));
     }
     return Promise.reject(err);
   },
@@ -292,7 +291,8 @@ export const systemAPI = {
   updateMaintenance: (data) => api.put('/api/system/maintenance', data).then(r => r.data),
   endMaintenance: (summary) => api.post('/api/system/maintenance/end', { summary }).then(r => r.data),
   logs:         (params = {}) => api.get('/api/system/maintenance/logs', { params }).then(r => r.data),
-  setRestricted: (roles) => api.put('/api/system/restrictions', { roles }).then(r => r.data),
+  // `popup` for the role being paused: { message, signOutMinutes }.
+  setRestricted: (roles, popup = {}) => api.put('/api/system/restrictions', { roles, ...popup }).then(r => r.data),
   notices:      (params = {}) => api.get('/api/system/notices', { params }).then(r => r.data),
   publishNotice: (data) => api.post('/api/system/notices', data).then(r => r.data),
   hideNotice:   (id) => api.post(`/api/system/notices/${id}/hide`).then(r => r.data),

@@ -68,17 +68,33 @@ export const hasValidSession = () => {
 export const SESSION_CHECK_EVENT = 'libot:session-check';
 
 // The reasons the server gives for a session that ended; anything else reads
-// as "expired".
-export const END_REASONS = ['expired', 'signedInElsewhere', 'signedOut', 'passwordChanged', 'passwordReset', 'deactivated'];
+// as "expired". `maintenance` and `restricted`: the super admin's countdown ran
+// out (components/SignOutPopup.jsx).
+export const END_REASONS = ['expired', 'signedInElsewhere', 'signedOut', 'passwordChanged', 'passwordReset', 'deactivated', 'maintenance', 'restricted'];
+
+// What the super admin wrote for that sign-out ({ note, expectedEndAt }), for
+// the sign-in page. This tab only.
+const NOTE_KEY = 'libot_signout_note';
+
+export function readSignOutNote() {
+  try { return JSON.parse(sessionStorage.getItem(NOTE_KEY)) || null; } catch { return null; }
+}
+
+export function clearSignOutNote() {
+  try { sessionStorage.removeItem(NOTE_KEY); } catch { /* private window */ }
+}
 
 let ending = false;
 
 /** Clears the session and goes to sign-in, saying why. Safe to call repeatedly. */
-export function endSession(reason = 'expired') {
+export function endSession(reason = 'expired', note = null) {
   clearSession();
   if (ending) return;
   ending = true;
   const why = END_REASONS.includes(reason) ? reason : 'expired';
+  if (note) {
+    try { sessionStorage.setItem(NOTE_KEY, JSON.stringify(note)); } catch { /* private window */ }
+  }
   window.location.assign(`/login?reason=${encodeURIComponent(why)}`);
 }
 

@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 import { accountsAPI } from '../api/api';
-import { Button, StatusPill, Table, Th, Td, Avatar, Loading, EmptyState, pageStyles as s } from './Layout';
+import { Button, StatusPill, Table, Th, Td, Row, Avatar, Loading, EmptyState, pageStyles as s } from './Layout';
 import { notify, confirmAction } from './AppAlert';
 import CredentialSlip from './CredentialSlip';
 import Drawer from './Drawer';
+import { Facts, DetailSection, detailStyles as d } from './Details';
 import Icon from './Icon';
 import { theme as t, radius, shadow, type } from '../theme';
 import { fmtDateTime, fmtDay, timeAgo } from '../utils/format';
@@ -22,7 +23,8 @@ const sq = { width: 34, minHeight: 34, padding: 0 };
  *     once on the credential slip.
  *   - StaffTable: each account's status, last sign-in and "Last changed by …",
  *     with Reset password (a new slip), Deactivate/Reactivate, Move town,
- *     History, and Unlock on a locked row (the super admin's page only).
+ *     and Unlock on a locked row (the super admin's page only). A row (or its
+ *     History button) opens the account's details and history.
  * Usernames are permanent and a moderator's name comes from the town, so
  * neither can be edited anywhere.
  */
@@ -170,8 +172,9 @@ export function AddAccountForm({ roles, accounts, onCancel, onMade }) {
 export function StaffTable({ accounts, extra, onChanged, canManage, onUnlock, caption = 'Staff accounts', townInName = false }) {
   const [slip, setSlip] = useState(null);
   const [moving, setMoving] = useState(null);
-  const [historyOf, setHistoryOf] = useState(null);
+  const [openId, setOpenId] = useState(null);
   const [busy, setBusy] = useState('');
+  const opened = openId && accounts.find((a) => a.id === openId);
 
   const act = async (id, fn) => {
     setBusy(id);
@@ -226,7 +229,7 @@ export function StaffTable({ accounts, extra, onChanged, canManage, onUnlock, ca
         {accounts.map((a) => {
           const mine = canManage(a);
           return (
-            <tr key={a.id}>
+            <Row key={a.id} onOpen={() => setOpenId(a.id)} label={`Details of ${a.username}`}>
               <Td>
                 <div style={s.person}>
                   <Avatar name={a.username} size={32} />
@@ -256,7 +259,7 @@ export function StaffTable({ accounts, extra, onChanged, canManage, onUnlock, ca
                     does, named for screen readers and in the tooltip (the
                     user's reference console does the same). */}
                 <div style={{ ...s.cellActions, flexWrap: 'nowrap' }}>
-                  <Button icon="history" style={sq} onClick={() => setHistoryOf(a)} aria-label={`History of ${a.username}`} title="History" />
+                  <Button icon="history" style={sq} onClick={() => setOpenId(a.id)} aria-label={`Details and history of ${a.username}`} title="Details and history" />
                   {onUnlock && a.status === 'locked' && (
                     <Button variant="success" icon="unlock" style={sq} disabled={busy === a.id} onClick={() => unlock(a)}
                       aria-label={`Unlock ${a.username}`} title="Unlock" />
@@ -274,7 +277,7 @@ export function StaffTable({ accounts, extra, onChanged, canManage, onUnlock, ca
                   </>}
                 </div>
               </Td>
-            </tr>
+            </Row>
           );
         })}
       </Table>
@@ -287,7 +290,7 @@ export function StaffTable({ accounts, extra, onChanged, canManage, onUnlock, ca
         <MoveDialog account={moving} accounts={accounts} onClose={() => setMoving(null)}
           onMoved={(acc) => { onChanged(acc); setMoving(null); }} />
       )}
-      {historyOf && <HistoryDrawer account={historyOf} onClose={() => setHistoryOf(null)} />}
+      {opened && <AccountDrawer account={opened} onClose={() => setOpenId(null)} />}
     </>
   );
 }
@@ -362,19 +365,37 @@ export function HistoryList({ entries }) {
   );
 }
 
-function HistoryDrawer({ account, onClose }) {
+// One account's details and what was done to it. The row it came from stays
+// current (live updates), and the history is asked again when it changes.
+function AccountDrawer({ account: a, onClose }) {
   const [entries, setEntries] = useState(null);
   const [error, setError] = useState('');
+  const changedAt = a.lastChange?.at;
   useEffect(() => {
     let live = true;
-    accountsAPI.history(account.id)
-      .then((rows) => { if (live) setEntries(rows); })
+    accountsAPI.history(a.id)
+      .then((rows) => { if (live) { setEntries(rows); setError(''); } })
       .catch(() => { if (live) setError('Couldn’t load the history.'); });
     return () => { live = false; };
-  }, [account.id]);
+  }, [a.id, changedAt, a.lastLoginAt]);
   return (
-    <Drawer title={`History of ${account.username}`} subtitle={`${ROLE_NAME[account.role]}${account.municipality ? ` · ${account.municipality}` : ''} · made ${fmtDay(account.createdAt)}`} onClose={onClose}>
-      {error ? <p style={f.error}>{error}</p> : entries ? <HistoryList entries={entries} /> : <Loading label="Loading history…" />}
+    <Drawer title={a.username} subtitle={`${ROLE_NAME[a.role]}${a.municipality ? ` · ${a.municipality}` : ''}`} onClose={onClose}>
+      <div style={d.stack}>
+        <div><StaffStatus status={a.status} /></div>
+        <Facts items={[
+          ['Kind of account', ROLE_NAME[a.role]],
+          ['Municipality', a.municipality || (a.role === 'moderator' ? 'None assigned' : 'All of Bulacan')],
+          ['Name', ownName(a)],
+          ['Made', `${fmtDay(a.createdAt)}${a.createdBy ? ` by ${a.createdBy}` : ''}`],
+          ['Last sign-in', a.lastLoginAt ? fmtDateTime(a.lastLoginAt) : 'Never'],
+          ['Temporary password ends', a.mustChangePassword && a.tempPasswordExpiresAt ? fmtDateTime(a.tempPasswordExpiresAt) : null],
+          // The Moderators page's rows carry the requests each has sent.
+          ['Requests sent', a.requests ? `${a.requests.total ?? 0}${a.requests.pending ? ` · ${a.requests.pending} waiting` : ''}` : null],
+        ]} />
+        <DetailSection title="History">
+          {error ? <p style={f.error}>{error}</p> : entries ? <HistoryList entries={entries} /> : <Loading label="Loading history…" />}
+        </DetailSection>
+      </div>
     </Drawer>
   );
 }

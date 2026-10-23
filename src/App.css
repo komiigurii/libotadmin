@@ -93,6 +93,12 @@ tbody td {
 tbody tr:hover td {
   background: var(--card-bg-hover);
 }
+/* A row that opens its details (Layout's Row): the pointer says so, and the
+   keyboard's focus tints it like a hover, with the ring inside the card's
+   rounded edge rather than clipped by it. */
+tr.row-open { cursor: pointer; }
+tr.row-open:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px; border-radius: 0; }
+tr.row-open:focus-visible td { background: var(--card-bg-hover); }
 
 /* The console's rail, top bar and page bands are styled in console.css. */
 
