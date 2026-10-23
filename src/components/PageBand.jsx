@@ -12,10 +12,10 @@ import { Bone } from './Skeleton';
  *
  * A stat: { label, value, hint, hue, to, tone, current, small, flag }
  *   hue      a series hue (teal, orange, blue, marigold, violet, magenta,
- *            slate). The whole cell wears it (it was a swatch by the label
- *            until the mock defense notes of 2026-10-23); the same hue marks
- *            that thing in the page's charts and tags, so the strip is the
- *            legend.
+ *            slate). Its swatch sits by the label; the same hue marks that
+ *            thing in the page's charts and tags, so the strip is the legend.
+ *            (Filling the whole cell with it was tried on 2026-10-23 and
+ *            reverted at the user's request.)
  *   tone     'warn' (amber number) or 'good' (green), for a state, never a series.
  *   flag     a short word beside a warning number ("Now").
  * No sparks: a quiet month drew them as a bare line that read as an underline.
@@ -66,7 +66,10 @@ function Cell({ label, value, hint, hue, to, tone, current, small, flag, onClick
   const pending = value === PENDING;
   const body = (
     <>
-      <span className="sa-cell-label">{label}</span>
+      <span className="sa-cell-label">
+        {hue && <span className="sa-swatch" style={{ background: `var(--k-${hue})` }} aria-hidden="true" />}
+        {label}
+      </span>
       <span className="sa-cell-row">
         <span className={`sa-cell-value${small ? ' small' : ''}`}>
           {pending ? <><Bone w={small ? 76 : 58} h={small ? 22 : 30} /><span className="sk-sr">Loading</span></> : value ?? '—'}
@@ -77,16 +80,15 @@ function Cell({ label, value, hint, hue, to, tone, current, small, flag, onClick
         : pending && hint === null && <span className="sa-cell-hint"><Bone w="64%" h={10} style={{ marginTop: 3 }} /></span>}
     </>
   );
-  const cls = `sa-cell${tone ? ` ${tone}` : ''}${hue ? ' hued' : ''}`;
-  const tint = hue ? { '--cell-hue': `var(--k-${hue})` } : undefined;
-  if (to) return <Link to={to} className={cls} style={tint} role="listitem" aria-current={current ? 'true' : undefined}>{body}</Link>;
+  const cls = `sa-cell${tone ? ` ${tone}` : ''}`;
+  if (to) return <Link to={to} className={cls} role="listitem" aria-current={current ? 'true' : undefined}>{body}</Link>;
   if (onClick) {
     return (
       <button type="button" className={cls} role="listitem" onClick={onClick} aria-pressed={!!current}
-        aria-current={current ? 'true' : undefined} style={{ ...tint, border: 'none', textAlign: 'left', cursor: 'pointer', font: 'inherit' }}>
+        aria-current={current ? 'true' : undefined} style={{ border: 'none', textAlign: 'left', cursor: 'pointer', font: 'inherit' }}>
         {body}
       </button>
     );
   }
-  return <div className={cls} style={tint} role="listitem">{body}</div>;
+  return <div className={cls} role="listitem">{body}</div>;
 }

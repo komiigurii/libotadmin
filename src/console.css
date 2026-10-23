@@ -402,11 +402,9 @@ button.sa-bell-item:hover, button.sa-bell-item:focus-visible { background: var(-
   background: transparent !important; color: var(--sa-band-warning) !important; border-color: var(--sa-band-warning) !important;
 }
 
-/* The strip: one row of cells joined by hairlines. A cell about a series
-   (travelers, reviews, tickets…) is filled with the hue that thing wears
-   everywhere else, so the strip is the page's legend (mock defense notes,
-   2026-10-23: the whole box in the colour, not a dot beside the label). The
-   fill is the hue half mixed into the band, so its words keep 4.5:1. */
+/* The strip: one row of cells joined by hairlines. Each cell's label carries a
+   swatch in the hue that thing wears everywhere else, so the strip is the
+   page's legend. */
 .sa-strip {
   display: grid; grid-template-columns: repeat(var(--n, 4), minmax(0, 1fr));
   gap: 1px; background: var(--sa-shell-line);
@@ -417,17 +415,11 @@ button.sa-bell-item:hover, button.sa-bell-item:focus-visible { background: var(-
   padding: 9px 13px 9px; background: var(--sa-band); color: inherit; text-decoration: none;
   transition: background 0.15s ease;
 }
-a.sa-cell:hover, button.sa-cell:hover { background: var(--sa-shell-raised); }
+a.sa-cell:hover { background: var(--sa-shell-raised); }
 .sa-cell[aria-current='true'] { background: var(--sa-shell-active); }
-.sa-cell.hued { background: color-mix(in srgb, var(--cell-hue) 50%, var(--sa-band)); }
-a.sa-cell.hued:hover, button.sa-cell.hued:hover { background: color-mix(in srgb, var(--cell-hue) 60%, var(--sa-band)); }
-.sa-cell.hued[aria-current='true'] {
-  background: color-mix(in srgb, var(--cell-hue) 66%, var(--sa-band));
-  box-shadow: inset 0 0 0 2px var(--sa-shell-text);
-}
 .sa-cell-label { display: flex; align-items: flex-start; gap: 7px; font-size: 15px; line-height: 1.2; color: var(--sa-shell-muted); }
-.sa-cell.hued .sa-cell-label, .sa-cell.hued .sa-cell-hint { color: var(--sa-shell-text); }
 .sa-swatch { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
+.sa-cell-label .sa-swatch { margin-top: 3px; }
 .sa-cell-row { display: flex; align-items: flex-end; justify-content: space-between; gap: 10px; min-width: 0; }
 .sa-cell-value {
   font-family: var(--font-display); font-weight: 700; font-size: 28px; line-height: 1; color: var(--sa-shell-text);
