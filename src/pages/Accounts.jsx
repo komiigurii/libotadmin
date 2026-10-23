@@ -2,16 +2,18 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { accountsAPI, systemAPI } from '../api/api';
 import {
-  Page, PageHeader, Toolbar, SearchInput, Button, StatusPill, Tag, Table, Th, Td, Avatar,
+  Page, PageHeader, Toolbar, SearchInput, Button, StatusPill, Tag, Table, Th, Td, Row, Avatar,
   Loading, EmptyState, ErrorBanner, pageStyles as s,
 } from '../components/Layout';
-import { AddAccountForm, StaffTable, HistoryList } from '../components/StaffAccounts';
+import { AddAccountForm, StaffTable } from '../components/StaffAccounts';
 import { notify, confirmAction, promptAction } from '../components/AppAlert';
 import CredentialSlip from '../components/CredentialSlip';
 import Pagination from '../components/Pagination';
 import Drawer from '../components/Drawer';
+import TravelerDrawer, { Standing } from '../components/TravelerDrawer';
+import { Facts, DetailSection, DetailText, detailStyles as d } from '../components/Details';
 import Icon from '../components/Icon';
-import { theme as t, radius, type } from '../theme';
+import { theme as t } from '../theme';
 import { fmtDateTime, fmtDay, fmtNum, plural, timeAgo } from '../utils/format';
 import { standingLabel } from '../utils/standing';
 import { useLive, useLiveTick } from '../api/live';
@@ -66,17 +68,6 @@ const LOCKED_FILTERS = [
 ];
 const lockedMatches = (acc, kind) => !kind || acc.kind === kind;
 const LOCKED_ROLE = { superadmin: 'Super admin', admin: 'Admin', moderator: 'Moderator', traveler: 'Traveler' };
-const STANDING = {
-  active:    { tone: 'success', icon: 'check',  label: 'Good standing' },
-  muted:     { tone: 'warning', icon: 'pause',  label: 'Muted' },
-  suspended: { tone: 'danger',  icon: 'pause',  label: 'Suspended' },
-  banned:    { tone: 'danger',  icon: 'slash',  label: 'Banned' },
-  inactive:  { tone: 'neutral', icon: 'clock',  label: 'Deactivated (inactive)' },
-};
-const Standing = ({ status }) => {
-  const st = STANDING[status] || STANDING.active;
-  return <StatusPill tone={st.tone} icon={st.icon}>{st.label}</StatusPill>;
-};
 const ARCHIVE_FILTERS = [
   { value: '',           label: 'All archived',            icon: 'archive' },
   { value: 'ban',        label: 'Banned',                  icon: 'slash' },
@@ -92,6 +83,7 @@ const BLOCKED = {
   emailInUse: 'Their email has a newer account, made after this one was deleted.',
   noRecord:   'Nothing of this account was kept.',
 };
+const APPEAL_WORD = { submitted: 'waiting for a decision', approved: 'approved', rejected: 'rejected' };
 
 /**
  * Asks for the reason and restores one archived account. `acc`: { id, name,
@@ -427,7 +419,7 @@ function TravelersView({ status, title, onShowDeleted }) {
                 </>}
               >
                 {data.travelers.map((u) => (
-                  <tr key={u.id}>
+                  <Row key={u.id} onOpen={() => setOpen(u)} label={`Overview of ${u.name}`}>
                     <Td>
                       <div style={s.person}>
                         <Avatar src={u.profileImage} name={u.name} size={32} />
@@ -448,7 +440,7 @@ function TravelersView({ status, title, onShowDeleted }) {
                       </div>
                     </Td>
                     <Td align="right"><Button size="sm" onClick={() => setOpen(u)}>Overview</Button></Td>
-                  </tr>
+                  </Row>
                 ))}
               </Table>
               <div style={a.footer}>
@@ -463,7 +455,10 @@ function TravelersView({ status, title, onShowDeleted }) {
             </>
           )}
 
-      {open && <TravelerDrawer traveler={open} onClose={() => setOpen(null)} />}
+      {open && (
+        <TravelerDrawer traveler={open} onClose={() => setOpen(null)}
+          archivedAction={(u) => <RestoreButton acc={{ id: u.id, name: u.name, email: u.email, reason: u.archiveReason, signInDeleted: false }} />} />
+      )}
     </>
   );
 }
@@ -591,6 +586,7 @@ function ArchivedView({ reason, title }) {
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const [busy, setBusy] = useState('');
+  const [open, setOpen] = useState(null);
 
   useEffect(() => { setPage(1); }, [reason]);
   useEffect(() => {
@@ -644,7 +640,7 @@ function ArchivedView({ reason, title }) {
                 {data.archived.map((acc) => {
                   const why = ARCHIVED[acc.reason] || ARCHIVED.inactivity;
                   return (
-                    <tr key={acc.id}>
+                    <Row key={acc.id} onOpen={() => setOpen(acc)} label={`Details of ${acc.name}`}>
                       <Td>
                         <div style={s.person}>
                           <Avatar src={acc.profileImage} name={acc.name} size={32} />
@@ -684,7 +680,7 @@ function ArchivedView({ reason, title }) {
                           {busy === acc.id ? 'Restoring…' : 'Restore'}
                         </Button>
                       </Td>
-                    </tr>
+                    </Row>
                   );
                 })}
               </Table>
@@ -697,87 +693,82 @@ function ArchivedView({ reason, title }) {
               </div>
             </>
           )}
+
+      {open && <ArchivedDrawer acc={open} onClose={() => setOpen(null)} />}
     </>
   );
 }
 
-function TravelerDrawer({ traveler, onClose }) {
-  const [data, setData] = useState(null);
-  const [error, setError] = useState('');
-  // Kept current while open; a failed live reload keeps what's shown.
-  const changed = useLiveTick(['travelers', 'progress', 'reviews']);
-  const seen = useRef(changed);
-  useEffect(() => {
-    let live = true;
-    const quiet = seen.current !== changed;
-    seen.current = changed;
-    accountsAPI.getTraveler(traveler.id)
-      .then((d) => { if (live) setData(d); })
-      .catch(() => { if (live && !quiet) setError('Couldn’t load this traveler.'); });
-    return () => { live = false; };
-  }, [traveler.id, changed]);
-
-  const u = data?.traveler;
-  // The live update that follows shows the new standing.
-  const [restoring, setRestoring] = useState(false);
+/** Restore, beside an archived account's details; `onRestored` once it's back. */
+function RestoreButton({ acc, onRestored }) {
+  const [busy, setBusy] = useState(false);
   const restore = async () => {
-    setRestoring(true);
-    await restoreArchived({ id: u.id, name: u.name, email: u.email, reason: u.archiveReason, signInDeleted: false });
-    setRestoring(false);
+    setBusy(true);
+    const ok = await restoreArchived(acc);
+    setBusy(false);
+    if (ok) onRestored?.();
   };
-
   return (
-    <Drawer title={traveler.name} subtitle={traveler.email} onClose={onClose}>
-      {error ? <p style={{ color: t.danger }}>{error}</p> : !u ? <Loading label="Loading…" /> : (
-        <div style={a.stack}>
-          <div><Standing status={u.status} /></div>
-          {u.archiveReason && (
-            <div style={a.archived}>
-              <span style={{ minWidth: 0 }}>
-                <strong style={{ color: t.textPrimary }}>In the archive</strong> since <span className="sa-mono">{fmtDay(u.archivedAt)}</span>
-                {' '}({(ARCHIVED[u.archiveReason]?.label || u.archiveReason).toLowerCase()}): hidden from the leaderboard, reviews and ratings.
-              </span>
-              <Button size="sm" variant="success" icon="rotate-ccw" disabled={restoring} onClick={restore}>
-                {restoring ? 'Restoring…' : 'Restore'}
-              </Button>
-            </div>
-          )}
-          <dl style={a.facts}>
-            {[
-              ['Joined', fmtDay(u.createdAt)],
-              ['Last active', u.lastActiveAt ? timeAgo(u.lastActiveAt) : '—'],
-              ['Lives in', u.municipality || '—'],
-              ['Points', fmtNum(u.points)],
-              ['Spots visited', fmtNum(u.counts.visits)],
-              ['Reviews', fmtNum(u.counts.reviews)],
-              ['Spot badges', fmtNum(u.counts.badges)],
-              ['Days active', fmtNum(u.counts.activeDays)],
-            ].map(([k, v]) => (
-              <div key={k} style={a.fact}><dt style={a.dt}>{k}</dt><dd style={a.dd}>{v}</dd></div>
-            ))}
-          </dl>
+    <Button size="sm" variant="success" icon="rotate-ccw" style={{ whiteSpace: 'nowrap' }} disabled={busy} onClick={restore}>
+      {busy ? 'Restoring…' : 'Restore'}
+    </Button>
+  );
+}
 
-          {(u.warningHistory.length > 0 || u.suspensionHistory.length > 0) && (
-            <section>
-              <h3 style={a.h3}>Record</h3>
-              <ul style={a.record}>
-                {u.warningHistory.map((w, i) => (
-                  <li key={`w${i}`}>Warning {i + 1}, {fmtDay(w.issuedAt)}{w.reason ? `: ${w.reason}` : ''}</li>
-                ))}
-                {u.suspensionHistory.map((x, i) => (
-                  <li key={`s${i}`}>Suspension {i + 1}, {fmtDay(x.issuedAt)}{x.reason ? `: ${x.reason}` : ''}</li>
-                ))}
-              </ul>
-            </section>
-          )}
-
-          <section>
-            <h3 style={a.h3}>Actions on this account</h3>
-            <HistoryList entries={data.entries} />
-          </section>
-          <p style={a.note}>Days active are counted from 21 Oct 2026, when the system started keeping them.</p>
-        </div>
+/*
+ * One archived account. While its User record is still in the app (banned,
+ * inactive), the traveler's full overview with the archive's own details on
+ * top; a deleted sign-in has only what the archive kept, so that is shown.
+ */
+function ArchivedDrawer({ acc, onClose }) {
+  const why = ARCHIVED[acc.reason] || ARCHIVED.inactivity;
+  const archiveDetails = (
+    <>
+      {acc.banReason && <DetailSection title="Why they were banned"><DetailText>{acc.banReason}</DetailText></DetailSection>}
+      {acc.appealStatus && acc.appealStatus !== 'none' && (
+        <p style={{ ...d.note, color: acc.appealStatus === 'submitted' ? t.warning : t.textMuted }}>
+          Appeal {APPEAL_WORD[acc.appealStatus] || acc.appealStatus}{acc.appealedAt ? `, sent ${fmtDay(acc.appealedAt)}` : ''}.
+        </p>
       )}
+      {acc.blocked && <p style={{ ...d.note, color: t.textSecondary }}>Can’t be restored: {BLOCKED[acc.blocked].toLowerCase()}</p>}
+    </>
+  );
+
+  if (!acc.signInDeleted && !acc.blocked) {
+    return (
+      <TravelerDrawer traveler={acc} onClose={onClose}
+        archivedAction={() => <RestoreButton acc={acc} onRestored={onClose} />}>
+        {archiveDetails}
+      </TravelerDrawer>
+    );
+  }
+  return (
+    <Drawer title={acc.name} subtitle={acc.email} onClose={onClose}>
+      <div style={d.stack}>
+        <div style={d.strip}>
+          <span style={{ minWidth: 0, flex: 1, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <StatusPill tone={why.tone} icon={why.icon}>{why.label}</StatusPill>
+            {acc.signInDeleted && acc.reason !== 'deleted' && <Tag icon="user-minus">Sign-in deleted too</Tag>}
+          </span>
+          {!acc.blocked && <RestoreButton acc={acc} onRestored={onClose} />}
+        </div>
+        <Facts items={[
+          ['Archived', fmtDay(acc.archivedAt)],
+          ['Sign-in deleted', acc.accountDeletedAt ? fmtDay(acc.accountDeletedAt) : null],
+          ['Joined', acc.createdAt ? fmtDay(acc.createdAt) : 'Unknown'],
+          ['Last active', acc.lastActiveAt ? timeAgo(acc.lastActiveAt) : '—'],
+          ['Lived in', acc.municipality || '—'],
+          ['Points', fmtNum(acc.points)],
+          ['Spots visited', fmtNum(acc.counts.visits)],
+          ['Reviews', fmtNum(acc.counts.reviews)],
+          ['Spot badges', fmtNum(acc.counts.badges)],
+        ]} />
+        {archiveDetails}
+        <p style={d.note}>
+          Kept for good and hidden from the leaderboard, reviews and ratings until it’s restored.
+          {acc.signInDeleted && !acc.blocked && ' Restoring makes a new sign-in for the same email.'}
+        </p>
+      </div>
     </Drawer>
   );
 }
@@ -787,17 +778,8 @@ const a = {
   footer: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' },
   toolbarEnd: { marginLeft: 'auto', display: 'flex', gap: 8, flexWrap: 'wrap' },
   warn:   { display: 'flex', alignItems: 'flex-start', gap: 6, margin: 0, fontSize: 13, color: t.textSecondary, lineHeight: 1.45 },
-  stack:  { display: 'flex', flexDirection: 'column', gap: 18 },
-  facts:  { margin: 0, display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 10 },
-  fact:   { padding: '10px 12px', borderRadius: radius.md, background: t.sidebarBg, border: `1px solid ${t.border}` },
-  dt:     { ...type.label, color: t.textMuted },
-  dd:     { margin: '4px 0 0', fontSize: 15, fontWeight: 600, color: t.textPrimary, ...type.num },
-  h3:     { fontSize: 13, fontWeight: 700, color: t.textPrimary, margin: '0 0 10px' },
-  record: { margin: 0, paddingLeft: 18, fontSize: 13, color: t.textSecondary, lineHeight: 1.6 },
-  note:   { fontSize: 12, color: t.textMuted, margin: 0 },
   link:   { padding: 0, border: 'none', background: 'none', font: 'inherit', color: t.brand, textDecoration: 'underline', cursor: 'pointer' },
   clip:   { maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   blocked: { maxWidth: 210, color: t.textSecondary, lineHeight: 1.35 },
   kept:   { display: 'flex', flexDirection: 'column', gap: 1, fontSize: 13, whiteSpace: 'nowrap' },
-  archived: { display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px', borderRadius: radius.md, background: t.sidebarBg, border: `1px solid ${t.border}`, fontSize: 13, color: t.textSecondary, lineHeight: 1.5 },
 };

@@ -1,10 +1,12 @@
-import { Fragment, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { bannedAccountsAPI, appealAPI, inactiveUsersAPI, userProgressAPI } from '../api/api';
 import { notify, confirmAction } from '../components/AppAlert';
 import {
-  Page, PageHeader, Toolbar, SearchInput, FilterTabs, Table, Th, Td, Button, StatusPill,
+  Page, PageHeader, Toolbar, SearchInput, FilterTabs, Table, Th, Td, Row, Button, StatusPill,
   Loading, EmptyState, ErrorBanner, Avatar, pageStyles,
 } from '../components/Layout';
+import TravelerDrawer from '../components/TravelerDrawer';
+import { Facts, DetailSection, DetailText } from '../components/Details';
 import { fmtNum, fmtDateTime, fmtDay, timeAgo } from '../utils/format';
 import { standingLabel } from '../utils/standing';
 import { theme as t, radius } from '../theme';
@@ -29,6 +31,11 @@ const MEDAL     = { 1: '#F2CE1B', 2: '#C7D0D2', 3: '#CD8B54' };
 const MEDAL_INK = '#2C2810';
 
 const TAB = { ALL: 'all', BANS: 'bans', INACTIVE: 'inactive', PROGRESS: 'progress' };
+
+// A row in any panel opens that traveler's overview (TravelerDrawer); the
+// Suspended & Banned one adds the ban, its reason and the appeal on top, and
+// an appeal is decided there.
+const overviewOf = (u) => ({ id: u.clerkUserId, name: u.name, email: u.email });
 
 // ─── Shared: traveler cell ────────────────────────────────────────────────────
 // Used in every panel so name / email / join date always look the same.
@@ -84,6 +91,7 @@ function AllUsersPanel() {
   const [loading, setLoading] = useState(true);
   const [error,   setError]   = useState(null);
   const [search,  setSearch]  = useState('');
+  const [open,    setOpen]    = useState(null);
 
   const load = async ({ quiet = false } = {}) => {
     if (!quiet) { setLoading(true); setError(null); }
@@ -141,7 +149,7 @@ function AllUsersPanel() {
           </>}
         >
           {filtered.map(r => (
-            <tr key={r.clerkUserId}>
+            <Row key={r.clerkUserId} onOpen={() => setOpen(overviewOf(r))} label={`Overview of ${r.name}`}>
               <Td>
                 <TravelerCell
                   src={r.profileImage}
@@ -159,10 +167,12 @@ function AllUsersPanel() {
               <Td align="right">{r.spotsVisited}</Td>
               <Td align="right">{r.badges}</Td>
               <Td align="right" muted>{r.lastActiveAt ? timeAgo(r.lastActiveAt) : 'Never'}</Td>
-            </tr>
+            </Row>
           ))}
         </Table>
       )}
+
+      {open && <TravelerDrawer traveler={open} onClose={() => setOpen(null)} />}
     </>
   );
 }
@@ -175,7 +185,9 @@ function BannedAccountsPanel() {
   const [search,     setSearch]     = useState('');
   const [error,      setError]      = useState('');
   const [busyId,     setBusyId]     = useState(null);
-  const [expandedId, setExpandedId] = useState(null);
+  const [openId,     setOpenId]     = useState(null);
+  // From the live list: an unban closes it, a decided appeal shows as decided.
+  const opened = openId && users.find(u => u.clerkUserId === openId);
 
   const load = async ({ quiet = false } = {}) => {
     if (!quiet) { setLoading(true); setError(''); }
@@ -212,7 +224,6 @@ function BannedAccountsPanel() {
     setBusyId(clerkUserId);
     try {
       await appealAPI.decide(clerkUserId, decision);
-      setExpandedId(null);
       await load();
     } catch (err) {
       notify(
@@ -270,109 +281,107 @@ function BannedAccountsPanel() {
           {filtered.map(u => {
             const hasAppeal = !!u.appealStatus && u.appealStatus !== 'none';
             const appeal    = APPEAL_STATUS[u.appealStatus];
-            const expanded  = expandedId === u.clerkUserId;
             const busy      = busyId === u.clerkUserId;
 
             return (
-              <Fragment key={u.clerkUserId}>
-                <tr>
-                  <Td>
-                    <TravelerCell
-                      src={u.profileImage}
-                      name={u.name}
-                      email={u.email}
-                      createdAt={u.createdAt}
-                    />
-                  </Td>
-                  <Td>
-                    <span style={pageStyles.clampCell} title={u.banReason}>
-                      {u.banReason || '—'}
-                    </span>
-                  </Td>
-                  {/* "Warning 3 · Suspension 1": every warning ever given (QA
-                      2026-10-16), not warningCount, which restarts after two. */}
-                  <Td muted={!standingLabel({ warnings: u.warningsGiven ?? u.warningCount, suspensions: u.suspensionCount })}>
-                    {standingLabel({ warnings: u.warningsGiven ?? u.warningCount, suspensions: u.suspensionCount }) || 'No warnings'}
-                  </Td>
-                  <Td>
-                    <div style={pageStyles.pillStack}>
-                      {u.isPermanent
-                        ? <StatusPill tone="danger"  icon="slash">Permanent ban</StatusPill>
-                        : <StatusPill tone="warning" icon="clock">{remaining(u.suspendedUntil)}</StatusPill>}
-                      {appeal && (
-                        <StatusPill tone={appeal.tone} icon={appeal.icon}>{appeal.label}</StatusPill>
-                      )}
-                    </div>
-                  </Td>
-                  <Td align="right">
-                    <div style={pageStyles.cellActions}>
-                      {hasAppeal && (
-                        <Button
-                          size="sm"
-                          icon={expanded ? 'chevron-up' : 'chevron-down'}
-                          onClick={() => setExpandedId(expanded ? null : u.clerkUserId)}
-                        >
-                          {expanded ? 'Hide appeal' : 'View appeal'}
-                        </Button>
-                      )}
-                      <Button
-                        size="sm"
-                        variant="subtle"
-                        disabled={busy}
-                        onClick={() => handleUnban(u.clerkUserId)}
-                      >
-                        Unban
+              <Row key={u.clerkUserId} onOpen={() => setOpenId(u.clerkUserId)} label={`Details of ${u.name || 'this traveler'}`}>
+                <Td>
+                  <TravelerCell
+                    src={u.profileImage}
+                    name={u.name}
+                    email={u.email}
+                    createdAt={u.createdAt}
+                  />
+                </Td>
+                <Td>
+                  <span style={pageStyles.clampCell} title={u.banReason}>
+                    {u.banReason || '—'}
+                  </span>
+                </Td>
+                {/* "Warning 3 · Suspension 1": every warning ever given (QA
+                    2026-10-16), not warningCount, which restarts after two. */}
+                <Td muted={!standingLabel({ warnings: u.warningsGiven ?? u.warningCount, suspensions: u.suspensionCount })}>
+                  {standingLabel({ warnings: u.warningsGiven ?? u.warningCount, suspensions: u.suspensionCount }) || 'No warnings'}
+                </Td>
+                <Td>
+                  <div style={pageStyles.pillStack}>
+                    {u.isPermanent
+                      ? <StatusPill tone="danger"  icon="slash">Permanent ban</StatusPill>
+                      : <StatusPill tone="warning" icon="clock">{remaining(u.suspendedUntil)}</StatusPill>}
+                    {appeal && (
+                      <StatusPill tone={appeal.tone} icon={appeal.icon}>{appeal.label}</StatusPill>
+                    )}
+                  </div>
+                </Td>
+                <Td align="right">
+                  <div style={pageStyles.cellActions}>
+                    {hasAppeal && (
+                      <Button size="sm" icon="message-square" onClick={() => setOpenId(u.clerkUserId)}>
+                        View appeal
                       </Button>
-                    </div>
-                  </Td>
-                </tr>
-
-                {expanded && (
-                  <tr>
-                    <td colSpan={5} style={pageStyles.panel}>
-                      <p style={pageStyles.panelLabel}>Appeal sent {fmtDateTime(u.appealedAt)}</p>
-                      <p style={{ ...pageStyles.itemText, margin: 0, whiteSpace: 'pre-wrap' }}>
-                        {u.appealText || '(No appeal text provided.)'}
-                      </p>
-                      {u.appealDeadline && (
-                        <p style={pageStyles.panelNote}>
-                          {new Date(u.appealDeadline) < new Date()
-                            ? 'Appeals for this ban closed on '
-                            : 'Appeals for this ban close on '}
-                          {fmtDay(u.appealDeadline)}. The account stays archived until you decide; it is never deleted.
-                        </p>
-                      )}
-                      {u.appealStatus === 'submitted' ? (
-                        <div style={pageStyles.buttonRow}>
-                          <Button
-                            variant="success"
-                            icon="check"
-                            disabled={busy}
-                            onClick={() => handleAppealDecision(u.clerkUserId, 'approved')}
-                          >
-                            Approve &amp; unban
-                          </Button>
-                          <Button
-                            variant="danger"
-                            icon="x"
-                            disabled={busy}
-                            onClick={() => handleAppealDecision(u.clerkUserId, 'rejected')}
-                          >
-                            Reject
-                          </Button>
-                        </div>
-                      ) : (
-                        <p style={pageStyles.panelNote}>
-                          This appeal has already been {u.appealStatus}.
-                        </p>
-                      )}
-                    </td>
-                  </tr>
-                )}
-              </Fragment>
+                    )}
+                    <Button
+                      size="sm"
+                      variant="subtle"
+                      disabled={busy}
+                      onClick={() => handleUnban(u.clerkUserId)}
+                    >
+                      Unban
+                    </Button>
+                  </div>
+                </Td>
+              </Row>
             );
           })}
         </Table>
+      )}
+
+      {opened && (
+        <TravelerDrawer traveler={overviewOf(opened)} onClose={() => setOpenId(null)}>
+          <BanDetails u={opened} busy={busyId === opened.clerkUserId} onDecide={handleAppealDecision} />
+        </TravelerDrawer>
+      )}
+    </>
+  );
+}
+
+// The ban or suspension, its reason in full, and the appeal with its decision.
+// The standing itself (Banned, Suspended) is the overview's own pill above.
+function BanDetails({ u, busy, onDecide }) {
+  const appeal = APPEAL_STATUS[u.appealStatus];
+  const record = standingLabel({ warnings: u.warningsGiven ?? u.warningCount, suspensions: u.suspensionCount });
+  return (
+    <>
+      <Facts items={[
+        ['Banned', u.isPermanent ? (u.bannedAt ? fmtDay(u.bannedAt) : 'For good') : null],
+        ['Suspended until', !u.isPermanent && u.suspendedUntil ? `${fmtDateTime(u.suspendedUntil)} (${remaining(u.suspendedUntil).toLowerCase()})` : null],
+        ['Record', record || 'No warnings'],
+      ]} />
+      <DetailSection title="Reason">
+        <DetailText>{u.banReason || 'No reason was written down.'}</DetailText>
+      </DetailSection>
+      {appeal && (
+        <DetailSection title={`Appeal${u.appealedAt ? `, sent ${fmtDateTime(u.appealedAt)}` : ''}`}>
+          <DetailText>{u.appealText || '(No appeal text provided.)'}</DetailText>
+          {u.appealDeadline && (
+            <p style={pageStyles.panelNote}>
+              {new Date(u.appealDeadline) < new Date() ? 'Appeals for this ban closed on ' : 'Appeals for this ban close on '}
+              {fmtDay(u.appealDeadline)}. The account stays archived until you decide; it is never deleted.
+            </p>
+          )}
+          {u.appealStatus === 'submitted' ? (
+            <div style={pageStyles.buttonRow}>
+              <Button variant="success" icon="check" disabled={busy} onClick={() => onDecide(u.clerkUserId, 'approved')}>
+                Approve &amp; unban
+              </Button>
+              <Button variant="danger" icon="x" disabled={busy} onClick={() => onDecide(u.clerkUserId, 'rejected')}>
+                Reject
+              </Button>
+            </div>
+          ) : (
+            <p style={pageStyles.panelNote}>This appeal has already been {u.appealStatus}.</p>
+          )}
+        </DetailSection>
       )}
     </>
   );
@@ -386,6 +395,7 @@ function InactiveUsersPanel() {
   const [loading, setLoading] = useState(true);
   const [error,   setError]   = useState(null);
   const [acting,  setActing]  = useState(null);
+  const [open,    setOpen]    = useState(null);
 
   const load = async ({ quiet = false } = {}) => {
     if (!quiet) { setLoading(true); setError(null); }
@@ -443,7 +453,7 @@ function InactiveUsersPanel() {
           {users.map(u => {
             const busy = acting === u.clerkUserId;
             return (
-              <tr key={u.clerkUserId}>
+              <Row key={u.clerkUserId} onOpen={() => setOpen(overviewOf(u))} label={`Overview of ${u.name || 'this traveler'}`}>
                 <Td>
                   <TravelerCell
                     src={u.profileImage}
@@ -479,11 +489,13 @@ function InactiveUsersPanel() {
                     </Button>
                   )}
                 </Td>
-              </tr>
+              </Row>
             );
           })}
         </Table>
       )}
+
+      {open && <TravelerDrawer traveler={open} onClose={() => setOpen(null)} />}
     </>
   );
 }
@@ -506,6 +518,7 @@ function TravelerProgressPanel() {
   const [error,   setError]   = useState(null);
   const [search,  setSearch]  = useState('');
   const [onlyExplorers, setOnlyExplorers] = useState(false);
+  const [open,    setOpen]    = useState(null);
 
   const load = async ({ quiet = false } = {}) => {
     if (!quiet) { setLoading(true); setError(null); }
@@ -598,7 +611,7 @@ function TravelerProgressPanel() {
           </>}
         >
           {visible.map(r => (
-            <tr key={r.clerkUserId}>
+            <Row key={r.clerkUserId} onOpen={() => setOpen(overviewOf(r))} label={`Overview of ${r.name}`}>
               <Td>
                 <span style={{
                   ...rankStyle,
@@ -626,10 +639,12 @@ function TravelerProgressPanel() {
               <Td align="right">{r.townsFinished ?? 0}</Td>
               <Td align="right">{r.missionsCompleted}</Td>
               <Td align="right" muted>{r.lastActiveAt ? timeAgo(r.lastActiveAt) : 'Never'}</Td>
-            </tr>
+            </Row>
           ))}
         </Table>
       )}
+
+      {open && <TravelerDrawer traveler={open} onClose={() => setOpen(null)} />}
     </>
   );
 }

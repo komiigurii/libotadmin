@@ -187,6 +187,31 @@ export function Td({ children, align = 'left', muted = false, strong = false, st
   );
 }
 
+/* A row that opens its details (2026-10-23: every table's rows open what they
+   show). The whole row takes the click, except a button, link or field inside
+   it, which keeps its own; dragging to select text doesn't open it. Tab
+   reaches it and Enter or Space opens it. `label` names what opens, for the
+   tooltip and screen readers ("Details of Ana Cruz"). */
+const OWN_CLICK = 'button, a, input, select, textarea, label, [role="button"]';
+
+export function Row({ onOpen, label, children }) {
+  const click = (e) => {
+    if (e.target.closest(OWN_CLICK)) return;
+    if (window.getSelection?.().toString()) return;
+    onOpen();
+  };
+  const key = (e) => {
+    if (e.target !== e.currentTarget || (e.key !== 'Enter' && e.key !== ' ')) return;
+    e.preventDefault();
+    onOpen();
+  };
+  return (
+    <tr className="row-open" tabIndex={0} title={label} aria-label={label} onClick={click} onKeyDown={key}>
+      {children}
+    </tr>
+  );
+}
+
 /* ── Avatar ───────────────────────────────────────────────────────
    A person's profile photo, falling back to their initials.
 

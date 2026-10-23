@@ -2,10 +2,11 @@ import { useCallback, useEffect, useId, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { systemAPI } from '../api/api';
 import {
-  Page, PageHeader, Button, StatusPill, Table, Th, Td, Loading, ErrorBanner, FilterTabs,
+  Page, PageHeader, Button, StatusPill, Table, Th, Td, Row, Loading, ErrorBanner, FilterTabs,
   pageStyles as s,
 } from '../components/Layout';
 import Pagination from '../components/Pagination';
+import MaintenanceDrawer from '../components/MaintenanceDrawer';
 import { notify, confirmAction, promptAction } from '../components/AppAlert';
 import Icon from '../components/Icon';
 import { publishHeartbeat } from '../auth/heartbeat';
@@ -556,6 +557,7 @@ function ToolsCard() {
 function MaintenanceLog() {
   const [data, setData] = useState(null);
   const [page, setPage] = useState(1);
+  const [open, setOpen] = useState(null);
   // A window ending adds its row (a failed reload keeps the rows shown).
   const changed = useLiveTick(['system']);
   useEffect(() => {
@@ -578,7 +580,7 @@ function MaintenanceLog() {
             <>
               <Table bare caption="Maintenance log" head={<><Th>Started</Th><Th>Length</Th><Th>By</Th><Th>What was done</Th></>}>
                 {data.logs.map((l) => (
-                  <tr key={l._id}>
+                  <Row key={l._id} onOpen={() => setOpen(l)} label={`Maintenance started ${fmtDateTime(l.startedAt)}`}>
                     <Td style={{ whiteSpace: 'nowrap' }}><span className="sa-mono">{fmtDateTime(l.startedAt)}</span></Td>
                     <Td muted style={{ whiteSpace: 'nowrap' }}>{l.endedAt ? <span className="sa-mono">{duration(l.startedAt, l.endedAt)}</span> : <StatusPill tone="warning" icon="clock">Going on</StatusPill>}</Td>
                     <Td muted>{l.startedBy?.username || '—'}{l.endedBy?.username && l.endedBy.username !== l.startedBy?.username ? ` → ${l.endedBy.username}` : ''}</Td>
@@ -587,12 +589,13 @@ function MaintenanceLog() {
                         {l.summary || (l.endedAt ? '—' : l.message || 'Not ended yet')}
                       </span>
                     </Td>
-                  </tr>
+                  </Row>
                 ))}
               </Table>
               {data.pages > 1 && <div style={{ padding: '10px 16px' }}><Pagination page={data.page} pages={data.pages} onChange={setPage} label="Maintenance log pages" /></div>}
             </>
           )}
+      {open && <MaintenanceDrawer log={open} length={open.endedAt ? duration(open.startedAt, open.endedAt) : null} onClose={() => setOpen(null)} />}
     </Section>
   );
 }
