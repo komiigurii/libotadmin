@@ -3,14 +3,13 @@ import { townBadgeAPI, uploadAPI } from '../api/api';
 import { theme as t, radius, fonts } from '../theme';
 import { Page, PageHeader, Toolbar, FilterTabs, Button, Loading, ErrorBanner, EmptyState, pageStyles } from '../components/Layout';
 import Icon from '../components/Icon';
-import TownSeal from '../components/TownSeal';
 import { notify } from '../components/AppAlert';
 import { useLive } from '../api/live';
 
 // Town Badges — a traveler earns a town's badge by finishing every mission at
 // every spot in it, and finishing towns earns titles (LibotBackend
-// utils/achievements.js). Here the admin sets each town's badge image; a town
-// with no image shows the seal the app draws. The name and wording are the
+// utils/achievements.js). Here the admin sets each town's badge image, and that
+// image is the badge — no drawn stand-in. The name and wording are the
 // same pattern for every town and can't be edited (mock defense notes,
 // 2026-10-23: edited wording would make the achievements inconsistent), so a
 // save also puts back any wording changed before. Admins only, like the
@@ -58,7 +57,7 @@ function TownCard({ town, onSaved }) {
       onSaved(town.municipality, badge);
       notify(url
         ? `${town.municipality}'s badge image is saved. Travelers see it next time they open their achievements.`
-        : `${town.municipality}'s badge shows the drawn seal again.`, { tone: 'success', title: 'Saved' });
+        : `${town.municipality}'s badge image is removed.`, { tone: 'success', title: 'Saved' });
     } catch (err) {
       setError(err?.response?.data?.message || err.message || 'Could not save');
     }
@@ -83,9 +82,15 @@ function TownCard({ town, onSaved }) {
   return (
     <article style={s.card} aria-label={`${town.municipality} badge`}>
       <div style={s.art}>
-        {image
-          ? <img src={image} alt="" style={s.artImg} onError={() => setError('That image link is broken — upload it again.')} />
-          : <TownSeal town={town.municipality} size={112} />}
+        {image ? (
+          <img src={image} alt="" style={s.artImg} onError={() => setError('That image link is broken — upload it again.')} />
+        ) : (
+          <button type="button" style={s.emptyArt} onClick={() => fileRef.current?.click()} disabled={busy}
+            aria-label={`Upload ${town.municipality}'s badge image`}>
+            <Icon name="image" size={22} />
+            <span>No image</span>
+          </button>
+        )}
       </div>
 
       <div style={s.cardBody}>
@@ -103,7 +108,7 @@ function TownCard({ town, onSaved }) {
           <Button size="sm" icon="image" onClick={() => fileRef.current?.click()} disabled={busy}>
             {busy ? 'Saving…' : image ? 'Replace image' : 'Upload image'}
           </Button>
-          {image && <Button size="sm" variant="danger" onClick={() => saveImage('')} disabled={busy}>Use the seal</Button>}
+          {image && <Button size="sm" variant="danger" onClick={() => saveImage('')} disabled={busy}>Remove image</Button>}
           <input ref={fileRef} type="file" accept="image/png,image/webp,image/jpeg" onChange={pick} style={{ display: 'none' }} />
         </div>
         {error && <p style={s.error} role="alert"><Icon name="alert-triangle" size={12} /> {error}</p>}
@@ -156,8 +161,7 @@ export default function TownBadges() {
         <div style={s.note}>
           <Icon name="info" size={14} />
           <span>
-            {missingArt} of {withSpots.length} towns with spots have no badge image yet. Until they do, the app shows
-            the drawn seal you see here — with the town's name and the Libot star.
+            {missingArt} of {withSpots.length} towns with spots have no badge image yet.
           </span>
         </div>
       )}
@@ -199,6 +203,11 @@ const s = {
     width: 112, height: 112, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
   },
   artImg: { width: 112, height: 112, objectFit: 'contain', borderRadius: radius.md },
+  emptyArt: {
+    width: 112, height: 112, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4,
+    border: `1.5px dashed ${t.border}`, borderRadius: radius.md, background: t.bg, color: t.textMuted,
+    fontFamily: 'inherit', fontSize: 14, cursor: 'pointer',
+  },
   cardBody: { flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 6 },
   cardHead: { display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap', marginBottom: 4 },
   townName: { fontFamily: fonts.display, fontSize: 20, fontWeight: 600, letterSpacing: '-0.01em', margin: 0, color: t.textPrimary },
