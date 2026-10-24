@@ -2456,15 +2456,15 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
 
         </div>
 
-        {/* Back / Next walk the tabs. A new spot is sent from the last tab,
-            once every tab is complete (mock defense 2026-10-21: "yung submit
-            for review, dapat nasa dulo siya kapag nagawa na lahat"); an edit
-            can be saved from any tab, since it may be one field. */}
+        {/* Back / Next walk the tabs. Submit for review / Save changes only
+            shows once the user is done: on the last tab, with every tab
+            complete (mock defense 2026-10-21: "yung submit for review, dapat
+            nasa dulo siya kapag nagawa na lahat"; edits too since 10-24). */}
         <div style={styles.footer}>
           <span style={styles.requiredNote}>
-            {isNew
-              ? (onLastTab && stillMissing.length ? `Still needed on: ${stillMissing.join(', ')}` : '* Every field is required for a new spot')
-              : '* Required fields'}
+            {onLastTab && stillMissing.length
+              ? `Still needed on: ${stillMissing.join(', ')}`
+              : isNew ? '* Every field is required for a new spot' : '* Required fields'}
           </span>
           <div style={styles.footerRight}>
             <button onClick={handleCancelClick} style={styles.cancelBtn} className="modern-btn" disabled={busy}>Cancel</button>
@@ -2475,15 +2475,14 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
             )}
             {!onLastTab && (
               <button onClick={() => selectTab(TABS[tabIndex + 1].id)}
-                style={isNew ? styles.saveBtn : styles.cancelBtn} className="modern-btn" disabled={busy}>
+                style={styles.saveBtn} className="modern-btn" disabled={busy}>
                 Next <Icon name="chevron-right" size={13} />
               </button>
             )}
-            {(!isNew || onLastTab) && (
+            {onLastTab && !stillMissing.length && (
               <button onClick={handleSave}
-                style={{ ...styles.saveBtn, opacity: busy || (isNew && stillMissing.length) ? 0.6 : 1 }}
-                className="modern-btn" disabled={busy || (isNew && stillMissing.length > 0)}
-                title={isNew && stillMissing.length ? `Still needed on: ${stillMissing.join(', ')}` : undefined}>
+                style={{ ...styles.saveBtn, opacity: busy ? 0.6 : 1 }}
+                className="modern-btn" disabled={busy}>
                 {busy
                   ? 'Saving…'
                   : !isModerator
