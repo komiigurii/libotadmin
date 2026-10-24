@@ -62,13 +62,14 @@ const ADMIN_NAV = [
   ] },
   { group: 'Content', items: [
     { label: 'Spot Management', path: '/spots', icon: 'map-pin', badge: 'approvals', hint: 'Every spot, and the moderators’ requests in the Approval Queue', keys: 'spots add edit delete approval queue requests map ar food' },
+    { label: 'Municipality & District Badges', path: '/town-badges', icon: 'star', hint: 'The municipalities and districts travelers have finished, and their badge images', keys: 'badge municipality town district title bronze silver gold goat' },
   ] },
   { group: 'Community', items: [
     { label: 'Rate and Review', path: '/comments', icon: 'message-square', hint: 'Every review travelers have left', keys: 'reviews comments filter warn suspend ban delete' },
   ] },
   { group: 'Travelers', items: [
     { label: 'User Management', path: '/user-management', icon: 'user', hint: 'Manage user accounts and permissions', keys: 'user management accounts permissions' },
-    { label: 'Municipality & District Badges', path: '/town-badges', icon: 'star', hint: 'The municipalities and districts travelers have finished, and their badge images', keys: 'badge municipality town district title bronze silver gold goat' },
+    
   ] },
   { group: 'Team', items: [
     { label: 'Moderators Management', path: '/moderators', icon: 'users', hint: 'The municipalities’ moderator accounts', keys: 'moderator lgu account add reset slip municipality town' },
