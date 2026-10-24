@@ -3,6 +3,7 @@ import { useLocation } from 'react-router-dom';
 import { Page, PageHeader } from '../components/Layout';
 import { publishHeartbeat, useHeartbeat } from '../auth/heartbeat';
 import { spotAPI } from '../api/api';
+import { useLiveTick } from '../api/live';
 import { fmtNum } from '../utils/format';
 import Spots from './Spots';
 import ModRequests from './ModRequests';
@@ -34,7 +35,9 @@ export default function SpotManagement() {
     publishHeartbeat({ pendingApprovals: n });
   }, []);
 
-  // The Spots tab reports its own count; on the queue, ask for it.
+  // The Spots tab reports its own count; on the queue, ask for it, and again
+  // when spots change (an approval adds one).
+  const spotsChanged = useLiveTick(['spots']);
   useEffect(() => {
     if (!onApprovals) return undefined;
     let live = true;
@@ -42,7 +45,7 @@ export default function SpotManagement() {
       .then((d) => { if (live) setSpotCount((d || []).length); })
       .catch(() => {});
     return () => { live = false; };
-  }, [onApprovals]);
+  }, [onApprovals, spotsChanged]);
 
   const pending = waiting ?? beat?.pendingApprovals ?? null;
 

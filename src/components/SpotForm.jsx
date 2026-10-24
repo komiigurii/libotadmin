@@ -4,6 +4,7 @@ import 'leaflet/dist/leaflet.css';
 import './SpotMap.css';
 import { theme as t, radius, shadow, type } from '../theme';
 import { uploadAPI, missionAPI, categoryAPI, spotAPI, municipalityAPI } from '../api/api';
+import { useLiveTick } from '../api/live';
 import { notify, confirmAction } from './AppAlert';
 import Icon from './Icon';
 import { Loading } from './Skeleton';
@@ -1360,6 +1361,10 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
   // Categories now come from the database. Seeded with the fallback so the
   // chips render on first paint rather than popping in.
   const [categories, setCategories] = useState(FALLBACK_CATEGORIES);
+  // Both lists below load again when they change while the form is open: a
+  // category added, or another spot placed nearby. Neither touches the fields.
+  const categoriesChanged = useLiveTick(['categories']);
+  const spotsChanged = useLiveTick(['spots']);
   useEffect(() => {
     let cancelled = false;
     categoryAPI.getAll()
@@ -1370,7 +1375,7 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
       })
       .catch(() => { /* keep the fallback */ });
     return () => { cancelled = true; };
-  }, []);
+  }, [categoriesChanged]);
 
   // Every published spot, so the Location map can show whether this one's
   // arrival ring overlaps another's. All cities, not just this moderator's:
@@ -1381,9 +1386,10 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
     let cancelled = false;
     spotAPI.getAll()
       .then((rows) => { if (!cancelled) setAllSpots(rows || []); })
-      .catch(() => { if (!cancelled) setAllSpots(false); });
+      // A failed live reload keeps the spots already shown.
+      .catch(() => { if (!cancelled) setAllSpots((prev) => (prev ? prev : false)); });
     return () => { cancelled = true; };
-  }, []);
+  }, [spotsChanged]);
 
   const otherSpots = useMemo(
     () => (allSpots || [])

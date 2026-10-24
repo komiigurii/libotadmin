@@ -1,6 +1,7 @@
 import { useEffect, useId, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { authAPI, accountsAPI, activityAPI } from '../api/api';
+import { useLiveTick } from '../api/live';
 import { saveSession, getToken, clearSession } from '../auth/session';
 import { getRole, isSuperAdmin, roleLabel } from '../auth/roles';
 import { useHeartbeat } from '../auth/heartbeat';
@@ -217,6 +218,7 @@ function MyAccount() {
 
 function MyRecentActivity() {
   const [entries, setEntries] = useState(undefined);
+  const changed = useLiveTick(['activity']);
   useEffect(() => {
     let live = true;
     (async () => {
@@ -227,11 +229,12 @@ function MyRecentActivity() {
         const data = me ? await activityAPI.get({ actor: me.id, limit: 10 }) : { entries: [] };
         if (live) setEntries(data.entries || []);
       } catch {
-        if (live) setEntries(null);
+        // A failed live reload keeps the list shown.
+        if (live) setEntries((prev) => (prev === undefined ? null : prev));
       }
     })();
     return () => { live = false; };
-  }, []);
+  }, [changed]);
   return (
     <section className="sa-panel" aria-labelledby="my-activity">
       <div className="sa-panel-head dark">
