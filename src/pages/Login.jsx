@@ -79,7 +79,7 @@ function SignInForm() {
   // page's title ("Spot Management · Libot Admin"), since the console pages
   // set it and nothing here did (mock defense notes, 2026-10-23).
   useEffect(() => {
-    document.title = `${forgot ? 'Forgot password' : 'Sign in'} · Libot Bulacan Console`;
+    document.title = `${forgot ? 'Forgot password' : 'Sign in'} · LibotBulacan Console`;
   }, [forgot]);
   // Said before signing in, so nobody tries while admins and moderators can't.
   const [maintenance, setMaintenance] = useState(null);
@@ -165,7 +165,7 @@ function SignInForm() {
 
   return (
     <div className="signin">
-      <aside className="signin-rail" aria-label="Libot Bulacan" style={{ backgroundImage: `url(${loginBg})` }}>
+      <aside className="signin-rail" aria-label="LibotBulacan" style={{ backgroundImage: `url(${loginBg})` }}>
         {/* The sidebar's brand block, larger. */}
         <div className="signin-brand" style={s.brand}>
           <span className="signin-emblem" style={s.emblem}>

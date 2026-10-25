@@ -205,7 +205,7 @@ export default function ConsoleShell({ children }) {
         <button type="button" className="sa-icon-btn sa-drawer-close" onClick={() => setDrawer(false)} aria-label="Close menu">
           <Icon name="x" size={18} />
         </button>
-        <button type="button" className="sa-brand" onClick={() => navigate('/dashboard')} aria-label={`Libot Bulacan ${kind.name}, go to the dashboard`}>
+        <button type="button" className="sa-brand" onClick={() => navigate('/dashboard')} aria-label={`LibotBulacan ${kind.name}, go to the dashboard`}>
           <img src={logo} alt="" />
           <span className="sa-brand-text sa-hide-collapsed">
             <span className="sa-brand-name">LibotBulacan</span>

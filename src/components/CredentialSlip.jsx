@@ -36,7 +36,7 @@ export default function CredentialSlip({ kind = 'new', account, tempPassword, ex
   const until = expiresAt ? fmtDateTime(expiresAt) : '';
 
   const text = [
-    'Libot Bulacan Console',
+    'LibotBulacan Console',
     `Sign in at: ${panelUrl}`,
     `Username: ${account.username}`,
     `Temporary password: ${tempPassword}`,

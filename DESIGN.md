@@ -1,5 +1,5 @@
 ---
-name: Libot Bulacan Super Admin Console
+name: LibotBulacan Super Admin Console
 description: A control room in Libot's own ink, where every count wears the hue of the chart it belongs to.
 colors:
   river-ink: "#0C2A2D"
@@ -186,7 +186,7 @@ components:
     height: "20px"
 ---
 
-# Design System: Libot Bulacan Super Admin Console
+# Design System: LibotBulacan Super Admin Console
 
 ## Overview
 
@@ -264,7 +264,7 @@ Dongle's x-height measures 0.30 em against Schibsted Grotesk's 0.53, so the face
 ### Hierarchy
 - **Display** (Knewave 400, 36px, 29px under 720px, line-height 1.02): the page title in the band. A count pill in Dongle 700 15px may sit beside it.
 - **Numeral** (Knewave 400, 34px, 28px under 720px, line-height 1): stat-strip numbers and the health panel's ping figure.
-- **Brand** (Knewave 400, 21px): "Libot Bulacan" in the rail; the avatar initial uses the same face at 14px.
+- **Brand** (Knewave 400, 21px): "LibotBulacan" in the rail; the avatar initial uses the same face at 14px.
 - **Strip Word** (Dongle 700, 25px, line-height 1.05): a word in a stat cell ("Off", "Working", a username).
 - **Title** (Dongle 700, 18px): panel titles.
 - **Body** (Dongle 400, 15 to 17px): rows, band subtitle (17px), rail links (16px), menu items (16px), jump results (17px), the jump input (19px).

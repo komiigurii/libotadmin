@@ -20,7 +20,7 @@ The thesis defense panel also evaluates the console; its notes drive changes.
 
 ## Product Purpose
 
-The back office of Libot Bulacan, the app that gets people to visit Bulacan's heritage spots in person. Staff keep spot content accurate and approved, keep the community civil, and keep the system running. Success for the super admin console is knowing at a glance whether the system is healthy and what is waiting on them, and acting on it without a developer's machine.
+The back office of LibotBulacan, the app that gets people to visit Bulacan's heritage spots in person. Staff keep spot content accurate and approved, keep the community civil, and keep the system running. Success for the super admin console is knowing at a glance whether the system is healthy and what is waiting on them, and acting on it without a developer's machine.
 
 ## Positioning
 
@@ -48,7 +48,7 @@ Nothing reaches travelers without approval, and nothing is erased: accounts are 
 
 ## Brand Commitments
 
-- Name: **Libot Bulacan**. Logo: the yellow rounded square with a white eight-point compass star (`src/assets/logo.png`).
+- Name: **LibotBulacan**. Logo: the yellow rounded square with a white eight-point compass star (`src/assets/logo.png`).
 - Voice: plain, honest and specific; say what happened and what to do next.
 - Not an official government or tourism-office tool, and must not look like one.
 - The user rejects generic "AI-made" interfaces; lead with real data and specific wording.

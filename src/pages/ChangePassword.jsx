@@ -134,7 +134,7 @@ export function SetPassword() {
   };
   return (
     <div className="signin">
-      <aside className="signin-rail" aria-label="Libot Bulacan" style={{ backgroundImage: `url(${loginBg})` }}>
+      <aside className="signin-rail" aria-label="LibotBulacan" style={{ backgroundImage: `url(${loginBg})` }}>
         <div style={f.brand}>
           <img src={logo} alt="" style={f.logo} />
           <div style={f.wordmark}>LibotBulacan</div>
