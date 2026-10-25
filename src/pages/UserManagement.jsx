@@ -458,20 +458,25 @@ const isMuted  = (u) => new Date(u.commentMuteUntil) > Date.now();
 // An older backend sends no warningsOpen: every warning can still be lifted.
 const openWarnings = (u) => u.warningsOpen ?? (u.warnings || []).length;
 
+// One lift per row, and it lifts everything against the traveler (their
+// warnings too), so they leave this list (user request 2026-10-25). What was
+// lifted stays on their record, marked lifted.
+const andWarnings = (open) => (open > 0 ? ` Their ${open > 1 ? 'warnings are' : 'warning is'} lifted too.` : '');
 const LIFT = {
   ban: {
     label: 'Lift ban', call: bannedAccountsAPI.unban,
-    ask: (n) => `Lift the ban on ${n}? Their account leaves the archive and opens again, and their reviews and place on the leaderboard show again.`,
+    ask: (n, open) => `Lift the ban on ${n}? Their account leaves the archive and opens again, and their reviews and place on the leaderboard show again.${andWarnings(open)}`,
   },
   suspension: {
     label: 'Lift suspension', call: bannedAccountsAPI.unban,
-    ask: (n) => `Lift the suspension on ${n}? They can use their account again now. It stays on their record but no longer counts toward a ban.`,
+    ask: (n, open) => `Lift the suspension on ${n}? They can use their account again now, and it no longer counts toward a ban.${andWarnings(open)}`,
   },
   warning: {
     label: 'Lift warning', call: bannedAccountsAPI.liftWarning,
-    ask: (n, open) => `Lift ${open > 1 ? `the ${open} warnings` : 'the warning'} on ${n}? Their reviews are no longer muted. ${open > 1 ? 'They stay' : 'It stays'} on their record, and their next warning counts as a 1st again.`,
+    ask: (n, open) => `Lift ${open > 1 ? `the ${open} warnings` : 'the warning'} on ${n}? Their reviews are no longer muted, and their next warning counts as a 1st again.`,
   },
 };
+const liftOf = (status) => (status === 'banned' ? 'ban' : status === 'suspended' ? 'suspension' : 'warning');
 
 function BannedAccountsPanel() {
   const [users,      setUsers]      = useState([]);
@@ -499,12 +504,11 @@ function BannedAccountsPanel() {
   useEffect(() => { load(); }, []);
   useLive(['travelers'], () => load({ quiet: true }));
 
-  // Lift a ban, a suspension or the warnings (2026-10-25). A lifted one stays
-  // on the record, marked lifted; a traveler with warnings on record stays
-  // listed, as warned.
+  // Lift a ban, a suspension or the warnings (2026-10-25): the traveler
+  // leaves this list, and an open drawer closes with their row.
   const handleLift = async (u, what) => {
     const lift = LIFT[what];
-    if (!(await confirmAction(lift.ask(u.name || 'this traveler', u.warningsOpen), { confirmText: lift.label }))) return;
+    if (!(await confirmAction(lift.ask(u.name || 'this traveler', openWarnings(u)), { confirmText: lift.label }))) return;
     setBusyId(u.clerkUserId);
     try {
       const res = await lift.call(u.clerkUserId);
@@ -632,36 +636,23 @@ function BannedAccountsPanel() {
                     {status === 'suspended' && <StatusPill tone="warning" icon="clock">{remaining(u.suspendedUntil)}</StatusPill>}
                     {status === 'warned' && (isMuted(u)
                       ? <StatusPill tone="warning" icon="alert-triangle">Muted · {remaining(u.commentMuteUntil).toLowerCase()}</StatusPill>
-                      : openWarnings(u) > 0
-                        ? <StatusPill tone="neutral" icon="alert-triangle">Warned</StatusPill>
-                        : <StatusPill tone="success" icon="check">Warnings lifted</StatusPill>)}
+                      : <StatusPill tone="neutral" icon="alert-triangle">Warned</StatusPill>)}
                     {appeal && (
                       <StatusPill tone={appeal.tone} icon={appeal.icon}>{appeal.label}</StatusPill>
                     )}
                   </div>
                 </Td>
                 <Td align="right">
-                  {status === 'warned' && !openWarnings(u) ? '—' : (
                   <div style={pageStyles.cellActions}>
                     {hasAppeal && (
                       <Button size="sm" icon="message-square" onClick={() => setOpenId(u.clerkUserId)}>
                         View appeal
                       </Button>
                     )}
-                    {/* A ban lifts everything; a suspension and the
-                        warnings' review mute are lifted one at a time. */}
-                    {status !== 'banned' && openWarnings(u) > 0 && (
-                      <Button size="sm" variant="subtle" disabled={busy} onClick={() => handleLift(u, 'warning')}>
-                        {LIFT.warning.label}
-                      </Button>
-                    )}
-                    {status !== 'warned' && (
-                      <Button size="sm" variant="subtle" disabled={busy} onClick={() => handleLift(u, status === 'banned' ? 'ban' : 'suspension')}>
-                        {status === 'banned' ? LIFT.ban.label : LIFT.suspension.label}
-                      </Button>
-                    )}
+                    <Button size="sm" variant="subtle" disabled={busy} onClick={() => handleLift(u, liftOf(status))}>
+                      {LIFT[liftOf(status)].label}
+                    </Button>
                   </div>
-                  )}
                 </Td>
               </Row>
             );
