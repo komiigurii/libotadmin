@@ -10,8 +10,8 @@ import { useLive } from '../api/live';
 // Badges — the tiers of achievement (LibotBackend utils/achievements.js; the
 // thesis panel, 2026-10-24): finishing every mission at a spot earns its badge
 // (iron, set only here since 2026-10-25: the spot form no longer has it, so a
-// new spot goes live without one until an admin adds it, and an image can only
-// be replaced, not removed); every spot in a town, its badge and "<Town> Traveler" (bronze);
+// new spot goes live without one until an admin adds it; removing its image
+// switches it off until a new one is set); every spot in a town, its badge and "<Town> Traveler" (bronze);
 // every town in a district that has spots, the district's badge and "District
 // 1 Traveler" (silver); every town in Bulacan, the Bulacan badge and The GOAT
 // Traveler (gold, 2026-10-25). Here the admin sets each town's and district's
@@ -65,7 +65,7 @@ const KINDS = {
     reward: (x) => (x.municipality
       ? <span>· Counts toward the <strong style={s.titleName}>{x.municipality}</strong> badge</span>
       : null),
-    canRemove: false,
+    removeNote: (name) => `${name}'s badge can't be earned until a new image is uploaded, and it leaves the app's badge list. Travelers who earned it keep it.`,
     save: (x, image) => spotBadgeAPI.save(x.spotId, image),
   },
   town: {
@@ -124,7 +124,7 @@ function BadgeCard({ item, kind, onSaved }) {
   // The image is the badge, so taking it off asks first.
   const remove = async () => {
     const ok = await confirmAction(
-      `${name}'s badge will have no image until a new one is uploaded. Travelers who earned it keep the badge and its title.`,
+      k.removeNote?.(name) || `${name}'s badge will have no image until a new one is uploaded. Travelers who earned it keep the badge and its title.`,
       { title: `Remove ${name}'s badge image?`, confirmText: 'Remove image', danger: true },
     );
     if (ok) await saveImage('');
@@ -185,7 +185,7 @@ function BadgeCard({ item, kind, onSaved }) {
           <Button size="sm" icon="image" onClick={() => fileRef.current?.click()} disabled={busy}>
             {busy ? 'Saving…' : image ? 'Replace image' : 'Upload image'}
           </Button>
-          {image && k.canRemove !== false && <Button size="sm" variant="danger" onClick={remove} disabled={busy}>Remove image</Button>}
+          {image && <Button size="sm" variant="danger" onClick={remove} disabled={busy}>Remove image</Button>}
           <input ref={fileRef} type="file" accept="image/png,image/webp,image/jpeg" onChange={pick} style={{ display: 'none' }} />
         </div>
         {error && <p style={s.error} role="alert"><Icon name="alert-triangle" size={12} /> {error}</p>}
