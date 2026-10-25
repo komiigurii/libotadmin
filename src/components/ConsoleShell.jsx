@@ -90,6 +90,7 @@ const MODERATOR_NAV = [
   ] },
   { group: 'Content', items: [
     { label: 'Spot Management', path: '/spots', icon: 'map-pin', hint: 'Your municipality’s spots: add one or propose changes', keys: 'spots add edit delete map ar food' },
+    { label: 'My Submissions', path: '/my-review-requests', icon: 'send', badge: 'submissions', hint: 'Where each request you sent stands', keys: 'requests submissions approval pending approved rejected' },
   ] },
   { group: 'Travelers', items: [
     { label: 'Travelers', path: '/my-travelers', icon: 'users', hint: 'Who visited your municipality’s spots', keys: 'travelers visitors' },
@@ -113,7 +114,7 @@ const MY_SUBMISSIONS = { label: 'My Submissions', path: '/my-review-requests', i
 const CONSOLES = {
   superadmin: { nav: SUPER_ADMIN_NAV, extra: [], name: 'Super admin console', role: 'Super admin', jump: 'maintenance, tickets, accounts' },
   admin:      { nav: [...ADMIN_NAV, HELP_NAV],     extra: [], name: 'Admin Console',     role: 'Admin',     jump: 'spots, approvals, reviews' },
-  moderator:  { nav: [...MODERATOR_NAV, HELP_NAV], extra: [MY_SUBMISSIONS], name: 'Moderator Console', role: 'Moderator', jump: 'spots, submissions, travelers' },
+  moderator: { nav: [...MODERATOR_NAV, HELP_NAV], extra: [], name: 'Moderator Console', role: 'Moderator', jump: 'spots, submissions, travelers' },
 };
 
 // How many of the newest the bell's dropdown shows.
