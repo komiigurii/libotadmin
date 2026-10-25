@@ -99,7 +99,7 @@ export const commentAPI = {
     return api.get(`/api/reviews/admin/all${query ? '?' + query : ''}`).then(r => r.data);
   },
   // Applies the next warning step to the review's author (the backend decides
-  // the mute length, and the 2nd warning also suspends the account).
+  // the mute length; a warning never suspends the account).
   warnUser: (id, warnReason)   =>
     api.patch(`/api/reviews/${id}/warn-user`, { warnReason }).then(r => r.data),
   delete: (id)                 => api.delete(`/api/reviews/admin/${id}`).then(r => r.data),

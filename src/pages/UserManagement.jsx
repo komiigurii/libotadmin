@@ -337,7 +337,7 @@ function ReportedPanel() {
 const REPORT_DECISIONS = [
   {
     key: 'warn', label: 'Warn', icon: 'alert-triangle', variant: 'warning', tone: 'warning',
-    ask: (n) => `Warn ${n}? A 1st warning mutes their reviews for 7 days; a 2nd mutes them for 14 days and suspends the account.`,
+    ask: (n) => `Warn ${n}? A 1st warning mutes their reviews for 7 days; every later one for 14 days. It doesn't suspend the account.`,
   },
   {
     key: 'suspend', label: 'Suspend', icon: 'clock', variant: 'warning', tone: 'warning',

@@ -166,7 +166,7 @@ function CommentRow({ comment, expanded, onToggle, onUpdated }) {
   };
 
   const warnUser = () => run({
-    confirm: `Warn ${userName}? A 1st warning mutes their reviews for 7 days; a 2nd mutes them for 14 days and suspends the account.`,
+    confirm: `Warn ${userName}? A 1st warning mutes their reviews for 7 days; every later one for 14 days. It doesn't suspend the account.`,
     confirmText: 'Warn',
     needsUser: false, // the backend finds the author from the review
     call: () => commentAPI.warnUser(comment._id, reason.trim()),
@@ -245,7 +245,7 @@ function CommentRow({ comment, expanded, onToggle, onUpdated }) {
             rows={2}
           />
           <p style={s.panelNote}>
-            Warnings: the 1st mutes reviews for 7 days; the 2nd mutes for 14 days and suspends the account.
+            Warnings only mute reviews: the 1st for 7 days, every later one for 14 days.
             Suspensions lock the account until they end: the 1st lasts 7 days, the 2nd 14 days; the 3rd is a permanent ban.
             Ban skips straight to permanent.
           </p>
