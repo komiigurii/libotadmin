@@ -3,10 +3,9 @@
 
    Desktop: the left side is the app's sign-in artwork and nothing else (the
    rail's own background, set in Login.jsx: no teal around it, no frame), with
-   the emblem, wordmark and slogan on it; the right side is the cream panel
-   holding the form card. ≤ 860px: the left side becomes a short band of the
-   artwork on top with the brand in a row, the slogan is dropped, and the
-   panel sits under it. */
+   the emblem, wordmark and console name on it; the right side is the cream
+   panel holding the form card. ≤ 860px: the left side becomes a short band of
+   the artwork on top with the brand in a row, and the panel sits under it. */
 
 .signin {
   display: grid;
@@ -55,7 +54,6 @@
     gap: 14px;
     padding: 18px 20px;
   }
-  .signin-slogan { display: none; }
   .signin-brand { flex-direction: row !important; align-items: center !important; gap: 12px !important; }
   .signin-brand-text { align-items: flex-start !important; }
   .signin-emblem img { width: 40px !important; height: 40px !important; border-radius: 11px !important; }

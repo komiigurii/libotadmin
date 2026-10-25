@@ -11,6 +11,8 @@ import { accountsAPI, authAPI, notificationsAPI } from '../api/api';
 import { useLive } from '../api/live';
 import { confirmAction } from './AppAlert';
 import { Button } from './Layout';
+import { notify } from './AppAlert';
+import { PasswordForm } from '../pages/ChangePassword';
 import { fmtDateTime, fmtDay, timeAgo } from '../utils/format';
 import { noticeKind } from '../utils/notificationKinds';
 import '../console.css';
@@ -23,6 +25,8 @@ import '../console.css';
  *
  *   rail      the brand, Jump to page (Ctrl K), the links in groups, and the
  *             account at the foot (View profile, Change password, Sign out).
+ *             Change password is a pop-up over the page you're on, not a page
+ *             (mock defense notes, 2026-10-26).
  *             Folds to icons from the top bar's button (remembered), always on
  *             a tablet, and becomes a drawer on a phone.
  *   top bar   the fold button, the system's state (the super admin's, or the
@@ -102,7 +106,7 @@ const HELP_NAV = { group: 'Help', items: [
 // each console's own (`extra`).
 const EXTRA = [
   { label: 'Notifications', path: '/notifications', icon: 'bell', hint: 'Everything in your bell', keys: 'bell inbox unread' },
-  { label: 'Change password', path: '/change-password', icon: 'key', hint: 'Your own password', keys: 'password security' },
+  { label: 'Change password', path: '/change-password', popup: 'password', icon: 'key', hint: 'Your own password', keys: 'password security' },
 ];
 const MY_SUBMISSIONS = { label: 'My Submissions', path: '/my-review-requests', icon: 'send', hint: 'Where each request you sent stands', keys: 'requests submissions approval pending approved rejected' };
 
@@ -139,6 +143,7 @@ export default function ConsoleShell({ children }) {
   const [drawer, setDrawer] = useState(false);
   const [jumpOpen, setJumpOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [passwordOpen, setPasswordOpen] = useState(false);
 
   // Read when the frame mounts after sign-in; SessionWatcher reloads the page
   // if the role or town changes while it's open.
@@ -164,6 +169,15 @@ export default function ConsoleShell({ children }) {
 
   // Picking a page closes the phone drawer.
   useEffect(() => { setDrawer(false); }, [location.pathname]);
+
+  // The old /change-password address lands here with this mark (App.jsx) and
+  // opens the pop-up; closing it drops the mark, so Back or a reload doesn't
+  // reopen it.
+  const askedPassword = !!location.state?.changePassword;
+  const closePassword = () => {
+    setPasswordOpen(false);
+    if (askedPassword) navigate(location.pathname + location.search, { replace: true, state: null });
+  };
   useEffect(() => {
     if (!drawer) return undefined;
     const onKey = (e) => { if (e.key === 'Escape') setDrawer(false); };
@@ -251,7 +265,7 @@ export default function ConsoleShell({ children }) {
         <AccountMenu
           account={account}
           onProfile={() => setProfileOpen(true)}
-          onPassword={() => navigate('/change-password')}
+          onPassword={() => setPasswordOpen(true)}
           onSignOut={signOut}
         />
       </nav>
@@ -274,8 +288,16 @@ export default function ConsoleShell({ children }) {
         {children}
       </div>
 
-      {jumpOpen && <JumpDialog items={[...all, ...offRail]} placeholder={kind.jump} onClose={() => setJumpOpen(false)} onGo={(p) => { setJumpOpen(false); navigate(p); }} />}
-      {profileOpen && <ProfileDialog account={account} onClose={() => setProfileOpen(false)} onPassword={() => { setProfileOpen(false); navigate('/change-password'); }} />}
+      {jumpOpen && (
+        <JumpDialog
+          items={[...all, ...offRail]}
+          placeholder={kind.jump}
+          onClose={() => setJumpOpen(false)}
+          onGo={(item) => { setJumpOpen(false); if (item.popup === 'password') setPasswordOpen(true); else navigate(item.path); }}
+        />
+      )}
+      {profileOpen && <ProfileDialog account={account} onClose={() => setProfileOpen(false)} onPassword={() => { setProfileOpen(false); setPasswordOpen(true); }} />}
+      {(passwordOpen || askedPassword) && <PasswordDialog onClose={closePassword} />}
     </div>
   );
 }
@@ -556,7 +578,7 @@ function JumpDialog({ items, placeholder, onClose, onGo }) {
   const onKey = (e) => {
     if (e.key === 'ArrowDown') { e.preventDefault(); setSel((at + 1) % Math.max(1, shown.length)); }
     else if (e.key === 'ArrowUp') { e.preventDefault(); setSel((at - 1 + shown.length) % Math.max(1, shown.length)); }
-    else if (e.key === 'Enter' && shown[at]) { e.preventDefault(); onGo(shown[at].path); }
+    else if (e.key === 'Enter' && shown[at]) { e.preventDefault(); onGo(shown[at]); }
   };
 
   return (
@@ -590,7 +612,7 @@ function JumpDialog({ items, placeholder, onClose, onGo }) {
                 aria-selected={n === at}
                 className="sa-jump-item"
                 onMouseEnter={() => setSel(n)}
-                onClick={() => onGo(i.path)}
+                onClick={() => onGo(i)}
                 tabIndex={-1}
               >
                 <Icon name={i.icon} size={18} color="var(--brand)" />
@@ -606,6 +628,30 @@ function JumpDialog({ items, placeholder, onClose, onGo }) {
           <span><kbd>↑</kbd> <kbd>↓</kbd> to choose</span>
           <span><kbd>Enter</kbd> to open</span>
           <span><kbd>Esc</kbd> to close</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Change password, over the page you're on. A click outside doesn't close it,
+// so a half-typed password isn't lost; Esc and the close button do.
+function PasswordDialog({ onClose }) {
+  const ref = useDialogFocus(onClose);
+  const titleId = useId();
+  return (
+    <div className="sa-dialog-backdrop" style={{ alignItems: 'center', paddingTop: 16 }}>
+      <div className="sa-dialog" role="dialog" aria-modal="true" aria-labelledby={titleId} ref={ref}
+        style={{ maxWidth: 460, maxHeight: 'calc(100dvh - 32px)', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ background: 'var(--sa-band)', color: 'var(--sa-shell-text)', padding: '20px 22px 16px', display: 'flex', alignItems: 'center', gap: 14, flexShrink: 0 }}>
+          <div style={{ minWidth: 0, flex: 1 }}>
+            <h2 id={titleId} style={{ margin: 0, fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 26, lineHeight: 1.05 }}>Change password</h2>
+            <p style={{ margin: '4px 0 0', fontSize: 15, color: 'var(--sa-shell-muted)' }}>You stay signed in here. Any other window or device is signed out.</p>
+          </div>
+          <button type="button" className="sa-icon-btn boxed" onClick={onClose} aria-label="Close"><Icon name="x" size={16} /></button>
+        </div>
+        <div style={{ padding: '18px 22px 20px', overflowY: 'auto' }}>
+          <PasswordForm onDone={() => { notify('Your password is changed.', { tone: 'success' }); onClose(); }} />
         </div>
       </div>
     </div>

@@ -7,6 +7,9 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 // moderators sitting on the login screen.
 import Login  from './pages/Login';
 import ConsoleShell from './components/ConsoleShell';
+// Eager too: the console's frame holds the change-password pop-up, which is
+// built from the same file.
+import { SetPassword } from './pages/ChangePassword';
 const Dashboard        = lazy(() => import('./pages/Dashboard'));
 const ModeratorSpotManagement = lazy(() => import('./pages/SpotManagement').then((m) => ({ default: m.ModeratorSpotManagement })));
 const SpotManagement   = lazy(() => import('./pages/SpotManagement'));
@@ -18,8 +21,6 @@ const MyTravelers      = lazy(() => import('./pages/MyTravelers'));
 const TownBadges      = lazy(() => import('./pages/TownBadges'));
 const Accounts         = lazy(() => import('./pages/Accounts'));
 const ActivityLog      = lazy(() => import('./pages/ActivityLog'));
-const ChangePassword   = lazy(() => import('./pages/ChangePassword'));
-const SetPassword      = lazy(() => import('./pages/ChangePassword').then((m) => ({ default: m.SetPassword })));
 const Notifications    = lazy(() => import('./pages/Notifications'));
 const Tickets          = lazy(() => import('./pages/Tickets'));
 const TicketDetail     = lazy(() => import('./pages/Tickets').then((m) => ({ default: m.TicketDetail })));
@@ -164,7 +165,9 @@ export default function App() {
 
                       {/* Every role, any time. Tickets: the super admin's queue,
                           or an admin's / moderator's own (Report a Problem). */}
-                      <Route path="/change-password"    element={<ChangePassword />} />
+                      {/* Change password is a pop-up (ConsoleShell); its old
+                          address opens it over the dashboard. */}
+                      <Route path="/change-password"    element={<Navigate to="/dashboard" replace state={{ changePassword: true }} />} />
                       <Route path="/notifications"      element={<Notifications />} />
                       <Route path="/tickets"            element={<Tickets />} />
                       <Route path="/tickets/:id"        element={<TicketDetail />} />

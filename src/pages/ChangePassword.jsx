@@ -1,15 +1,10 @@
 import { useEffect, useId, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { authAPI, accountsAPI, activityAPI } from '../api/api';
-import { useLiveTick } from '../api/live';
+import { useNavigate } from 'react-router-dom';
+import { authAPI } from '../api/api';
 import { saveSession, getToken, clearSession } from '../auth/session';
-import { getRole, isSuperAdmin, roleLabel } from '../auth/roles';
-import { useHeartbeat } from '../auth/heartbeat';
-import { actionLabel, groupOf, GROUP_HUE } from '../utils/activity';
-import { fmtDateTime, timeAgo } from '../utils/format';
+import { roleLabel } from '../auth/roles';
 import { theme as t, radius, fonts, type } from '../theme';
-import { Page, PageHeader, Button, Loading } from '../components/Layout';
-import { Bone } from '../components/Skeleton';
+import { Button } from '../components/Layout';
 import { notify } from '../components/AppAlert';
 import Icon from '../components/Icon';
 import logo from '../assets/logo.png';
@@ -25,13 +20,16 @@ import './Login.css';
  *                   opens until it's done (the server refuses everything else
  *                   with 403 mustChangePassword). Built in the sign-in page's
  *                   frame, since it's the second step of signing in.
- *   ChangePassword  /change-password — any time, from the rail's footer.
+ *   PasswordForm    the form both use. Any time after that, it opens in a
+ *                   pop-up over the page you're on (ConsoleShell's
+ *                   PasswordDialog; mock defense notes 2026-10-26: "pop-up yung
+ *                   change password sa web"), not a page of its own.
  *
  * Saving ends the account's other sessions; this one carries on with the fresh
  * token the server sends back.
  */
 
-function PasswordForm({ forced, onDone }) {
+export function PasswordForm({ forced, onDone }) {
   const ids = { cur: useId(), next: useId(), again: useId(), err: useId() };
   const [username, setUsername] = useState('');
   const [current, setCurrent] = useState('');
@@ -85,7 +83,7 @@ function PasswordForm({ forced, onDone }) {
     <div style={f.field}>
       <label htmlFor={id} style={f.label}>{label}</label>
       <input
-        id={id} type={show ? 'text' : 'password'} value={value} maxLength={PASSWORD_MAX}
+        id={id} type={show ? 'text' : 'password'} value={value} maxLength={PASSWORD_MAX} autoFocus={key === 'currentPassword'}
         onChange={(e) => { setter(e.target.value); setServerError({}); }}
         autoComplete={autoComplete} className="modern-input"
         aria-invalid={!!shown[key]} aria-describedby={shown[key] ? `${id}-err` : undefined}
@@ -161,119 +159,7 @@ export function SetPassword() {
   );
 }
 
-/** /change-password — any time, from the rail. */
-export default function ChangePassword() {
-  const navigate = useNavigate();
-  const form = (
-    <PasswordForm onDone={() => {
-      notify('Your password is changed.', { tone: 'success' });
-      navigate('/dashboard');
-    }} />
-  );
-  const subtitle = 'Choose a new password for your account. You stay signed in here; any other window or device is signed out.';
-  // The form, and beside it: for the super admin, what was done with this
-  // account lately, so a sign-in you don't recognise stands out before you
-  // change the password (only the super admin can read the activity log);
-  // for an admin or a moderator, the account itself and where to turn.
-  return (
-    <Page>
-      <PageHeader title="Change password" subtitle={subtitle} />
-      <div className="sa-grid sa-split-even">
-        <section className="sa-panel" style={{ padding: '18px 20px' }} aria-label="New password">{form}</section>
-        {isSuperAdmin() ? <MyRecentActivity /> : <MyAccount />}
-      </div>
-    </Page>
-  );
-}
-
-function MyAccount() {
-  const beat = useHeartbeat();
-  const role = getRole();
-  const city = localStorage.getItem('city') || '';
-  const rows = [
-    ['Username', beat?.username ? <span style={{ fontFamily: fonts.mono }}>{beat.username}</span> : <Bone inline w={96} h={13} />],
-    ['Role', roleLabel(role)],
-    ['Looks after', role === 'moderator' ? (city || 'No city assigned') : 'All of Bulacan'],
-  ];
-  return (
-    <section className="sa-panel" aria-labelledby="my-account">
-      <div className="sa-panel-head">
-        <h2 id="my-account" className="sa-panel-title"><Icon name="user" size={16} /> Your account</h2>
-      </div>
-      <dl style={{ margin: 0 }}>
-        {rows.map(([k, v]) => (
-          <div key={k} style={f.fact}>
-            <dt style={{ color: t.textMuted }}>{k}</dt>
-            <dd style={{ margin: 0, fontWeight: 700, color: t.textPrimary, textAlign: 'right' }}>{v}</dd>
-          </div>
-        ))}
-      </dl>
-      <p style={{ ...f.help, textAlign: 'left', margin: 0, padding: '12px 16px 14px' }}>
-        Usernames are permanent. Forgot your password later? Use “Forgot your password?” on the sign-in page: the super admin
-        gives you a new slip. Something you don’t recognise? <Link to="/tickets" style={f.inlineLink}>Report a Problem</Link>.
-      </p>
-    </section>
-  );
-}
-
-function MyRecentActivity() {
-  const [entries, setEntries] = useState(undefined);
-  const changed = useLiveTick(['activity']);
-  useEffect(() => {
-    let live = true;
-    (async () => {
-      try {
-        const { username } = await authAPI.session();
-        const { accounts } = await accountsAPI.getStaff({ role: 'superadmin' });
-        const me = (accounts || []).find((a) => a.username === username);
-        const data = me ? await activityAPI.get({ actor: me.id, limit: 10 }) : { entries: [] };
-        if (live) setEntries(data.entries || []);
-      } catch {
-        // A failed live reload keeps the list shown.
-        if (live) setEntries((prev) => (prev === undefined ? null : prev));
-      }
-    })();
-    return () => { live = false; };
-  }, [changed]);
-  return (
-    <section className="sa-panel" aria-labelledby="my-activity">
-      <div className="sa-panel-head dark">
-        <h2 id="my-activity" className="sa-panel-title">Your account lately</h2>
-        <Link to="/activity">Activity Log <Icon name="chevron-right" size={13} /></Link>
-      </div>
-      {entries === undefined ? <Loading label="Loading your activity…" kind="rows" rows={5} />
-        : entries === null ? <p style={f.pad}>Couldn’t load your activity.</p>
-          : entries.length === 0 ? <p style={f.pad}>Nothing logged for this account yet.</p>
-            : (
-              <ol style={f.recent}>
-                {entries.map((e) => {
-                  const a = actionLabel(e.action);
-                  return (
-                    <li key={e._id} style={f.recentRow}>
-                      <span style={f.recentWhat}>
-                        <span className="sa-swatch" style={{ background: `var(--s-${GROUP_HUE[groupOf(e.action)] || 'slate'})` }} aria-hidden="true" />
-                        {a.label}
-                      </span>
-                      <span style={f.recentText} title={e.summary}>{e.summary && e.summary !== a.label ? e.summary : ''}</span>
-                      <time className="sa-mono" dateTime={e.at} title={fmtDateTime(e.at)} style={{ color: t.textMuted, whiteSpace: 'nowrap' }}>{timeAgo(e.at)}</time>
-                    </li>
-                  );
-                })}
-              </ol>
-            )}
-      <p style={{ ...f.help, margin: 0, padding: '10px 16px 14px' }}>A sign-in you don’t recognise? Change the password now, then tell the team.</p>
-    </section>
-  );
-}
-
 const f = {
-  pad:        { margin: 0, padding: '14px 16px', fontSize: 15, color: t.textMuted },
-  fact:       { display: 'flex', justifyContent: 'space-between', gap: 16, padding: '10px 16px', borderBottom: `1px solid ${t.divider}`, fontSize: 16 },
-  inlineLink: { color: t.brand, fontWeight: 700 },
-  recent:     { listStyle: 'none', margin: 0, padding: 0 },
-  recentRow:  { display: 'grid', gridTemplateColumns: 'minmax(120px, auto) minmax(0, 1fr) auto', alignItems: 'center', gap: 12, padding: '9px 16px', borderBottom: `1px solid ${t.divider}`, fontSize: 15 },
-  recentWhat: { display: 'inline-flex', alignItems: 'center', gap: 8, fontWeight: 700, color: t.textPrimary, whiteSpace: 'nowrap' },
-  recentText: { color: t.textSecondary, overflowWrap: 'anywhere' },
   brand:   { display: 'flex', flexDirection: 'column', alignItems: 'flex-start', textAlign: 'left', gap: 12 },
   logo:     { width: 64, height: 64, objectFit: 'contain', borderRadius: 18, display: 'block' },
   // Ink comes from .signin-rail (the brand sits on the sign-in artwork).

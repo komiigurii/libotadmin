@@ -18,12 +18,11 @@ import './Login.css';
  * the same sidebar).
  *
  * The left side is the app's sign-in artwork (bg.png) and nothing else, no
- * teal around it, no frame. The emblem, wordmark, console name and app slogan
- * sit on it in dark ink (Login.css); the right side is the cream panel with
- * the form in a dashboard-style card.
+ * teal around it, no frame. The emblem, wordmark and console name sit on it
+ * in dark ink (Login.css); the right side is the cream panel with the form in
+ * a dashboard-style card. The "Discover, Explore, Experience Bulacan." slogan
+ * under them is gone (mock defense notes, 2026-10-26).
  */
-
-const SLOGAN = ['Discover,', 'Explore,', 'Experience', 'Bulacan.'];
 
 // Why the last session ended, as the server reported it (one session per
 // account: signing in somewhere else ends this one).
@@ -176,10 +175,6 @@ function SignInForm() {
             <div style={s.console}>Admin and moderator console</div>
           </div>
         </div>
-
-        <p className="signin-slogan" style={s.slogan}>
-          {SLOGAN.map((line, i) => <span key={line} style={s.sloganLine}>{line}{i < SLOGAN.length - 1 ? ' ' : ''}</span>)}
-        </p>
       </aside>
 
       <main className="signin-panel">
@@ -490,7 +485,7 @@ function ForgotPassword({ initialUsername, onBack }) {
 const s = {
   // ── Brand on the picture (the sidebar's brand block, scaled up). Colour
   // comes from .signin-rail: one fixed ink, since the artwork doesn't theme.
-  // Everything on the picture shares one left edge with the slogan. ──
+  // Everything on the picture shares one left edge. ──
   brand: {
     display: 'flex', flexDirection: 'column', alignItems: 'flex-start', textAlign: 'left', gap: 14,
   },
@@ -503,13 +498,6 @@ const s = {
     lineHeight: 1.1, whiteSpace: 'nowrap',
   },
   console: { marginTop: 6, fontSize: 13, fontWeight: 600 },
-  // Upright: Dongle has no italic.
-  slogan: {
-    width: '100%', maxWidth: 400, margin: 0,
-    fontFamily: fonts.display, fontWeight: 700,
-    fontSize: 'clamp(22px, 2.1vw, 28px)', lineHeight: 1.12,
-  },
-  sloganLine: { display: 'block' },
 
   // ── Panel (a dashboard card) ──
   card: {
