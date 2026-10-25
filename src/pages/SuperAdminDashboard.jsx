@@ -133,6 +133,9 @@ export default function SuperAdminDashboard() {
 
       <div className="sa-grid sa-split sa-dash">
         <div className="sa-col">
+          {/* Graphs first (2026-10-25: "graphs are prioritize"). */}
+          <div className="sa-usage sa-o-usage"><UsageCharts /></div>
+
           <section className="sa-panel sa-o-attention" aria-labelledby="dash-attention">
             <div className="sa-panel-head dark">
               <h2 id="dash-attention" className="sa-panel-title">Needs your attention</h2>
@@ -162,8 +165,6 @@ export default function SuperAdminDashboard() {
               ))}
             </ul>
           </section>
-
-          <div className="sa-usage sa-o-usage"><UsageCharts /></div>
 
           <section className="sa-panel sa-o-activity" aria-labelledby="dash-activity">
             <div className="sa-panel-head dark">

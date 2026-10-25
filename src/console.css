@@ -619,14 +619,15 @@ a.sa-cell:hover { background: var(--sa-shell-raised); }
   .sa-strip[data-n='6'] { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 /* One column. The dashboard's panels then come in the order they matter:
-   what needs you, then the server's health, then the rest. */
+   the graphs first (2026-10-25: "graphs are prioritize"), then what needs
+   you, then the server's health, then the rest. */
 @media (max-width: 860px) {
   .sa-split, .sa-split-even { grid-template-columns: minmax(0, 1fr); }
   .sa-dash > .sa-col { display: contents; }
   .sa-dash > .sa-col > * { order: 9; }
+  .sa-dash .sa-o-usage { order: 0; }
   .sa-dash .sa-o-attention { order: 1; }
   .sa-dash .sa-o-health { order: 2; }
-  .sa-dash .sa-o-usage { order: 3; }
   .sa-dash .sa-o-activity { order: 4; }
 }
 /* Tablet: the rail folds to icons whatever was chosen. */

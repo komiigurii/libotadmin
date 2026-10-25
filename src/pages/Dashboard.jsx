@@ -226,14 +226,14 @@ function StaffDashboard() {
         <ErrorBanner>Couldn&rsquo;t load {data.failed.join(', ')}. Everything else below is current.</ErrorBanner>
       )}
 
-      {/* On a phone the panels come in the order they matter (console.css,
-          .sa-o-*). */}
+      {/* Graphs first (2026-10-25: "graphs are prioritize"). On a phone the
+          panels come in the order they matter (console.css, .sa-o-*). */}
       <div className="sa-grid sa-split sa-dash">
         {isModerator ? (
           <>
             <div className="sa-col">
-              <SubmissionsPanel submissions={subs} loading={loading} />
               <VisitsPanel />
+              <SubmissionsPanel submissions={subs} loading={loading} />
               <CoveragePanel spots={spots} loading={loading} scope={city || 'your area'} />
             </div>
             <div className="sa-col">
@@ -244,8 +244,8 @@ function StaffDashboard() {
         ) : (
           <>
             <div className="sa-col">
-              <AttentionPanel attention={data?.attention} loading={loading} />
               <div className="sa-usage sa-o-usage"><UsageCharts /></div>
+              <AttentionPanel attention={data?.attention} loading={loading} />
               <QuickActions />
             </div>
             <div className="sa-col">
