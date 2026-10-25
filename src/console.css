@@ -230,10 +230,16 @@
 .sa-account { position: relative; padding: 10px; border-top: 1px solid var(--sa-shell-line); }
 .sa-account-btn {
   display: flex; align-items: center; gap: 10px; width: 100%;
-  padding: 7px 8px; border-radius: 10px; border: none; background: transparent;
+  padding: 7px 8px 7px 10px; border-radius: 10px; border: 1px solid var(--sa-shell-line-strong); background: var(--sa-band-cell);
   color: var(--sa-shell-text); cursor: pointer; text-align: left;
+  transition: background-color 0.14s ease, border-color 0.14s ease;
 }
-.sa-account-btn:hover, .sa-account-btn[aria-expanded='true'] { background: var(--sa-shell-raised); }
+/* No photo to click on, so the button wears an edge and a picker caret to
+   read as something that opens. */
+.sa-account-btn:hover, .sa-account-btn[aria-expanded='true'] { background: var(--sa-shell-raised); border-color: var(--sa-shell-muted); }
+.sa-account-btn:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+.sa-account-caret { display: grid; place-items: center; flex-shrink: 0; color: var(--sa-shell-muted); }
+.sa-account-btn:hover .sa-account-caret, .sa-account-btn[aria-expanded='true'] .sa-account-caret { color: var(--sa-shell-text); }
 /* Staff have no photo: the account button is name + role, and a person icon
    only when the rail is folded. */
 .sa-show-collapsed { display: none; }

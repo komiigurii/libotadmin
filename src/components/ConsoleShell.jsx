@@ -507,6 +507,7 @@ function AccountMenu({ account, onProfile, onPassword, onSignOut }) {
           <span className="sa-account-name">{username || account.role}</span>
           <span className="sa-account-role">{roleLine(account)}</span>
         </span>
+        <span className="sa-account-caret sa-hide-collapsed" aria-hidden="true"><Icon name="chevrons-up-down" size={16} /></span>
       </button>
     </div>
   );
