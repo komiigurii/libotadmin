@@ -1202,7 +1202,7 @@ function TravelerProgressPanel() {
 
 const TAB_META = {
   [TAB.ALL]:      { label: 'All Users' },
-  [TAB.REPORTED]: { label: 'Reported' },
+  [TAB.REPORTED]: { label: 'Reported Users' },
   [TAB.BANS]:     { label: 'Warned, Suspended & Banned' },
   [TAB.APPEALS]:  { label: 'Appeals' },
   [TAB.INACTIVE]: { label: 'Inactive' },
