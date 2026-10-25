@@ -177,7 +177,7 @@ function AllUsersPanel() {
         </Paged>
       )}
 
-      {open && <TravelerDrawer traveler={open} onClose={() => setOpen(null)} />}
+      {open && <TravelerDrawer traveler={open} onClose={() => setOpen(null)} moderate />}
     </>
   );
 }
@@ -345,7 +345,7 @@ function BannedAccountsPanel() {
       )}
 
       {opened && (
-        <TravelerDrawer traveler={overviewOf(opened)} onClose={() => setOpenId(null)}>
+        <TravelerDrawer traveler={overviewOf(opened)} onClose={() => setOpenId(null)} moderate>
           <BanDetails u={opened} busy={busyId === opened.clerkUserId} onDecide={handleAppealDecision} />
         </TravelerDrawer>
       )}
@@ -506,14 +506,14 @@ function InactiveUsersPanel() {
         </Paged>
       )}
 
-      {open && <TravelerDrawer traveler={open} onClose={() => setOpen(null)} />}
+      {open && <TravelerDrawer traveler={open} onClose={() => setOpen(null)} moderate />}
     </>
   );
 }
 
 // ─── Traveler Progress panel ──────────────────────────────────────────────────
 
-// Read-only leaderboard — actions on accounts live in the other tabs.
+// No action column: Warn, Suspend and Ban are at the bottom of a traveler's drawer.
 const rankStyle = {
   display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
   minWidth: 26, height: 26, borderRadius: radius.pill,
@@ -659,7 +659,7 @@ function TravelerProgressPanel() {
         </Paged>
       )}
 
-      {open && <TravelerDrawer traveler={open} onClose={() => setOpen(null)} />}
+      {open && <TravelerDrawer traveler={open} onClose={() => setOpen(null)} moderate />}
     </>
   );
 }

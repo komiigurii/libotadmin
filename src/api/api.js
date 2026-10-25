@@ -107,6 +107,9 @@ export const commentAPI = {
 
 export const bannedAccountsAPI = {
   getAll: () => api.get('/api/admin/banned-users').then(r => r.data.users),
+  // The warning ladder, from the traveler's overview (no review needed).
+  warn:   (clerkUserId, reason) =>
+    api.patch(`/api/admin/users/${clerkUserId}/warn`, { reason }).then(r => r.data),
   // No custom duration — the backend decides: 7 days, then 14, and the
   // 3rd suspension is a permanent ban instead, so manual and automatic
   // suspensions stay consistent.

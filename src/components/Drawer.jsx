@@ -5,9 +5,10 @@ import Icon from './Icon';
 /*
  * A panel that slides over the right side of the page: one account's history,
  * one traveler's overview. Esc or the backdrop closes it; focus moves in when
- * it opens and back to what opened it when it closes.
+ * it opens and back to what opened it when it closes. footer: a bar pinned
+ * under the scrolling body (a traveler's Warn / Suspend / Ban).
  */
-export default function Drawer({ title, subtitle, onClose, children, width = 460 }) {
+export default function Drawer({ title, subtitle, onClose, children, footer, width = 460 }) {
   const titleId = useId();
   const closeRef = useRef(null);
 
@@ -38,6 +39,7 @@ export default function Drawer({ title, subtitle, onClose, children, width = 460
           </button>
         </header>
         <div style={s.body}>{children}</div>
+        {footer && <footer style={s.foot}>{footer}</footer>}
       </aside>
     </div>
   );
@@ -60,4 +62,5 @@ const s = {
     border: 'none', background: t.cardBgHover, cursor: 'pointer',
   },
   body: { flex: 1, overflowY: 'auto', padding: '16px 22px 24px' },
+  foot: { flexShrink: 0, padding: '14px 22px 18px', borderTop: `1px solid ${t.divider}`, background: t.cardBg },
 };
