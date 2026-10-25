@@ -22,16 +22,17 @@ import { fmtDay, fmtNum, timeAgo } from '../utils/format';
  * review's actions; the backend decides each step's length.
  */
 
+// An account with nothing against it shows no pill ("Good standing" removed,
+// user request 2026-10-25).
 const STANDING = {
-  active:    { tone: 'success', icon: 'check',  label: 'Good standing' },
   muted:     { tone: 'warning', icon: 'pause',  label: 'Muted' },
   suspended: { tone: 'danger',  icon: 'pause',  label: 'Suspended' },
   banned:    { tone: 'danger',  icon: 'slash',  label: 'Banned' },
   inactive:  { tone: 'neutral', icon: 'clock',  label: 'Inactive (archived)' },
 };
 export const Standing = ({ status }) => {
-  const st = STANDING[status] || STANDING.active;
-  return <StatusPill tone={st.tone} icon={st.icon}>{st.label}</StatusPill>;
+  const st = STANDING[status];
+  return st ? <StatusPill tone={st.tone} icon={st.icon}>{st.label}</StatusPill> : null;
 };
 
 const ARCHIVE_NAME = { ban: 'banned', inactivity: 'inactive', deleted: 'deleted by the traveler' };
@@ -67,7 +68,7 @@ export default function TravelerDrawer({ traveler, onClose, archivedAction, mode
   return (
     <Drawer title={traveler.name || 'Traveler'} subtitle={traveler.email} onClose={onClose} footer={footer}>
       <div style={d.stack}>
-        {u && (
+        {u && (STANDING[u.status] || u.titleName) && (
           <div style={x.pills}>
             <Standing status={u.status} />
             {u.titleName && <StatusPill tone="info" icon="star">{u.titleName}</StatusPill>}
@@ -99,22 +100,13 @@ export default function TravelerDrawer({ traveler, onClose, archivedAction, mode
               ['Days active', fmtNum(u.counts.activeDays)],
             ]} />
 
+            <DetailSection title="Warnings, suspensions and bans">
+              <ModerationHistory items={u.moderation || []} />
+            </DetailSection>
+
             {u.recentVisits?.length > 0 && (
               <DetailSection title={u.counts.visits > u.recentVisits.length ? `Latest ${u.recentVisits.length} visits` : 'Visits'}>
                 <VisitList visits={u.recentVisits} />
-              </DetailSection>
-            )}
-
-            {(u.warningHistory.length > 0 || u.suspensionHistory.length > 0) && (
-              <DetailSection title="Record">
-                <ul style={d.record}>
-                  {u.warningHistory.map((w, i) => (
-                    <li key={`w${i}`}>Warning {i + 1}, {fmtDay(w.issuedAt)}{w.reason ? `: ${w.reason}` : ''}{w.liftedAt ? ` (lifted ${fmtDay(w.liftedAt)})` : ''}</li>
-                  ))}
-                  {u.suspensionHistory.map((s, i) => (
-                    <li key={`s${i}`}>Suspension {i + 1}, {fmtDay(s.issuedAt)}{s.reason ? `: ${s.reason}` : ''}{s.liftedAt ? ` (lifted ${fmtDay(s.liftedAt)})` : ''}</li>
-                  ))}
-                </ul>
               </DetailSection>
             )}
 
@@ -128,6 +120,49 @@ export default function TravelerDrawer({ traveler, onClose, archivedAction, mode
         )}
       </div>
     </Drawer>
+  );
+}
+
+// The whole record, newest first (user request 2026-10-25): each warning,
+// suspension and ban with its reason, who gave it and how long it ran, and
+// when one was lifted. Built by the backend (routes/accounts.js).
+const HISTORY_HUE = { warn: t.warning, suspend: t.danger, ban: t.danger, lift: t.success };
+const LIFT_TITLE = { unban: 'Ban lifted', appeal: 'Ban lifted on appeal', restore: 'Restored from the archive' };
+
+function historyTitle(e) {
+  if (e.kind === 'warn') return `Warning ${e.n}`;
+  if (e.kind === 'suspend') return e.becameBan ? `Suspension ${e.n}, a permanent ban` : `Suspension ${e.n}`;
+  if (e.kind === 'ban') return 'Permanent ban';
+  return LIFT_TITLE[e.how] || 'Ban lifted';
+}
+
+function historyMeta(e) {
+  const parts = [];
+  if (e.kind === 'warn' && e.until) parts.push(`reviews muted to ${fmtDay(e.until)}`);
+  if (e.kind === 'suspend' && e.until) parts.push(`suspended to ${fmtDay(e.until)}`);
+  if (e.liftedAt) parts.push(`lifted ${fmtDay(e.liftedAt)}`);
+  if (e.by) parts.push(`by ${e.by}`);
+  return parts.join(' · ');
+}
+
+function ModerationHistory({ items }) {
+  if (!items.length) return <p style={d.note}>No warnings, suspensions or bans.</p>;
+  return (
+    <ul style={x.history}>
+      {items.map((e, i) => (
+        <li key={i} style={x.entry}>
+          <span style={{ ...x.dot, background: HISTORY_HUE[e.kind] }} />
+          <div style={{ minWidth: 0, flex: 1 }}>
+            <div style={x.entryHead}>
+              <strong style={{ color: t.textPrimary, opacity: e.liftedAt ? 0.6 : 1 }}>{historyTitle(e)}</strong>
+              {e.at && <span className="sa-mono" style={x.when}>{fmtDay(e.at)}</span>}
+            </div>
+            {e.reason && <p style={x.reason}>{e.reason}</p>}
+            {historyMeta(e) && <p style={d.note}>{historyMeta(e)}</p>}
+          </div>
+        </li>
+      ))}
+    </ul>
   );
 }
 
@@ -213,6 +248,12 @@ function ModerationBar({ u, name, onDone }) {
 
 const x = {
   pills:   { display: 'flex', gap: 6, flexWrap: 'wrap' },
+  history: { listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column' },
+  entry:   { display: 'flex', gap: 10, padding: '8px 0', borderBottom: `1px solid ${t.divider}`, fontSize: 13.5 },
+  dot:     { width: 8, height: 8, borderRadius: '50%', flexShrink: 0, marginTop: 6 },
+  entryHead: { display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 12, flexWrap: 'wrap' },
+  when:    { color: t.textSecondary, whiteSpace: 'nowrap', fontSize: 13 },
+  reason:  { margin: '2px 0', color: t.textSecondary, lineHeight: 1.5, overflowWrap: 'anywhere' },
   actions: { display: 'flex', gap: 8 },
   action:  { flex: 1, justifyContent: 'center' },
 };

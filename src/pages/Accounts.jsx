@@ -496,6 +496,7 @@ function TravelersView({ status, title, onShowDeleted }) {
                       <div style={s.pillStack}>
                         <Standing status={u.status} />
                         {standingLabel(u) && <span style={s.itemDate}>{standingLabel(u)}</span>}
+                        {u.status === 'active' && !standingLabel(u) && <span style={s.itemDate}>—</span>}
                       </div>
                     </Td>
                     <Td align="right"><Button size="sm" onClick={() => setOpen(u)}>Overview</Button></Td>
