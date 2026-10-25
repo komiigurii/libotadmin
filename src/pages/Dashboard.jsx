@@ -12,6 +12,7 @@ import { fmtNum as fmt, plural, timeAgo, fmtDateTime } from '../utils/format';
 import { loadUsage } from '../utils/usage';
 import Icon from '../components/Icon';
 import UsageCharts, { ColumnChart } from '../components/UsageCharts';
+import { usePaged, Paged } from '../components/Pagination';
 import SuperAdminDashboard from './SuperAdminDashboard';
 import { isSuperAdmin } from '../auth/roles';
 import { useLive } from '../api/live';
@@ -183,14 +184,26 @@ function StaffDashboard() {
     : null;
   const v = (n) => (loading ? '…' : fmt(n));
 
+  // A moderator's Waiting for approval and Approved open that list in the
+  // submissions panel, on this page (2026-10-25: "it should still be the same
+  // screen"); pressed again, the panel goes back to the recent ones.
+  const [subTab, setSubTab] = useState('recent');
+  const subsRef = useRef(null);
+  const showSubs = (tab) => {
+    setSubTab((now) => (now === tab ? 'recent' : tab));
+    requestAnimationFrame(() => subsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+  };
+
   // Hues as everywhere in the consoles: teal travelers, magenta arrivals,
   // orange reviews. The figures with no hue are things, not series.
   const stats = isModerator ? [
     { label: city ? `Spots in ${city}` : 'Your spots', to: '/spots', value: v(spots?.length),
       hint: spots ? `${fmt(spots.filter((x) => x.AR3DModelURL).length)} with an AR model` : null },
-    { label: 'Waiting for approval', to: '/my-review-requests', value: v(subs?.filter((x) => x.status === 'pending').length),
+    { label: 'Waiting for approval', onClick: () => showSubs('pending'), current: subTab === 'pending',
+      value: v(subs?.filter((x) => x.status === 'pending').length),
       hint: subs ? `${fmt(subs.filter((x) => x.status === 'rejected').length)} rejected so far` : null },
-    { label: 'Approved', to: '/my-review-requests', value: v(subs?.filter((x) => x.status === 'approved').length),
+    { label: 'Approved', onClick: () => showSubs('approved'), current: subTab === 'approved',
+      value: v(subs?.filter((x) => x.status === 'approved').length),
       hint: subs ? `${plural(subs.length, 'request')} sent in all` : null },
     { label: 'Travelers', hue: 'teal', to: '/my-travelers', value: v(data?.travelers?.length),
       hint: `visited the spots${city ? ` in ${city}` : ''}` },
@@ -233,7 +246,7 @@ function StaffDashboard() {
           <>
             <div className="sa-col">
               <VisitsPanel />
-              <SubmissionsPanel submissions={subs} loading={loading} />
+              <SubmissionsPanel submissions={subs} loading={loading} tab={subTab} onTab={setSubTab} innerRef={subsRef} />
               <CoveragePanel spots={spots} loading={loading} scope={city || 'your area'} />
             </div>
             <div className="sa-col">
@@ -271,9 +284,10 @@ const sumKnown = (vals) => {
 
 // A panel as on the super admin's dashboard: an ink head for a live list,
 // a plain one for charts and the actions.
-function Panel({ id, title, dark, meta, to, linkLabel, className = '', children }) {
+function Panel({ id, title, dark, meta, to, linkLabel, className = '', innerRef, children }) {
   return (
-    <section className={`sa-panel ${className}`} aria-labelledby={id}>
+    // Scrolled to, it stops below the sticky top bar.
+    <section ref={innerRef} className={`sa-panel ${className}`} aria-labelledby={id} style={{ scrollMarginTop: 76 }}>
       <div className={`sa-panel-head${dark ? ' dark' : ''}`}>
         <h2 id={id} className="sa-panel-title">{title}</h2>
         {meta && <span className="sa-panel-meta">{meta}</span>}
@@ -328,33 +342,67 @@ function AttentionPanel({ attention, loading }) {
 
 const SUBMISSIONS_SHOWN = 6;
 
-function SubmissionsPanel({ submissions, loading }) {
-  const recent = (submissions || []).slice(0, SUBMISSIONS_SHOWN);
+// Recent: the latest few. The others: every request with that status, 10 a
+// page, newest first.
+const SUB_TABS = [
+  { value: 'recent',   label: 'Recent',               title: 'Your recent submissions' },
+  { value: 'pending',  label: 'Waiting for approval', title: 'Waiting for approval', empty: 'Nothing waiting for approval.' },
+  { value: 'approved', label: 'Approved',             title: 'Approved',             empty: 'Nothing approved yet.' },
+  { value: 'rejected', label: 'Rejected',             title: 'Rejected',             empty: 'Nothing rejected.' },
+];
+
+function SubmissionsPanel({ submissions, loading, tab = 'recent', onTab, innerRef }) {
+  const current = SUB_TABS.find((x) => x.value === tab) || SUB_TABS[0];
+  const all = submissions || [];
+  const list = tab === 'recent' ? all.slice(0, SUBMISSIONS_SHOWN) : all.filter((r) => r.status === tab);
+  const paged = usePaged(tab === 'recent' ? [] : list, tab);
+  const rows = tab === 'recent' ? list : paged.rows;
+  const count = (status) => all.filter((r) => r.status === status).length;
+
+  const items = (
+    <ul style={d.list}>
+      {rows.map((r, i) => (
+        <li key={`${r.kind}-${r.name}-${r.date}-${i}`} style={d.itemRow}>
+          <span style={d.rowIcon}>
+            <Icon name={r.kind === 'Food spot location' ? 'utensils' : r.kind === 'Deletion' ? 'trash' : 'map-pin'} size={17} />
+          </span>
+          <span style={d.rowText}>
+            <span style={d.rowLabel}>{r.name || '—'}</span>
+            <span style={d.rowDetail}>{r.kind} · <span className="sa-mono">{timeAgo(r.date)}</span></span>
+          </span>
+          <ApprovalPill status={r.status} />
+        </li>
+      ))}
+    </ul>
+  );
+
   return (
-    <Panel id="dash-submissions" title="Your recent submissions" dark className="sa-o-attention" to="/my-review-requests" linkLabel="My Submissions">
+    <Panel id="dash-submissions" title={current.title} dark className="sa-o-attention" innerRef={innerRef}
+      to="/my-review-requests" linkLabel="My Submissions">
+      {!loading && submissions != null && all.length > 0 && (
+        <div style={d.tabs}>
+          <FilterTabs label="Show" value={tab} onChange={onTab}
+            options={SUB_TABS.map((x) => ({ value: x.value, label: x.value === 'recent' ? x.label : `${x.label} (${fmt(count(x.value))})` }))} />
+        </div>
+      )}
       {loading ? (
         <Loading label="Loading your submissions…" kind="rows" media="icon" rows={5} />
       ) : submissions == null ? (
         <p style={d.pad}>Couldn&rsquo;t load your submissions.</p>
-      ) : recent.length === 0 ? (
+      ) : all.length === 0 ? (
         <p style={d.pad}>
           Nothing sent yet. Changes you make in Spot Management go to an admin for approval, and show up here.
         </p>
-      ) : (
-        <ul style={d.list}>
-          {recent.map((r, i) => (
-            <li key={`${r.kind}-${r.name}-${i}`} style={d.itemRow}>
-              <span style={d.rowIcon}>
-                <Icon name={r.kind === 'Food spot location' ? 'utensils' : r.kind === 'Deletion' ? 'trash' : 'map-pin'} size={17} />
-              </span>
-              <span style={d.rowText}>
-                <span style={d.rowLabel}>{r.name || '—'}</span>
-                <span style={d.rowDetail}>{r.kind} · <span className="sa-mono">{timeAgo(r.date)}</span></span>
-              </span>
-              <ApprovalPill status={r.status} />
-            </li>
-          ))}
-        </ul>
+      ) : rows.length === 0 ? (
+        <p style={d.pad}>{current.empty}</p>
+      ) : tab === 'recent' ? items : (
+        // The page numbers sit inside the panel's padding; the rows still run
+        // edge to edge.
+        <div style={d.pagedWrap}>
+          <Paged {...paged} label={`${current.title} pages`}>
+            <div style={d.pagedRows}>{items}</div>
+          </Paged>
+        </div>
       )}
     </Panel>
   );
@@ -616,6 +664,9 @@ const d = {
   clear:    { flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 15, fontWeight: 700, color: t.success },
   muted:    { fontSize: 15, color: t.textMuted },
   pad:      { margin: 0, padding: '14px 16px', fontSize: 15, color: t.textMuted, lineHeight: 1.4 },
+  tabs:     { padding: '10px 16px', borderBottom: `1px solid ${t.divider}`, overflowX: 'auto' },
+  pagedWrap: { padding: '0 16px 12px' },
+  pagedRows: { margin: '0 -16px' },
 
   personRow:  { display: 'flex', alignItems: 'center', gap: 11, padding: '9px 16px', borderBottom: `1px solid ${t.divider}` },
   personName: { fontSize: 16, fontWeight: 700, color: t.textPrimary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
