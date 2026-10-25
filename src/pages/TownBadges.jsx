@@ -4,7 +4,7 @@ import { theme as t, radius, fonts } from '../theme';
 import { Page, PageHeader, Toolbar, FilterTabs, Button, Loading, ErrorBanner, EmptyState, pageStyles } from '../components/Layout';
 import Icon from '../components/Icon';
 import { Paged, usePaged } from '../components/Pagination';
-import { notify } from '../components/AppAlert';
+import { notify, confirmAction } from '../components/AppAlert';
 import { useLive } from '../api/live';
 
 // Town & District Badges — the tiers of achievement (LibotBackend
@@ -94,6 +94,15 @@ function BadgeCard({ item, kind, onSaved }) {
     setBusy(false);
   };
 
+  // The image is the badge, so taking it off asks first.
+  const remove = async () => {
+    const ok = await confirmAction(
+      `${name}'s badge will have no image until a new one is uploaded. Travelers who earned it keep the badge and its title.`,
+      { title: `Remove ${name}'s badge image?`, confirmText: 'Remove image', danger: true },
+    );
+    if (ok) await saveImage('');
+  };
+
   const pick = async (e) => {
     const file = e.target.files?.[0];
     if (fileRef.current) fileRef.current.value = '';
@@ -143,7 +152,7 @@ function BadgeCard({ item, kind, onSaved }) {
           <Button size="sm" icon="image" onClick={() => fileRef.current?.click()} disabled={busy}>
             {busy ? 'Saving…' : image ? 'Replace image' : 'Upload image'}
           </Button>
-          {image && <Button size="sm" variant="danger" onClick={() => saveImage('')} disabled={busy}>Remove image</Button>}
+          {image && <Button size="sm" variant="danger" onClick={remove} disabled={busy}>Remove image</Button>}
           <input ref={fileRef} type="file" accept="image/png,image/webp,image/jpeg" onChange={pick} style={{ display: 'none' }} />
         </div>
         {error && <p style={s.error} role="alert"><Icon name="alert-triangle" size={12} /> {error}</p>}
