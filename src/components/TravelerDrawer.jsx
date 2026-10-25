@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { accountsAPI, bannedAccountsAPI } from '../api/api';
 import { useLiveTick } from '../api/live';
 import Drawer from './Drawer';
-import { notify, promptAction } from './AppAlert';
+import { notify, confirmAction, promptAction } from './AppAlert';
 import { Button, Loading, StatusPill } from './Layout';
 import { Facts, DetailSection, VisitList, detailStyles as d } from './Details';
 import { HistoryList } from './StaffAccounts';
@@ -109,10 +109,10 @@ export default function TravelerDrawer({ traveler, onClose, archivedAction, mode
               <DetailSection title="Record">
                 <ul style={d.record}>
                   {u.warningHistory.map((w, i) => (
-                    <li key={`w${i}`}>Warning {i + 1}, {fmtDay(w.issuedAt)}{w.reason ? `: ${w.reason}` : ''}</li>
+                    <li key={`w${i}`}>Warning {i + 1}, {fmtDay(w.issuedAt)}{w.reason ? `: ${w.reason}` : ''}{w.liftedAt ? ` (lifted ${fmtDay(w.liftedAt)})` : ''}</li>
                   ))}
                   {u.suspensionHistory.map((s, i) => (
-                    <li key={`s${i}`}>Suspension {i + 1}, {fmtDay(s.issuedAt)}{s.reason ? `: ${s.reason}` : ''}</li>
+                    <li key={`s${i}`}>Suspension {i + 1}, {fmtDay(s.issuedAt)}{s.reason ? `: ${s.reason}` : ''}{s.liftedAt ? ` (lifted ${fmtDay(s.liftedAt)})` : ''}</li>
                   ))}
                 </ul>
               </DetailSection>
@@ -154,8 +154,29 @@ const ACTIONS = [
 function ModerationBar({ u, name, onDone }) {
   const [busy, setBusy] = useState(false);
 
+  // A banned account can't be warned or suspended: its one action is lifting
+  // the ban (2026-10-25). Suspensions and warnings are lifted on the Warned,
+  // Suspended & Banned tab.
+  const liftBan = async () => {
+    const question = `Lift the ban on ${name}? Their account leaves the archive and opens again, and their reviews and place on the leaderboard show again.`;
+    if (!(await confirmAction(question, { confirmText: 'Lift ban' }))) return;
+    setBusy(true);
+    try {
+      const res = await bannedAccountsAPI.unban(u.id);
+      notify(res?.message || 'Lifted.', { tone: 'success' });
+      onDone();
+    } catch (err) {
+      notify(err?.response?.data?.message || 'Couldn’t lift it. Try again.', { tone: 'danger' });
+    }
+    setBusy(false);
+  };
+
   if (u.status === 'banned') {
-    return <p style={d.note}>Banned. The ban is lifted from the Warned, Suspended &amp; Banned tab.</p>;
+    return (
+      <div style={x.actions}>
+        <Button variant="subtle" icon="unlock" disabled={busy} onClick={liftBan} style={x.action}>Lift ban</Button>
+      </div>
+    );
   }
 
   const run = async (a) => {

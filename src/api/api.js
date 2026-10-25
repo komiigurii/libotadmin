@@ -117,14 +117,16 @@ export const bannedAccountsAPI = {
     api.patch(`/api/admin/users/${clerkUserId}/suspend`, { reason }).then(r => r.data),
   ban:    (clerkUserId, reason) =>
     api.patch(`/api/admin/users/${clerkUserId}/ban`, { reason }).then(r => r.data),
+  // Lifts the ban, or else the suspension.
   unban:  (clerkUserId) =>
     api.patch(`/api/admin/users/${clerkUserId}/unban`).then(r => r.data),
+  // Ends the review mute; the warnings stay on the record, marked lifted.
+  liftWarning: (clerkUserId) =>
+    api.patch(`/api/admin/users/${clerkUserId}/lift-warning`).then(r => r.data),
 };
 
-// Ban appeals submitted by archived/banned users. The backend route already
-// existed (GET/PATCH /api/admin/appeals) but nothing in this app called it —
-// admins could only see an "Appeal pending" badge with no way to read or
-// act on the appeal itself.
+// Appeals: a banned traveler's, and an inactive one's request for their
+// account back. status: submitted (the default), rejected or all.
 export const appealAPI = {
   getAll: (status) => api.get(`/api/admin/appeals${status ? `?status=${status}` : ''}`).then(r => r.data.appeals),
   decide: (clerkUserId, decision, adminNote) =>

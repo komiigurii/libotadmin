@@ -58,7 +58,9 @@ async function loadAdmin() {
       spotAPI.getPendingProposals(),
       spotAPI.getPending(),
       missionAPI.getProposals(),
-      appealAPI.getAll('pending'),
+      // The ones waiting for a decision ('pending' was never a status, so this
+      // used to count none).
+      appealAPI.getAll('submitted'),
     ]);
   const ok = (r) => r.status === 'fulfilled';
   const val = (r) => (ok(r) ? r.value : undefined);
@@ -209,7 +211,7 @@ function StaffDashboard() {
       hint: `visited the spots${city ? ` in ${city}` : ''}` },
   ] : [
     { label: 'Needs attention', value: v(waiting), tone: loading || waiting == null ? undefined : waiting ? 'warn' : 'good',
-      hint: loading ? null : waiting ? 'approvals and ban appeals' : 'Nothing waiting on you' },
+      hint: loading ? null : waiting ? 'approvals and appeals' : 'Nothing waiting on you' },
     { label: 'Travelers', hue: 'teal', to: '/user-management', value: v(figures?.totalUsers),
       hint: figures ? `${fmt(figures.activeLast7)} active this week` : null },
     { label: 'Spot visits', hue: 'magenta', to: LEADERBOARD, value: v(figures?.totalVisits),
@@ -309,8 +311,8 @@ function AttentionPanel({ attention, loading }) {
   const rows = [
     { icon: 'inbox', label: 'Approval Queue', to: '/spots/approvals', count: attention?.approvals,
       detail: 'Requests from moderators' },
-    { icon: 'slash', label: 'Ban appeals', to: '/user-management?tab=bans', count: attention?.appeals,
-      detail: 'Suspended or banned travelers Requesting account reinstatement' },
+    { icon: 'slash', label: 'Appeals', to: '/user-management?tab=appeals', count: attention?.appeals,
+      detail: 'Banned and inactive travelers asking for their account back' },
   ];
   const total = sumKnown(rows.map((r) => r.count));
   return (

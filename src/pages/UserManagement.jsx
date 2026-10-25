@@ -32,7 +32,7 @@ const APPEAL_STATUS = {
 const MEDAL     = { 1: '#F2CE1B', 2: '#C7D0D2', 3: '#CD8B54' };
 const MEDAL_INK = '#2C2810';
 
-const TAB = { ALL: 'all', REPORTED: 'reported', BANS: 'bans', INACTIVE: 'inactive', PROGRESS: 'progress' };
+const TAB = { ALL: 'all', REPORTED: 'reported', BANS: 'bans', APPEALS: 'appeals', INACTIVE: 'inactive', PROGRESS: 'progress' };
 
 // A row in any panel opens that traveler's overview (TravelerDrawer); the
 // Warned, Suspended & Banned one adds the ban, the warnings and the appeal, and
@@ -455,6 +455,23 @@ const rl = {
 
 const recordOf = (u) => standingLabel({ warnings: u.warningsGiven ?? u.warningCount, suspensions: u.suspensionCount });
 const isMuted  = (u) => new Date(u.commentMuteUntil) > Date.now();
+// An older backend sends no warningsOpen: every warning can still be lifted.
+const openWarnings = (u) => u.warningsOpen ?? (u.warnings || []).length;
+
+const LIFT = {
+  ban: {
+    label: 'Lift ban', call: bannedAccountsAPI.unban,
+    ask: (n) => `Lift the ban on ${n}? Their account leaves the archive and opens again, and their reviews and place on the leaderboard show again.`,
+  },
+  suspension: {
+    label: 'Lift suspension', call: bannedAccountsAPI.unban,
+    ask: (n) => `Lift the suspension on ${n}? They can use their account again now. It stays on their record but no longer counts toward a ban.`,
+  },
+  warning: {
+    label: 'Lift warning', call: bannedAccountsAPI.liftWarning,
+    ask: (n, open) => `Lift ${open > 1 ? `the ${open} warnings` : 'the warning'} on ${n}? Their reviews are no longer muted. ${open > 1 ? 'They stay' : 'It stays'} on their record, and their next warning counts as a 1st again.`,
+  },
+};
 
 function BannedAccountsPanel() {
   const [users,      setUsers]      = useState([]);
@@ -482,15 +499,19 @@ function BannedAccountsPanel() {
   useEffect(() => { load(); }, []);
   useLive(['travelers'], () => load({ quiet: true }));
 
-  const handleUnban = async (clerkUserId) => {
-    if (!(await confirmAction('Lift the suspension or ban on this account?', { confirmText: 'Unban' }))) return;
-    setBusyId(clerkUserId);
+  // Lift a ban, a suspension or the warnings (2026-10-25). A lifted one stays
+  // on the record, marked lifted; a traveler with warnings on record stays
+  // listed, as warned.
+  const handleLift = async (u, what) => {
+    const lift = LIFT[what];
+    if (!(await confirmAction(lift.ask(u.name || 'this traveler', u.warningsOpen), { confirmText: lift.label }))) return;
+    setBusyId(u.clerkUserId);
     try {
-      await bannedAccountsAPI.unban(clerkUserId);
-      // A traveler with warnings on record stays, as warned.
+      const res = await lift.call(u.clerkUserId);
+      notify(res?.message || 'Lifted.', { tone: 'success' });
       await load({ quiet: true });
     } catch (err) {
-      notify('Failed to unban: ' + (err.message || 'Unknown error'), { tone: 'danger' });
+      notify(err?.response?.data?.message || 'Couldn’t lift it. Try again.', { tone: 'danger' });
     }
     setBusyId(null);
   };
@@ -611,28 +632,34 @@ function BannedAccountsPanel() {
                     {status === 'suspended' && <StatusPill tone="warning" icon="clock">{remaining(u.suspendedUntil)}</StatusPill>}
                     {status === 'warned' && (isMuted(u)
                       ? <StatusPill tone="warning" icon="alert-triangle">Muted · {remaining(u.commentMuteUntil).toLowerCase()}</StatusPill>
-                      : <StatusPill tone="neutral" icon="alert-triangle">Warned</StatusPill>)}
+                      : openWarnings(u) > 0
+                        ? <StatusPill tone="neutral" icon="alert-triangle">Warned</StatusPill>
+                        : <StatusPill tone="success" icon="check">Warnings lifted</StatusPill>)}
                     {appeal && (
                       <StatusPill tone={appeal.tone} icon={appeal.icon}>{appeal.label}</StatusPill>
                     )}
                   </div>
                 </Td>
                 <Td align="right">
-                  {status === 'warned' ? '—' : (
+                  {status === 'warned' && !openWarnings(u) ? '—' : (
                   <div style={pageStyles.cellActions}>
                     {hasAppeal && (
                       <Button size="sm" icon="message-square" onClick={() => setOpenId(u.clerkUserId)}>
                         View appeal
                       </Button>
                     )}
-                    <Button
-                      size="sm"
-                      variant="subtle"
-                      disabled={busy}
-                      onClick={() => handleUnban(u.clerkUserId)}
-                    >
-                      Unban
-                    </Button>
+                    {/* A ban lifts everything; a suspension and the
+                        warnings' review mute are lifted one at a time. */}
+                    {status !== 'banned' && openWarnings(u) > 0 && (
+                      <Button size="sm" variant="subtle" disabled={busy} onClick={() => handleLift(u, 'warning')}>
+                        {LIFT.warning.label}
+                      </Button>
+                    )}
+                    {status !== 'warned' && (
+                      <Button size="sm" variant="subtle" disabled={busy} onClick={() => handleLift(u, status === 'banned' ? 'ban' : 'suspension')}>
+                        {status === 'banned' ? LIFT.ban.label : LIFT.suspension.label}
+                      </Button>
+                    )}
                   </div>
                   )}
                 </Td>
@@ -681,7 +708,9 @@ function BanDetails({ u, busy, onDecide }) {
                 <DetailText>{w.reason || 'No reason was written down.'}</DetailText>
                 <div style={rl.meta}>
                   {w.issuedAt ? fmtDateTime(w.issuedAt) : 'Date not recorded'}
-                  {w.muteUntil ? ` · reviews muted until ${fmtDay(w.muteUntil)}` : ''}
+                  {w.liftedAt
+                    ? ` · lifted ${fmtDay(w.liftedAt)}`
+                    : w.muteUntil ? ` · reviews muted until ${fmtDay(w.muteUntil)}` : ''}
                 </div>
               </li>
             ))}
@@ -711,6 +740,193 @@ function BanDetails({ u, busy, onDecide }) {
           )}
         </DetailSection>
       )}
+    </>
+  );
+}
+
+// ─── Appeals panel ────────────────────────────────────────────────────────────
+// Every appeal in one place (2026-10-25): a banned traveler's appeal, and an
+// inactive one's request for their account back, both sent from the app's
+// closed-account screen. A row opens the traveler with what they wrote; the
+// decision is made there. An approved one restores the account, so it leaves
+// this list.
+
+const APPEAL_KIND = {
+  ban:        { tone: 'danger',  icon: 'slash', label: 'Ban appeal' },
+  inactivity: { tone: 'neutral', icon: 'clock', label: 'Account request' },
+};
+
+function AppealsPanel() {
+  const [rows,    setRows]    = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error,   setError]   = useState(null);
+  const [search,  setSearch]  = useState('');
+  const [show,    setShow]    = useState('submitted');
+  const [busy,    setBusy]    = useState(false);
+  const [openId,  setOpenId]  = useState(null);
+  const opened = openId && rows.find(r => r.clerkUserId === openId);
+
+  const load = async ({ quiet = false } = {}) => {
+    if (!quiet) { setLoading(true); setError(null); }
+    try {
+      setRows(await appealAPI.getAll('all') || []);
+    } catch (err) {
+      console.error('[Appeals]', err);
+      if (!quiet) { setError("Couldn't load the appeals."); setRows([]); }
+    }
+    if (!quiet) setLoading(false);
+  };
+
+  useEffect(() => { load(); }, []);
+  // A new appeal, and any decision on one.
+  useLive(['travelers'], () => load({ quiet: true }));
+
+  const decide = async (a, decision) => {
+    const name = a.name || 'this traveler';
+    const ban = a.archiveReason === 'ban';
+    const approve = decision === 'approved';
+    const question = approve
+      ? (ban
+        ? `Approve ${name}’s appeal? The ban is lifted and their account opens again.`
+        : `Give ${name} their account back? It leaves the archive and opens again.`)
+      : `Reject ${name}’s ${ban ? 'appeal' : 'request'}? Their account stays ${ban ? 'closed' : 'deactivated'} (it is never deleted).`;
+    const confirmText = approve ? (ban ? 'Approve & unban' : 'Restore account') : 'Reject';
+    if (!(await confirmAction(question, { danger: !approve, confirmText }))) return;
+    setBusy(true);
+    try {
+      await appealAPI.decide(a.clerkUserId, decision);
+      notify(approve ? `${name}’s account is open again.` : `${ban ? 'Appeal' : 'Request'} rejected.`, { tone: 'success' });
+      await load({ quiet: true });
+    } catch (err) {
+      notify(err?.response?.data?.message || 'Couldn’t decide it. Try again.', { tone: 'danger' });
+    }
+    setBusy(false);
+  };
+
+  const count = (s) => rows.filter(r => r.appealStatus === s).length;
+  const visible = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return rows.filter(r => {
+      if (show !== 'all' && r.appealStatus !== show) return false;
+      if (!q) return true;
+      return [r.name, r.email].some(v => (v || '').toLowerCase().includes(q));
+    });
+  }, [rows, search, show]);
+  const paged = usePaged(visible, `${search}|${show}`);
+
+  return (
+    <>
+      {error && <ErrorBanner onDismiss={() => setError(null)}>{error}</ErrorBanner>}
+
+      <Toolbar>
+        <FilterTabs
+          label="Show"
+          pending={loading}
+          value={show}
+          onChange={setShow}
+          options={[
+            { value: 'submitted', label: 'Waiting',  count: count('submitted') },
+            { value: 'rejected',  label: 'Rejected', count: count('rejected') },
+            { value: 'all',       label: 'All',      count: rows.length },
+          ]}
+        />
+        <SearchInput
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          placeholder="Search by name or email…"
+        />
+      </Toolbar>
+
+      {loading ? (
+        <Loading label="Loading appeals…" cols={5} media="avatar" />
+      ) : visible.length === 0 ? (
+        <EmptyState
+          icon={rows.length === 0 || show === 'submitted' ? 'check' : 'users'}
+          title={rows.length === 0 ? 'No appeals'
+            : search ? 'No appeals match'
+            : show === 'submitted' ? 'Nothing waiting' : 'No rejected appeals'}
+          subtitle={rows.length === 0
+            ? 'Banned and inactive travelers can appeal from the app.'
+            : search ? 'Try a different name or email.'
+            : show === 'submitted' ? 'Every appeal has been decided.' : 'Rejected appeals appear here.'}
+        />
+      ) : (
+        <Paged {...paged} label="Appeal pages">
+        <Table
+          caption="Appeals"
+          head={<>
+            <Th>Traveler</Th>
+            <Th>Kind</Th>
+            <Th>What they wrote</Th>
+            <Th align="right">Sent</Th>
+            <Th>Status</Th>
+          </>}
+        >
+          {paged.rows.map(a => {
+            const kind = APPEAL_KIND[a.archiveReason] || APPEAL_KIND.ban;
+            const st = APPEAL_STATUS[a.appealStatus];
+            return (
+              <Row key={a.clerkUserId} onOpen={() => setOpenId(a.clerkUserId)} label={`Appeal of ${a.name || 'this traveler'}`}>
+                <Td>
+                  <TravelerCell src={a.profileImage} name={a.name} email={a.email} />
+                </Td>
+                <Td><StatusPill tone={kind.tone} icon={kind.icon}>{kind.label}</StatusPill></Td>
+                <Td>
+                  <span style={pageStyles.clampCell} title={a.appealText}>{a.appealText || '—'}</span>
+                </Td>
+                <Td align="right" muted>{a.appealedAt ? timeAgo(a.appealedAt) : '—'}</Td>
+                <Td>{st && <StatusPill tone={st.tone} icon={st.icon}>{st.label}</StatusPill>}</Td>
+              </Row>
+            );
+          })}
+        </Table>
+        </Paged>
+      )}
+
+      {opened && (
+        <TravelerDrawer traveler={overviewOf(opened)} onClose={() => setOpenId(null)}>
+          <AppealDetails a={opened} busy={busy} onDecide={decide} />
+        </TravelerDrawer>
+      )}
+    </>
+  );
+}
+
+function AppealDetails({ a, busy, onDecide }) {
+  const ban = a.archiveReason === 'ban';
+  return (
+    <>
+      <Facts items={[
+        ['Kind', ban ? 'Appeal against a ban' : 'Request for the account back (inactive)'],
+        [ban ? 'Banned' : 'Archived', a.archivedAt ? fmtDay(a.archivedAt) : null],
+        ['Sent', a.appealedAt ? fmtDateTime(a.appealedAt) : null],
+      ]} />
+      {ban && (
+        <DetailSection title="Reason for the ban">
+          <DetailText>{a.banReason || 'No reason was written down.'}</DetailText>
+        </DetailSection>
+      )}
+      <DetailSection title="What they wrote">
+        <DetailText>{a.appealText || '(Nothing was written.)'}</DetailText>
+        {ban && a.appealDeadline && (
+          <p style={pageStyles.panelNote}>
+            Appeals for this ban {new Date(a.appealDeadline) < new Date() ? 'closed' : 'close'} on {fmtDay(a.appealDeadline)}.
+            The account stays archived until you decide; it is never deleted.
+          </p>
+        )}
+        {a.appealStatus === 'submitted' ? (
+          <div style={pageStyles.buttonRow}>
+            <Button variant="success" icon="check" disabled={busy} onClick={() => onDecide(a, 'approved')}>
+              {ban ? 'Approve & unban' : 'Restore account'}
+            </Button>
+            <Button variant="danger" icon="x" disabled={busy} onClick={() => onDecide(a, 'rejected')}>
+              Reject
+            </Button>
+          </div>
+        ) : (
+          <p style={pageStyles.panelNote}>This {ban ? 'appeal' : 'request'} was {a.appealStatus}.</p>
+        )}
+      </DetailSection>
     </>
   );
 }
@@ -990,13 +1206,14 @@ const TAB_META = {
   [TAB.ALL]:      { label: 'All Users' },
   [TAB.REPORTED]: { label: 'Reported' },
   [TAB.BANS]:     { label: 'Warned, Suspended & Banned' },
+  [TAB.APPEALS]:  { label: 'Appeals' },
   [TAB.INACTIVE]: { label: 'Inactive' },
   [TAB.PROGRESS]: { label: 'Leaderboard' },
 };
 
 export default function UserManagement() {
-  // ?tab= opens a tab straight away (the dashboard's Leaderboard and Ban
-  // appeals links, and the old pages' addresses).
+  // ?tab= opens a tab straight away (the dashboard's Leaderboard and Appeals
+  // links, and the old pages' addresses).
   const [params, setParams] = useSearchParams();
   const asked = params.get('tab');
   const tab = Object.values(TAB).includes(asked) ? asked : TAB.ALL;
@@ -1020,6 +1237,7 @@ export default function UserManagement() {
       {tab === TAB.ALL      && <AllUsersPanel />}
       {tab === TAB.REPORTED && <ReportedPanel />}
       {tab === TAB.BANS     && <BannedAccountsPanel />}
+      {tab === TAB.APPEALS  && <AppealsPanel />}
       {tab === TAB.INACTIVE && <InactiveUsersPanel />}
       {tab === TAB.PROGRESS && <TravelerProgressPanel />}
     </Page>
