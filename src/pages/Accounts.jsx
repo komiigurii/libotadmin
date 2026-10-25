@@ -233,13 +233,13 @@ export default function Accounts() {
   // Six figures (the strip folds six to three on a tablet): Locked took
   // the old Deactivated staff figure's place (deleted staff are in the archive).
   const stats = [
-    { label: 'Admins', hue: 'blue', value: n(nStaff((a) => a.role === 'admin')), hint: 'run spots, reviews and travelers', onClick: () => showStaff('admin'), current: view === 'staff' && role === 'admin' && !staffStatus },
-    { label: 'Moderators', hue: 'blue', value: n(nStaff((a) => a.role === 'moderator')), hint: 'one per municipality', onClick: () => showStaff('moderator'), current: view === 'staff' && role === 'moderator' && !staffStatus },
-    { label: 'Temporary password', hue: 'blue', value: n(onSlip), tone: onSlip ? 'warn' : undefined, hint: 'waiting for a first sign-in', onClick: () => showStaff('', 'firstSignIn'), current: view === 'staff' && staffStatus === 'firstSignIn' },
-    { label: 'Travelers', hue: 'teal', value: n(travelerCounts?.['']), hint: 'every app account', onClick: () => showTravelers(''), current: view === 'travelers' && !travelerStatus },
-    { label: 'Suspended or banned', hue: 'teal', value: n(inTrouble), tone: inTrouble ? 'warn' : undefined, hint: 'locked out of the app', onClick: () => showTravelers('suspended'), current: view === 'travelers' && (travelerStatus === 'suspended' || travelerStatus === 'banned') },
+    { label: 'Admins', hue: 'blue', value: n(nStaff((a) => a.role === 'admin')), onClick: () => showStaff('admin'), current: view === 'staff' && role === 'admin' && !staffStatus },
+    { label: 'Moderators', hue: 'blue', value: n(nStaff((a) => a.role === 'moderator')), onClick: () => showStaff('moderator'), current: view === 'staff' && role === 'moderator' && !staffStatus },
+    { label: 'Temporary password', hue: 'blue', value: n(onSlip), tone: onSlip ? 'warn' : undefined, onClick: () => showStaff('', 'firstSignIn'), current: view === 'staff' && staffStatus === 'firstSignIn' },
+    { label: 'Travelers', hue: 'teal', value: n(travelerCounts?.['']), onClick: () => showTravelers(''), current: view === 'travelers' && !travelerStatus },
+    { label: 'Suspended or banned', hue: 'teal', value: n(inTrouble), tone: inTrouble ? 'warn' : undefined, onClick: () => showTravelers('suspended'), current: view === 'travelers' && (travelerStatus === 'suspended' || travelerStatus === 'banned') },
     { label: 'Locked accounts', hue: 'blue', value: n(nLocked), tone: nLocked ? 'warn' : undefined,
-      hint: nLocked ? locked.accounts.map((acc) => acc.label).join(', ') : 'too many wrong passwords', onClick: () => showLocked(''), current: view === 'locked' && !lockedKind },
+      hint: nLocked ? locked.accounts.map((acc) => acc.label).join(', ') : undefined, onClick: () => showLocked(''), current: view === 'locked' && !lockedKind },
   ];
 
   return (

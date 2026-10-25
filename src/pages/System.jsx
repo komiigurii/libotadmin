@@ -118,7 +118,7 @@ export default function System() {
   const stats = state && [
     { label: 'Maintenance', hue: 'violet', small: true, value: on ? 'On' : 'Off', tone: on ? 'warn' : 'good',
       hint: on ? `since ${timeAgo(state.maintenance.startedAt)}` : state.lastMaintenance ? `last ended ${timeAgo(state.lastMaintenance.endedAt)}` : 'never run' },
-    { label: 'App and website', small: true, value: 'Open', tone: 'good', hint: 'maintenance never closes them' },
+    { label: 'App and website', small: true, value: 'Open', tone: 'good', hint: 'Running' },
     ...['admin', 'moderator'].map((r) => ({
       label: r === 'admin' ? 'Admins' : 'Moderators', hue: 'blue', small: true, value: roleState(r), tone: roleState(r) === 'Working' ? 'good' : 'warn',
       hint: restricted.includes(r) ? 'can’t sign in' : on ? 'can’t sign in until it ends' : 'can sign in and save',
@@ -163,10 +163,12 @@ function Section({ id, title, description, children, tone, meta, table }) {
   const titleId = useId();
   return (
     <section id={id} className="sa-panel" style={{ ...(tone === 'warning' ? x.cardWarning : null), ...(table ? { overflow: 'hidden' } : null), scrollMarginTop: 68 }} aria-labelledby={titleId}>
-      <div className={`sa-panel-head${table ? ' dark' : ''}`}>
-        <h2 id={titleId} className="sa-panel-title">{title}</h2>
-        {meta}
-      </div>
+      {(title || meta) && (  // ← add this condition
+        <div className={`sa-panel-head${table ? ' dark' : ''}`}>
+          <h2 id={titleId} className="sa-panel-title">{title}</h2>
+          {meta}
+        </div>
+      )}
       {table ? children : (
         <div className="sa-panel-body">
           {description && <p style={x.cardDesc}>{description}</p>}
@@ -237,26 +239,22 @@ function MaintenanceCard({ state, onChanged }) {
       meta={m.on ? <StatusPill tone="warning" icon="tool">On</StatusPill> : <StatusPill tone="success" icon="check">Off</StatusPill>}
       description={m.on
         ? <>On since <span className="sa-mono">{fmtDateTime(m.startedAt)}</span>{m.startedBy?.username ? `, started by ${m.startedBy.username}` : ''}. Admins and moderators are <SignOutWhen at={m.signOutAt} />; travelers aren’t affected.</>
-        : 'For work on the console: admins and moderators get a pop-up with your message and a countdown, then are signed out until you end it. The app and the website keep working for travelers.'}
+        : undefined}
     >
       <div style={x.formGrid}>
         <div style={{ minWidth: 0 }}>
-          <label htmlFor={ids.msg} style={s.panelLabel}>Message in the pop-up <span style={x.optional}>(optional)</span></label>
-          <textarea id={ids.msg} value={message} onChange={(e) => setMessage(e.target.value)} maxLength={300} rows={3}
-            placeholder="e.g. Moving the database to a bigger plan." style={s.textarea} />
-          <p style={x.hint}>Admins and moderators see it in the pop-up, and on the sign-in page until it ends.</p>
+          <label htmlFor={ids.msg} style={s.panelLabel}>Message in the pop-up </label>
+          <textarea id={ids.msg} value={message} placeholder="Enter a message for the maintenance pop-up." onChange={(e) => setMessage(e.target.value)} maxLength={300} rows={3} style={s.textarea} />
         </div>
         <div style={{ minWidth: 0 }}>
-          <label htmlFor={ids.end} style={s.panelLabel}>Expected back <span style={x.optional}>(optional)</span></label>
+          <label htmlFor={ids.end} style={s.panelLabel}>Expected back </label>
           <input id={ids.end} type="datetime-local" value={endAt} onChange={(e) => setEndAt(e.target.value)}
             min={toLocalInput(new Date())} style={s.select} />
-          <p style={x.hint}>Shown with the message, in Philippine time.</p>
         </div>
         {!m.on && (
           <div style={{ minWidth: 0 }}>
             <label htmlFor={ids.wait} style={s.panelLabel}>Sign staff out after</label>
             <SignOutAfter id={ids.wait} value={signOutMinutes} onChange={setSignOutMinutes} />
-            <p style={x.hint}>Time to save what they’re doing. The pop-up counts it down.</p>
           </div>
         )}
       </div>
@@ -277,8 +275,8 @@ function MaintenanceCard({ state, onChanged }) {
 // ── Access ─────────────────────────────────────────────────────────────────
 
 const ROLE_TEXT = {
-  admin: { name: 'Admins', on: 'Admins can sign in and work as usual.', off: 'Admins can’t sign in. Moderators are not affected.' },
-  moderator: { name: 'Moderators', on: 'Moderators can sign in and work as usual.', off: 'Moderators can’t sign in. Admins are not affected.' },
+  admin: { name: 'Admins', on: 'Admins can sign in.', off: 'Admins can’t sign in. Moderators are not affected.' },
+  moderator: { name: 'Moderators', on: 'Moderators can sign in.', off: 'Moderators can’t sign in. Admins are not affected.' },
 };
 
 function AccessCard({ restricted, pauses, maintenanceOn, onChanged }) {
@@ -308,7 +306,6 @@ function AccessCard({ restricted, pauses, maintenanceOn, onChanged }) {
   return (
     <Section
       title="Who can use the console"
-      description={`Pause one kind of staff account without closing the app, e.g. moderators while their pages change. They get a pop-up with your message and a countdown, then are signed out.${maintenanceOn ? ' During maintenance every admin and moderator is signed out anyway.' : ''}`}
     >
       <div className="sa-rows" style={x.accessGrid}>
         {['admin', 'moderator'].map((role) => {
@@ -442,7 +439,7 @@ function NoticesCard() {
 
   const shown = tried ? errors : {};
   return (
-    <Section id="notices" title="Update notices" description="Tell travelers and staff about an update: one that’s coming, or one that’s done. The newest shows for two weeks.">
+    <Section id="notices" title="Update notices" >
       <form onSubmit={publish} noValidate>
         <FilterTabs label="Kind of notice" value={kind} onChange={setKind}
           options={[{ value: 'scheduled', label: 'An update is coming' }, { value: 'completed', label: 'An update is done' }]} />
@@ -465,7 +462,7 @@ function NoticesCard() {
         </div>
         <label htmlFor={ids.msg} style={{ ...s.panelLabel, display: 'block', marginTop: 12 }}>Details <span style={x.optional}>(optional)</span></label>
         <textarea id={ids.msg} value={message} onChange={(e) => setMessage(e.target.value)} maxLength={1000} rows={3} style={s.textarea}
-          placeholder="What changes for travelers, in a sentence or two." />
+          placeholder="What changes for travelers." />
         <div style={s.buttonRow}>
           <Button type="submit" variant="primary" icon="send" disabled={busy}>{busy ? 'Publishing…' : 'Publish notice'}</Button>
         </div>
@@ -517,14 +514,14 @@ function ToolsCard() {
   const checkHealth = () => run('health', async () => setHealth((await systemAPI.health()).health));
 
   return (
-    <Section id="tools" title="Tools" description="Everyday fixes that used to need a developer’s machine.">
+    <Section id="tools"  >
       <div className="sa-rows" style={x.tools}>
         <div style={x.tool}>
           <div style={x.toolHead}>
             <Icon name="refresh-cw" size={16} color={t.textSecondary} />
             <strong style={x.toolName}>Clear cache</strong>
           </div>
-          <p style={x.toolDesc}>Spot lists, categories and the website’s figures are kept for a minute or five. Clear them when a change made straight in the database doesn’t show.</p>
+          <p style={x.toolDesc}>Clears cached data so recent changes appear immediately on the site.</p>
           <Button size="sm" icon="refresh-cw" onClick={clearCache} disabled={busy === 'cache'}>{busy === 'cache' ? 'Clearing…' : 'Clear cache'}</Button>
           {cleared && (
             <p style={x.toolResult} role="status">
@@ -538,7 +535,7 @@ function ToolsCard() {
             <Icon name="monitor" size={16} color={t.textSecondary} />
             <strong style={x.toolName}>Server health</strong>
           </div>
-          <p style={x.toolDesc}>Whether the database answers, how long the server has been up, and which version is running.</p>
+          <p style={x.toolDesc}>Database Status, Up Time, Memory, Version</p>
           <Button size="sm" icon="check" onClick={checkHealth} disabled={busy === 'health'}>{busy === 'health' ? 'Checking…' : 'Check now'}</Button>
           {health && (
             <div style={x.facts} role="status">
@@ -574,13 +571,12 @@ function MaintenanceLog() {
     <Section
       table
       title="Maintenance log"
-      meta={<span className="sa-panel-meta">Every window: when, how long, who, and what was done</span>}
     >
       {!data ? <Loading label="Loading the log…" kind="rows" rows={3} />
         : data.logs.length === 0 ? <p style={x.flushNote}>No maintenance yet. Each one is kept here once it starts.</p>
           : (
             <>
-              <Table bare caption="Maintenance log" head={<><Th>Started</Th><Th>Length</Th><Th>By</Th><Th>What was done</Th></>}>
+              <Table bare caption="Maintenance log" head={<><Th>Started</Th><Th>Length</Th><Th>By</Th><Th>Action</Th></>}>
                 {data.logs.map((l) => (
                   <Row key={l._id} onOpen={() => setOpen(l)} label={`Maintenance started ${fmtDateTime(l.startedAt)}`}>
                     <Td style={{ whiteSpace: 'nowrap' }}><span className="sa-mono">{fmtDateTime(l.startedAt)}</span></Td>
@@ -632,7 +628,7 @@ const x = {
 
   tools:       { display: 'flex', flexDirection: 'column' },
   tool:        { display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 8, padding: '14px 0', minWidth: 0 },
-  toolHead:    { display: 'flex', alignItems: 'center', gap: 8 },
+  toolHead:    { display: 'flex', alignItems: 'center' },
   toolName:    { fontSize: 14, color: t.textPrimary },
   toolDesc:    { fontSize: 12.5, color: t.textMuted, lineHeight: 1.45, margin: 0 },
   toolResult:  { fontSize: 12.5, color: t.textSecondary, lineHeight: 1.45, margin: 0, display: 'flex', gap: 6, alignItems: 'flex-start' },

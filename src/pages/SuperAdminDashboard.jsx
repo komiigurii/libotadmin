@@ -90,7 +90,7 @@ export default function SuperAdminDashboard() {
     sys?.maintenance?.on && { icon: 'tool', label: 'Maintenance is on', detail: `Since ${timeAgo(sys.maintenance.startedAt)}. Admins and moderators are signed out until you end it.`, to: '/system', tone: 'warning', count: null },
     sys?.restrictedRoles?.length > 0 && { icon: 'pause', label: `${sys.restrictedRoles.map((r) => (r === 'admin' ? 'Admins' : 'Moderators')).join(' and ')} paused`, detail: 'They can’t use the console until you let them back in.', to: '/system', tone: 'warning', count: null },
     { icon: 'flag', hue: 'marigold', label: 'Tickets waiting', detail: ticketsHint ? `${ticketsHint}${passwordRequests ? `, ${plural(passwordRequests, 'password request')}` : ''}` : 'Problems admins and moderators reported', to: '/tickets', count: waitingTickets },
-    { icon: 'lock', hue: 'blue', label: 'Locked accounts', detail: 'Staff and travelers with too many wrong passwords; unlock on the Accounts page', to: '/accounts?view=locked', count: lockedCount },
+    { icon: 'lock', hue: 'blue', label: 'Locked accounts', detail: 'Password attempts exceeded', to: '/accounts?view=locked', count: lockedCount },
     { icon: 'key', hue: 'blue', label: 'Waiting for a first sign-in', detail: 'Accounts still on their slip’s temporary password', to: '/accounts?status=firstSignIn', count: onSlip },
   ].filter(Boolean);
   const waiting = loading ? null

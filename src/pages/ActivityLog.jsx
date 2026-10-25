@@ -77,10 +77,9 @@ export default function ActivityLog() {
   const n = (v) => (v == null ? '…' : fmtNum(v));
   const label = (g) => ACTION_GROUPS.find((x) => x.value === g)?.label || g;
   const stats = [
-    { label: 'Everything', value: n(counts?.['']), hint: 'logged since the log began', onClick: () => pick(''), current: !group },
+    { label: 'Everything', value: n(counts?.['']), onClick: () => pick(''), current: !group },
     ...MIX_ORDER.map((g) => ({
       label: label(g), hue: GROUP_HUE[g], value: n(counts?.[g]),
-      hint: counts?.[''] && counts?.[g] != null ? `${Math.round((counts[g] / counts['']) * 100)}% of everything` : ' ',
       onClick: () => pick(g), current: group === g,
     })),
   ];

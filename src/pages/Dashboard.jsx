@@ -293,9 +293,9 @@ function Count({ count, loading }) {
 function AttentionPanel({ attention, loading }) {
   const rows = [
     { icon: 'inbox', label: 'Approval Queue', to: '/spots/approvals', count: attention?.approvals,
-      detail: 'New spots, edits, deletions and food spot locations from moderators' },
+      detail: 'Requests from moderators' },
     { icon: 'slash', label: 'Ban appeals', to: '/user-management?tab=bans', count: attention?.appeals,
-      detail: 'Suspended or banned travelers asking to come back' },
+      detail: 'Suspended or banned travelers Requesting account reinstatement' },
   ];
   const total = sumKnown(rows.map((r) => r.count));
   return (

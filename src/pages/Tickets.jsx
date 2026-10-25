@@ -93,11 +93,11 @@ function TicketQueue() {
   const pick = (s, c = category) => { setStatus(s); setCategory(c); setPage(1); };
   const n = (v) => (v == null ? '…' : fmtNum(v));
   const stats = [
-    { label: 'Open', hue: 'marigold', value: n(counts?.open), tone: counts?.open ? 'warn' : undefined, hint: 'waiting on you', onClick: () => pick('open', ''), current: status === 'open' && !category },
-    { label: 'Being worked on', hue: 'marigold', value: n(counts?.inProgress), hint: 'you’ve picked these up', onClick: () => pick('inProgress', ''), current: status === 'inProgress' && !category },
-    { label: 'Resolved', hue: 'marigold', value: n(counts?.resolved), hint: 'answered and closed', onClick: () => pick('resolved', ''), current: status === 'resolved' && !category },
-    { label: 'Password requests', hue: 'blue', value: n(counts?.passwords), tone: counts?.passwords ? 'warn' : undefined, hint: 'open, from the sign-in page', onClick: () => pick('open', 'passwordReset'), current: category === 'passwordReset' },
-    { label: 'All tickets', value: n(counts?.all), hint: 'since tickets began', onClick: () => pick('', ''), current: !status && !category },
+    { label: 'Open', hue: 'marigold', value: n(counts?.open), tone: counts?.open ? 'warn' : undefined, onClick: () => pick('open', ''), current: status === 'open' && !category },
+    { label: 'Being worked on', hue: 'marigold', value: n(counts?.inProgress), onClick: () => pick('inProgress', ''), current: status === 'inProgress' && !category },
+    { label: 'Resolved', hue: 'marigold', value: n(counts?.resolved), onClick: () => pick('resolved', ''), current: status === 'resolved' && !category },
+    { label: 'Password requests', hue: 'blue', value: n(counts?.passwords), tone: counts?.passwords ? 'warn' : undefined, onClick: () => pick('open', 'passwordReset'), current: category === 'passwordReset' },
+    { label: 'All tickets', value: n(counts?.all), onClick: () => pick('', ''), current: !status && !category },
   ];
 
   const statusLabel = status ? TICKET_STATUS[status].label : 'All';
