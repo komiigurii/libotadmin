@@ -8,7 +8,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Login  from './pages/Login';
 import ConsoleShell from './components/ConsoleShell';
 const Dashboard        = lazy(() => import('./pages/Dashboard'));
-const Spots            = lazy(() => import('./pages/Spots'));
+const ModeratorSpotManagement = lazy(() => import('./pages/SpotManagement').then((m) => ({ default: m.ModeratorSpotManagement })));
 const SpotManagement   = lazy(() => import('./pages/SpotManagement'));
 const Comments         = lazy(() => import('./pages/Comments'));
 const MyReviewRequests = lazy(() => import('./pages/MyReviewRequests'));
@@ -73,9 +73,10 @@ const AdminRoute = ({ children }) => (
 );
 
 // /spots: an admin's Spot Management (the spots and the Approval Queue), or a
-// moderator's own town's spots. A component, so the role is read on every visit.
+// moderator's (their municipality's spots and their requests waiting for
+// approval). A component, so the role is read on every visit.
 const SpotsRoute = () => (
-  isAdminOnly() ? <SpotManagement /> : isModeratorRole() ? <Spots /> : <Navigate to="/dashboard" replace />
+  isAdminOnly() ? <SpotManagement /> : isModeratorRole() ? <ModeratorSpotManagement /> : <Navigate to="/dashboard" replace />
 );
 
 // Only while there is a temporary password to replace. A component, so the
@@ -169,9 +170,11 @@ export default function App() {
                       <Route path="/tickets/:id"        element={<TicketDetail />} />
 
                       {/* An admin's Spot Management (the spots, and the
-                          Approval Queue tab); a moderator's town's spots. */}
+                          Approval Queue tab); a moderator's (their spots, and
+                          the Waiting for approval tab). */}
                       <Route path="/spots"            element={<SpotsRoute />} />
                       <Route path="/spots/approvals"  element={<AdminRoute><SpotManagement /></AdminRoute>} />
+                      <Route path="/spots/waiting"    element={<ModeratorRoute><ModeratorSpotManagement /></ModeratorRoute>} />
 
                       <Route path="*" element={<Navigate to="/dashboard" replace />} />
                     </Routes>

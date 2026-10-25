@@ -1,25 +1,25 @@
 import { useEffect, useState } from 'react';
-import { spotAPI } from '../api/api';
 import {
   Page, PageHeader, Toolbar, FilterTabs, List, Button, ApprovalPill, Tag,
   Loading, EmptyState, ErrorBanner, SpotThumb, pageStyles as s,
 } from '../components/Layout';
 import { ChangeList, ProposalFieldList } from '../components/ChangeDiff';
-import { changedFieldLabels, recordFromRequest, MISSION_FIELD_LABELS } from '../utils/changeDiff';
+import { changedFieldLabels, MISSION_FIELD_LABELS } from '../utils/changeDiff';
 import { fmtDateTime } from '../utils/format';
+import { loadMyRequests } from '../utils/myRequests';
 import Icon from '../components/Icon';
 import { Paged, usePaged } from '../components/Pagination';
 import { useLive } from '../api/live';
 
 // Request Tracking — every request this moderator has sent and where it
 // stands: new spots, edits to existing ones, deletions, and food spot
-// locations. The other side of the admin's Approval Queue, so it's drawn the
-// same way: same row layout, same status pills, same "what changed" viewer.
+// locations (utils/myRequests.js). The other side of the admin's Approval
+// Queue, so it's drawn the same way: same row layout, same status pills, same
+// "what changed" viewer.
 //
-// Edits and food spot requests come from the backend's change-request
-// history (GET /api/spots/change-requests/mine), which keeps each one after
-// it's decided — before that existed, an edit vanished from here the moment
-// an admin approved or rejected it.
+// `pendingOnly` is the Waiting for approval tab of the moderator's Spot
+// Management (2026-10-25: "make it like the spot management in admin"): no
+// page shell, only the requests still waiting, and `onCount` hears how many.
 
 const KIND_LABELS = {
   spot:     'Spot edit',
@@ -30,19 +30,11 @@ const KIND_LABELS = {
 
 const DECIDED = { approved: 'Approved', rejected: 'Rejected' };
 
-function toArray(data, key) {
-  if (!data) return [];
-  if (Array.isArray(data))       return data;
-  if (Array.isArray(data[key]))  return data[key];
-  if (Array.isArray(data.data))  return data.data;
-  return [];
-}
-
-export default function MyReviewRequests() {
+export default function MyReviewRequests({ pendingOnly = false, onCount }) {
   const [requests, setRequests] = useState([]);
   const [loading,  setLoading]  = useState(true);
   const [error,    setError]    = useState(null);
-  const [statusFilter, setStatusFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState(pendingOnly ? 'pending' : '');
   const [expanded, setExpanded] = useState(null);
 
   // `quiet`: a live update (an admin decided), without the spinner.
@@ -51,80 +43,9 @@ export default function MyReviewRequests() {
       setLoading(true);
       setError(null);
     }
-    // allSettled: one source failing shouldn't hide the others.
-    const [spotsRes, proposalsRes, deletesRes, changesRes] = await Promise.allSettled([
-      spotAPI.getMine(),
-      spotAPI.getMyProposals(),
-      spotAPI.getMyDeleteRequests(),
-      spotAPI.getMyChangeRequests(),
-    ]);
-    const ok = (r) => r.status === 'fulfilled';
-    const failed = [
-      !ok(proposalsRes) && 'new spots',
-      !ok(deletesRes) && 'deletions',
-      !ok(changesRes) && 'edits and food spot requests',
-    ].filter(Boolean);
-
-    const mySpots = ok(spotsRes) ? toArray(spotsRes.value, 'spots') : [];
-    const imageOf = new Map(mySpots.map((sp) => [String(sp._id), sp.image]));
-    const history = ok(changesRes) ? changesRes.value : [];
-
-    const changeItems = history.map((c) => ({
-      kind: c.kind === 'mission-location' ? 'mission' : 'spot',
-      id: c._id,
-      status: c.status,
-      subtitle: c.targetName || '—',
-      image: imageOf.get(String(c.spotId)) || null,
-      date: c.submittedAt,
-      decidedAt: c.reviewedAt,
-      note: c.reviewNote,
-      record: recordFromRequest(c),
-      locationName: c.changes?.locationName,
-    }));
-
-    // Edits sent before the history existed have no row in it yet; while
-    // they're still pending, show them from the spot itself.
-    const tracked = new Set(history.filter((c) => c.kind === 'spot-edit' && c.status === 'pending').map((c) => String(c.spotId)));
-    const legacyEdits = mySpots
-      .filter((sp) => sp.pendingChange && !tracked.has(String(sp._id)))
-      .map((sp) => ({
-        kind: 'spot',
-        id: sp._id,
-        status: 'pending',
-        subtitle: sp.name || '—',
-        image: sp.image || null,
-        date: sp.pendingChange.submittedAt,
-        record: sp,
-      }));
-
-    const proposalItems = (ok(proposalsRes) ? toArray(proposalsRes.value, 'proposals') : []).map((p) => ({
-      kind: 'proposal',
-      id: p._id,
-      status: p.status || 'pending',
-      subtitle: p.name || '—',
-      image: p.image || null,
-      date: p.submittedAt || p.createdAt,
-      decidedAt: p.reviewedAt,
-      note: p.reviewNote || p.rejectionReason,
-      record: p,
-    }));
-
-    const deleteItems = (ok(deletesRes) ? toArray(deletesRes.value, 'requests') : []).map((d) => ({
-      kind: 'delete',
-      id: d._id,
-      status: d.status || 'pending',
-      subtitle: d.spotName || '—',
-      date: d.submittedAt,
-      decidedAt: d.reviewedAt,
-      note: d.reviewNote,
-      reason: d.reason,
-    }));
-
-    setRequests(
-      [...changeItems, ...legacyEdits, ...proposalItems, ...deleteItems]
-        .sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0)),
-    );
-    setError(failed.length ? `Couldn’t load ${failed.join(', ')}. Everything else is shown below.` : null);
+    const res = await loadMyRequests();
+    setRequests(res.requests);
+    setError(res.error);
     setLoading(false);
   };
 
@@ -134,41 +55,57 @@ export default function MyReviewRequests() {
   const visible = requests.filter((r) => !statusFilter || r.status === statusFilter);
   const paged = usePaged(visible, statusFilter);
   const count = (st) => requests.filter((r) => r.status === st).length;
+  const waiting = count('pending');
+  useEffect(() => { if (!loading) onCount?.(waiting); }, [loading, waiting, onCount]);
+
+  const Shell = pendingOnly ? EmbeddedShell : Page;
 
   return (
-    <Page>
-      <PageHeader
-        title="My Submissions"
-        count={loading ? '…' : requests.length}
-      />
+    <Shell>
+      {!pendingOnly && (
+        <>
+          <PageHeader
+            title="My Submissions"
+            count={loading ? '…' : requests.length}
+          />
 
-      <Toolbar>
-        <FilterTabs
-          label="Filter by status"
-          pending={loading}
-          value={statusFilter}
-          onChange={setStatusFilter}
-          options={[
-            { value: '',         label: 'All',      count: requests.length },
-            { value: 'pending',  label: 'Pending',  count: count('pending') },
-            { value: 'approved', label: 'Approved', count: count('approved') },
-            { value: 'rejected', label: 'Rejected', count: count('rejected') },
-          ]}
-        />
-      </Toolbar>
+          <Toolbar>
+            <FilterTabs
+              label="Filter by status"
+              pending={loading}
+              value={statusFilter}
+              onChange={setStatusFilter}
+              options={[
+                { value: '',         label: 'All',      count: requests.length },
+                { value: 'pending',  label: 'Pending',  count: count('pending') },
+                { value: 'approved', label: 'Approved', count: count('approved') },
+                { value: 'rejected', label: 'Rejected', count: count('rejected') },
+              ]}
+            />
+          </Toolbar>
+        </>
+      )}
 
       {error && <ErrorBanner>{error}</ErrorBanner>}
 
       {loading ? (
         <Loading label="Loading your submissions…" kind="list" />
       ) : visible.length === 0 ? (
-        <EmptyState
-          icon="send"
-          title={requests.length === 0 ? 'Nothing submitted yet' : 'No submissions here'}
-          subtitle={requests.length === 0
-            ? 'Spots you add, edit or remove in Spot Management will appear here with their status.'
-            : 'Try another filter.'}
-        />
+        pendingOnly ? (
+          <EmptyState
+            icon="check-circle"
+            title="Nothing waiting for approval"
+            subtitle="Spots you add, edit or remove wait here until an admin decides. Every request, decided or not, is in My Submissions."
+          />
+        ) : (
+          <EmptyState
+            icon="send"
+            title={requests.length === 0 ? 'Nothing submitted yet' : 'No submissions here'}
+            subtitle={requests.length === 0
+              ? 'Spots you add, edit or remove in Spot Management will appear here with their status.'
+              : 'Try another filter.'}
+          />
+        )
       ) : (
         <Paged {...paged} label="Submission pages">
         <List>
@@ -247,9 +184,11 @@ export default function MyReviewRequests() {
         </List>
         </Paged>
       )}
-    </Page>
+    </Shell>
   );
 }
+
+const EmbeddedShell = ({ children }) => <>{children}</>;
 
 const noteStyle = {
   fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.5, margin: '8px 0 0', padding: '8px 10px',

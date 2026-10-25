@@ -171,7 +171,7 @@ export default function Spots({ embedded = false, onCount }) {
   const waitingCount = spots.filter((x) => x.pendingChange || x.pendingDelete).length;
   const stats = embedded ? undefined : [
     { label: lockedCity ? `Spots in ${lockedCity}` : 'Your spots', value: figure(spots.length), hint: 'live in the app' },
-    { label: 'Waiting for approval', to: '/my-review-requests', value: figure(waitingCount), tone: waitingCount ? 'warn' : undefined,
+    { label: 'Waiting for approval', to: '/spots/waiting', value: figure(waitingCount), tone: waitingCount ? 'warn' : undefined,
       hint: 'edits and deletions an admin hasn’t decided yet' },
     { label: 'With an AR model', value: figure(spots.filter((x) => x.AR3DModelURL).length), hint: loading ? null : `of ${plural(spots.length, 'spot')}` },
     { label: 'Visits', hue: 'magenta', value: figure(spots.reduce((n, x) => n + (x.visitCount || 0), 0)), hint: 'travelers’ arrivals at these spots' },

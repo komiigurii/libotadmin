@@ -5,8 +5,10 @@ import { publishHeartbeat, useHeartbeat } from '../auth/heartbeat';
 import { spotAPI } from '../api/api';
 import { useLiveTick } from '../api/live';
 import { fmtNum } from '../utils/format';
+import { loadMyRequests } from '../utils/myRequests';
 import Spots from './Spots';
 import ModRequests from './ModRequests';
+import MyReviewRequests from './MyReviewRequests';
 
 /*
  * Spot Management for admins: everything about spots on one page (mock
@@ -15,11 +17,16 @@ import ModRequests from './ModRequests';
  * directly, and the moderators' requests waiting for a decision.
  *   /spots            the spots
  *   /spots/approvals  the Approval Queue (was its own page, /mod-requests)
- * Moderators have the spots of their town only, at /spots (pages/Spots.jsx).
  *
  * The band's strip is the switch between the two (2026-10-23, the consoles'
  * look): each cell counts its side and opens it, like the strip filters on
  * the super admin's Tickets.
+ *
+ * Moderators get the same page for their municipality (2026-10-25: "make it
+ * like the spot management in admin"; Waiting for approval used to send them
+ * to My Submissions), ModeratorSpotManagement below:
+ *   /spots          their municipality's spots
+ *   /spots/waiting  their requests an admin hasn't decided yet
  */
 
 export default function SpotManagement() {
@@ -79,6 +86,63 @@ export default function SpotManagement() {
       />
       {onApprovals
         ? <ModRequests embedded onCount={onCount} />
+        : <Spots embedded onCount={setSpotCount} />}
+    </Page>
+  );
+}
+
+export function ModeratorSpotManagement() {
+  const { pathname } = useLocation();
+  const onWaiting = pathname.startsWith('/spots/waiting');
+  const city = localStorage.getItem('city') || '';
+  const [waiting,   setWaiting]   = useState(null);
+  const [spotCount, setSpotCount] = useState(null);
+
+  // The tab on show reports its own count; the other one is asked for, and
+  // again when spots or requests change.
+  const changed = useLiveTick(['spots', 'approvals', 'missions']);
+  useEffect(() => {
+    let live = true;
+    if (onWaiting) {
+      spotAPI.getMine()
+        .then((d) => { if (live) setSpotCount((d || []).length); })
+        .catch(() => {});
+    } else {
+      loadMyRequests()
+        .then((r) => { if (live) setWaiting(r.requests.filter((x) => x.status === 'pending').length); })
+        .catch(() => {});
+    }
+    return () => { live = false; };
+  }, [onWaiting, changed]);
+
+  const stats = [
+    {
+      label:   city ? `Spots in ${city}` : 'Your spots',
+      to:      '/spots',
+      current: !onWaiting,
+      value:   spotCount == null ? '…' : fmtNum(spotCount),
+      hint:    'live in the app',
+    },
+    {
+      label:   'Waiting for approval',
+      to:      '/spots/waiting',
+      current: onWaiting,
+      value:   waiting == null ? '…' : fmtNum(waiting),
+      tone:    waiting ? 'warn' : waiting === 0 ? 'good' : undefined,
+      hint:    waiting ? 'your requests an admin hasn’t decided yet' : 'nothing waiting on an admin',
+    },
+  ];
+
+  return (
+    <Page>
+      <PageHeader
+        title="Spot Management"
+        stats={stats}
+        statsLabel="Spot Management tabs"
+        statsBeside
+      />
+      {onWaiting
+        ? <MyReviewRequests pendingOnly onCount={setWaiting} />
         : <Spots embedded onCount={setSpotCount} />}
     </Page>
   );
