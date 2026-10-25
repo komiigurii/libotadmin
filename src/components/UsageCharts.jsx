@@ -58,7 +58,8 @@ const H = 132;          // plot height
 const AXIS_W = 30;      // room for the y ticks
 const X_LABELS_H = 18;
 
-function ColumnChart({ points, label, fill = 'var(--data-1)' }) {
+// Also the moderator dashboard's visits chart (pages/Dashboard.jsx).
+export function ColumnChart({ points, label, fill = 'var(--data-1)' }) {
   const wrapRef = useRef(null);
   const width = useWidth(wrapRef);
   const [hover, setHover] = useState(null);

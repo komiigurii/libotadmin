@@ -1,17 +1,17 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   spotAPI, missionAPI, appealAPI, userProgressAPI, myTravelersAPI,
 } from '../api/api';
 import { theme as t } from '../theme';
 import {
-  Page, PageHeader, Avatar, ErrorBanner, ApprovalPill, Loading,
+  Page, PageHeader, Avatar, ErrorBanner, ApprovalPill, Loading, FilterTabs,
 } from '../components/Layout';
 import { Bone } from '../components/Skeleton';
 import { fmtNum as fmt, plural, timeAgo, fmtDateTime } from '../utils/format';
 import { loadUsage } from '../utils/usage';
 import Icon from '../components/Icon';
-import UsageCharts from '../components/UsageCharts';
+import UsageCharts, { ColumnChart } from '../components/UsageCharts';
 import SuperAdminDashboard from './SuperAdminDashboard';
 import { isSuperAdmin } from '../auth/roles';
 import { useLive } from '../api/live';
@@ -233,6 +233,7 @@ function StaffDashboard() {
           <>
             <div className="sa-col">
               <SubmissionsPanel submissions={subs} loading={loading} />
+              <VisitsPanel />
               <CoveragePanel spots={spots} loading={loading} scope={city || 'your area'} />
             </div>
             <div className="sa-col">
@@ -387,6 +388,83 @@ function VisitorsPanel({ travelers, loading }) {
           ))}
         </ul>
       )}
+    </Panel>
+  );
+}
+
+// Arrivals at the moderator's spots, day by day, from GET /api/moderator/visits
+// (2026-10-25: "add graph in dashboard for user visit"). Counted like the
+// admin's "Spot arrivals" chart: a traveler's first arrival at a spot. In the
+// arrivals hue, magenta. Beside it, the same range per spot.
+const VISIT_RANGES = [{ value: 7, label: '7 days' }, { value: 30, label: '30 days' }, { value: 90, label: '90 days' }];
+const VISIT_SPOTS_SHOWN = 5;
+
+function VisitsPanel() {
+  const [days, setDays] = useState(30);
+  const [data, setData] = useState(null);
+  const [error, setError] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  // A live reload (someone arrived) keeps the chart up while it loads, and
+  // keeps it if it fails.
+  const [changed, setChanged] = useState(0);
+  useLive(['progress', 'spots'], () => setChanged((n) => n + 1), { gap: 5000 });
+  const seen = useRef(changed);
+
+  useEffect(() => {
+    let live = true;
+    const quiet = seen.current !== changed;
+    seen.current = changed;
+    if (!quiet) setLoading(true);
+    myTravelersAPI.visits(days)
+      .then((res) => { if (live) { setData(res); setError(false); } })
+      .catch(() => { if (live && !quiet) setError(true); })
+      .finally(() => { if (live) setLoading(false); });
+    return () => { live = false; };
+  }, [days, changed]);
+
+  const fill = 'var(--chart-arrivals, var(--data-1))';
+  const spots = (data?.bySpot || []).filter((x) => x.count > 0).slice(0, VISIT_SPOTS_SHOWN);
+  const spotMax = Math.max(1, ...spots.map((x) => x.count));
+
+  return (
+    <Panel id="dash-visits" title="Visits to your spots" className="sa-o-usage"
+      meta={data ? `${plural(data.total, 'visit')} in ${data.days} days` : loading ? <Bone inline w={88} h={11} /> : null}>
+      <div style={vp.body}>
+        <FilterTabs label="Time range" value={days} onChange={setDays} options={VISIT_RANGES} pending={!data && loading} />
+        {error && !data ? (
+          <p style={vp.muted}>Couldn&rsquo;t load the visits.</p>
+        ) : !data ? (
+          <Loading label="Loading the visits…" kind="charts" rows={1} />
+        ) : (
+          // The previous range stays, dimmed, while another loads.
+          <div style={{ ...vp.grid, opacity: loading ? 0.55 : 1, transition: 'opacity 0.2s' }}>
+            <div style={{ minWidth: 0 }}>
+              <ColumnChart points={data.series} fill={fill}
+                label={`Visits to the spots in your municipality, last ${data.days} days, ${fmt(data.total)} in all`} />
+              <p style={vp.note}>A traveler&rsquo;s first arrival at one of your spots, by day.</p>
+            </div>
+            <div style={{ minWidth: 0 }}>
+              <p style={s.miniHead}>Most visited in {data.days} days</p>
+              {spots.length === 0 ? (
+                <p style={vp.muted}>No visits in these {data.days} days yet.</p>
+              ) : (
+                <ul style={s.barList}>
+                  {spots.map((x) => (
+                    <li key={x.id} style={vp.barRow} title={`${x.name}: ${plural(x.count, 'visit')}`}>
+                      <span style={s.barLabel}>{x.name}</span>
+                      <span style={s.barTrack}>
+                        <span style={{ ...s.barFill, background: fill, width: `${(x.count / spotMax) * 100}%` }} />
+                        <span style={s.barValue}>{fmt(x.count)}</span>
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
     </Panel>
   );
 }
@@ -572,4 +650,15 @@ const s = {
   barFill: { height: 12, borderRadius: '0 4px 4px 0', background: t.data1, minWidth: 2, flexShrink: 0, maxWidth: 'calc(100% - 30px)' },
   barValue: { fontSize: 15, fontWeight: 700, color: t.textPrimary },
   note: { fontSize: 14, color: t.textMuted, margin: '10px 0 0', lineHeight: 1.4 },
+};
+
+// The visits panel: the range tabs, then the chart beside the per-spot bars
+// (under it when the panel is narrow).
+const vp = {
+  body:   { display: 'flex', flexDirection: 'column', gap: 12, padding: '12px 16px 16px' },
+  grid:   { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px 28px', alignItems: 'start' },
+  muted:  { margin: 0, fontSize: 15, color: t.textMuted },
+  note:   { fontSize: 14, color: t.textMuted, margin: '6px 0 0', lineHeight: 1.4 },
+  // Wider labels than the category bars: these are spot names.
+  barRow: { display: 'grid', gridTemplateColumns: 'minmax(0, 150px) minmax(0, 1fr)', alignItems: 'center', gap: 10 },
 };

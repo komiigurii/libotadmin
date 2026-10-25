@@ -238,6 +238,8 @@ export const moderatorsAPI = {
 // municipality. Read-only (QA 2026-10-16, decided with the team).
 export const myTravelersAPI = {
   getAll: () => api.get('/api/moderator/travelers').then(r => r.data),
+  // Arrivals at the municipality's spots, day by day (the dashboard's chart).
+  visits: (days = 30) => api.get('/api/moderator/visits', { params: { days } }).then(r => r.data),
 };
 
 // type: 'image' | 'badge' | 'model'
