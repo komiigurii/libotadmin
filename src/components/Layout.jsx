@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { theme as t, radius, type } from '../theme';
 import Icon from './Icon';
@@ -134,15 +134,60 @@ export function EmptyState({ icon = 'check', title, subtitle }) {
 /* ── Table ────────────────────────────────────────────────────────
    One cell padding and one header treatment, rather than 13px here and 10px
    there. `align="right"` for numeric columns. */
+
+/* Rows become cards when the table is wider than its box. Each cell is given
+   its column's name (data-label, shown above the value in a card), and the
+   main column (the traveler, the ticket: the first one nearly as wide as the
+   widest, so a long Reason beside the traveler doesn't win) is marked
+   data-main: it heads the card on its own line. Measured as a table every time the box's width or the
+   rows change, so a table goes back to rows as soon as it fits again. The
+   class is set on the element itself: React never re-renders for it. */
+function useFitTable(ref) {
+  useLayoutEffect(() => {
+    const box = ref.current;
+    const table = box?.querySelector('table');
+    if (!table) return undefined;
+    let width = -1;
+    const fit = () => {
+      box.classList.remove('stacked');
+      const heads = [...(table.tHead?.rows[0]?.cells || [])];
+      const names = heads.map((th) => th.textContent.trim());
+      const widest = Math.max(0, ...heads.map((th) => th.offsetWidth));
+      const main = Math.max(0, heads.findIndex((th) => th.offsetWidth >= widest * 0.8));
+      for (const tr of table.tBodies[0]?.rows || []) {
+        [...tr.cells].forEach((td, i) => {
+          if (td.colSpan > 1) return;
+          if (td.dataset.label !== names[i]) td.dataset.label = names[i] || '';
+          if (i === main) td.dataset.main = ''; else delete td.dataset.main;
+        });
+      }
+      if (box.scrollWidth > box.clientWidth + 1) box.classList.add('stacked');
+    };
+    fit();
+    const resize = new ResizeObserver(() => {
+      if (box.clientWidth === width) return;
+      width = box.clientWidth;
+      fit();
+    });
+    resize.observe(box);
+    const rows = new MutationObserver(fit);
+    rows.observe(table, { childList: true, subtree: true, characterData: true });
+    return () => { resize.disconnect(); rows.disconnect(); };
+  }, [ref]);
+}
+
 // `bare`: no card of its own, for a table that sits flush inside a panel
 // (a card in a card is the thing to avoid).
 export function Table({ head, children, caption, bare = false }) {
+  const box = useRef(null);
+  useFitTable(box);
   const table = (
-    // A 7-column moderation table has no sensible 360px layout, so on narrow
-    // viewports it scrolls sideways inside its card rather than reflowing
-    // into unreadable stacks. tabIndex makes that region keyboard-scrollable,
-    // which is a WCAG requirement for any scrollable container.
-    <div className="table-scroll" style={{ overflowX: 'auto' }} tabIndex={0} role="region" aria-label={caption || 'Data table'}>
+    // A table that doesn't fit its space (a phone, a tablet, the rail open
+    // beside a wide table) turns each row into a card instead of scrolling
+    // sideways (2026-10-25: "adapt to every screen size"): useFitTable below.
+    // tabIndex keeps the region keyboard-scrollable for the moment before it
+    // does, which WCAG asks of any scrollable container.
+    <div ref={box} className="table-scroll" style={{ overflowX: 'auto' }} tabIndex={0} role="region" aria-label={caption || 'Data table'}>
       <table style={s.table}>
         {caption && <caption style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0 0 0 0)' }}>{caption}</caption>}
         {head && <thead><tr>{head}</tr></thead>}
@@ -488,7 +533,9 @@ const base = {
   th: {
     padding: `11px ${layout.rowPadX}px`, textAlign: 'left', fontSize: 11, fontWeight: 700,
     color: t.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em',
-    borderBottom: `1px solid ${t.divider}`, whiteSpace: 'nowrap', background: t.sidebarBg,
+    // Wraps between words ("Spots / visited") before a table gives up and
+    // turns its rows into cards.
+    borderBottom: `1px solid ${t.divider}`, background: t.sidebarBg,
   },
   td: {
     padding: `${layout.rowPadY}px ${layout.rowPadX}px`, fontSize: 13.5,
@@ -500,12 +547,14 @@ const base = {
     padding: '3px 10px', borderRadius: radius.pill,
     fontSize: 11.5, fontWeight: 700, letterSpacing: '0.02em', whiteSpace: 'nowrap',
   },
+  // A long name ("Malolos Cathedral (Minor Basilica …)") wraps inside the
+  // tag rather than running out of its card on a phone.
   tag: {
-    display: 'inline-flex', alignItems: 'center', gap: 5,
+    display: 'inline-flex', alignItems: 'center', gap: 5, maxWidth: '100%',
     padding: '2px 9px', borderRadius: radius.pill,
     borderWidth: 1, borderStyle: 'solid', borderColor: t.border,
     background: t.sidebarBg, color: t.textSecondary,
-    fontSize: 11.5, fontWeight: 600, whiteSpace: 'nowrap',
+    fontSize: 11.5, fontWeight: 600, overflowWrap: 'break-word',
   },
   tagDanger: { background: t.dangerBg, borderColor: t.dangerBorder, color: t.danger },
 
@@ -580,9 +629,13 @@ const base = {
   },
   // A person in a table cell: avatar, name, and email under it. Traveler
   // Progress, Inactive Accounts and Suspensions & Bans all show people.
+  // A long name or email wraps rather than being cut (2026-10-25: rows grow
+  // with their text on any screen); the pills beside a name drop under it.
   person:     { display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 },
-  personName: { fontWeight: 600, fontSize: 13.5, color: t.textPrimary, display: 'flex', alignItems: 'center', gap: 7, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
-  personSub:  { fontSize: 12, color: t.textMuted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  // break-word, not anywhere: a table must still know how wide a name is, or
+  // it squeezes the column instead of turning its rows into cards.
+  personName: { fontWeight: 600, fontSize: 13.5, color: t.textPrimary, display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '2px 7px', overflowWrap: 'break-word' },
+  personSub:  { fontSize: 12, color: t.textMuted, overflowWrap: 'break-word' },
 
   // Long text in a table cell: one line, cut with an ellipsis (full text in
   // the title tooltip). Set on an inner block — table cells don't truncate.

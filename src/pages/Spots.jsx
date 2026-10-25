@@ -341,7 +341,7 @@ const s = {
   modalText:    { fontSize: 13, color: t.textSecondary, margin: '0 0 10px', lineHeight: 1.5 },
   formWrap:     { marginBottom: 18 },
 
-  grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 16 },
+  grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(260px, 100%), 1fr))', gap: 16 },
   filterSelect: { ...pageStyles.select, width: 'auto', minWidth: 170, flex: '0 1 auto' },
 
   spotCard:    { ...pageStyles.item, display: 'flex', flexDirection: 'column' },

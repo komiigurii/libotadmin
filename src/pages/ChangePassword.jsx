@@ -273,7 +273,7 @@ const f = {
   recent:     { listStyle: 'none', margin: 0, padding: 0 },
   recentRow:  { display: 'grid', gridTemplateColumns: 'minmax(120px, auto) minmax(0, 1fr) auto', alignItems: 'center', gap: 12, padding: '9px 16px', borderBottom: `1px solid ${t.divider}`, fontSize: 15 },
   recentWhat: { display: 'inline-flex', alignItems: 'center', gap: 8, fontWeight: 700, color: t.textPrimary, whiteSpace: 'nowrap' },
-  recentText: { color: t.textSecondary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  recentText: { color: t.textSecondary, overflowWrap: 'anywhere' },
   brand:   { display: 'flex', flexDirection: 'column', alignItems: 'flex-start', textAlign: 'left', gap: 12 },
   logo:     { width: 64, height: 64, objectFit: 'contain', borderRadius: 18, display: 'block' },
   // Ink comes from .signin-rail (the brand sits on the sign-in artwork).
@@ -296,7 +296,7 @@ const f = {
   },
   inputInvalid: { borderColor: t.danger },
   error:    { display: 'flex', alignItems: 'center', gap: 6, margin: '6px 0 0', fontSize: 13, color: t.danger },
-  checks:   { listStyle: 'none', margin: '-4px 0 14px', padding: 0, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '4px 12px' },
+  checks:   { listStyle: 'none', margin: '-4px 0 14px', padding: 0, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(170px, 100%), 1fr))', gap: '4px 12px' },
   check:    { display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5 },
   show:     { display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: t.textSecondary, margin: '2px 0 16px', cursor: 'pointer' },
   submit:   { width: '100%', minHeight: 44, fontSize: 15 },

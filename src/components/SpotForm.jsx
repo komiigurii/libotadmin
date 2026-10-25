@@ -2557,7 +2557,7 @@ const styles = {
   categoryChip:       { padding: '7px 14px', borderRadius: radius.pill, border: `1px solid ${t.border}`, background: t.sidebarBg, color: t.textSecondary, fontWeight: 600, fontSize: 13, cursor: 'pointer' },
   categoryChipActive: { background: t.brandSoft, borderColor: t.brand, color: t.brand },
 
-  uploadGrid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 },
+  uploadGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(220px, 100%), 1fr))', gap: 12 },
   uploadCard: { display: 'flex', gap: 12, padding: 12, borderRadius: radius.lg, border: `1px solid ${t.border}`, background: t.sidebarBg, boxShadow: shadow.sm },
   uploadCardBody: { display: 'flex', flexDirection: 'column', gap: 6, minWidth: 0, flex: 1 },
 
@@ -2617,13 +2617,15 @@ const styles = {
   arBadge:      { fontSize: 12, fontWeight: 700, color: t.info, background: t.infoBg, borderRadius: 6, padding: '3px 8px', flexShrink: 0 },
   removeBtn:    { padding: '5px 10px', background: t.dangerBg, color: t.danger, border: 'none', borderRadius: 6, fontWeight: 600, fontSize: 12, cursor: 'pointer', flexShrink: 0 },
 
-  footer:      { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 24px', borderTop: `1px solid ${t.divider}`, flexShrink: 0 },
-  footerRight: { display: 'flex', alignItems: 'center', gap: 10 },
-  requiredNote: { fontSize: 12, color: t.textSecondary },
-  cancelBtn: { padding: '9px 18px', borderRadius: radius.md, border: `1px solid ${t.border}`, background: 'transparent', color: t.textSecondary, fontWeight: 600, fontSize: 13, cursor: 'pointer' },
+  // On a phone the note takes its own line above the buttons, rather than
+  // being squeezed into a column a word wide.
+  footer:      { display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: '10px 16px', padding: '14px 24px', borderTop: `1px solid ${t.divider}`, flexShrink: 0 },
+  footerRight: { display: 'flex', alignItems: 'center', justifyContent: 'flex-end', flexWrap: 'wrap', gap: 10, marginLeft: 'auto' },
+  requiredNote: { flex: '1 1 180px', fontSize: 12, color: t.textSecondary },
+  cancelBtn: { display: 'inline-flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap', padding: '9px 18px', borderRadius: radius.md, border: `1px solid ${t.border}`, background: 'transparent', color: t.textSecondary, fontWeight: 600, fontSize: 13, cursor: 'pointer' },
   // The one primary CTA on this form — yellow, like the app's accent. The
   // mission backfill button above stays teal so there's never two "the" buttons.
-  saveBtn:   { padding: '9px 18px', borderRadius: radius.md, border: 'none', background: t.accent, color: t.onAccent, fontWeight: 700, fontSize: 13, cursor: 'pointer', boxShadow: shadow.sm },
+  saveBtn:   { display: 'inline-flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap', padding: '9px 18px', borderRadius: radius.md, border: 'none', background: t.accent, color: t.onAccent, fontWeight: 700, fontSize: 13, cursor: 'pointer', boxShadow: shadow.sm },
 
   warningText: { fontSize: 12, color: t.danger, fontWeight: 500, margin: 0 },
   okText:      { fontSize: 12, color: t.success, fontWeight: 500, margin: 0, overflowWrap: 'anywhere' },

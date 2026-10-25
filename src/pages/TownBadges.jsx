@@ -322,9 +322,11 @@ const s = {
   silver: '#8E9AA3',
   gold: '#D9B21A',
   dot: { width: 8, height: 8, borderRadius: 4, flexShrink: 0, alignSelf: 'center' },
-  grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: 14 },
+  grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(340px, 100%), 1fr))', gap: 14 },
+  // Too narrow for the words beside the image (a small phone): the image
+  // goes on top.
   card: {
-    display: 'flex', gap: 16, padding: 16, background: t.cardBg, borderRadius: radius.lg,
+    display: 'flex', flexWrap: 'wrap', gap: 16, padding: 16, background: t.cardBg, borderRadius: radius.lg,
     border: `1px solid ${t.border}`,
   },
   art: {
@@ -336,7 +338,7 @@ const s = {
     border: `1.5px dashed ${t.border}`, borderRadius: radius.md, background: t.bg, color: t.textMuted,
     fontFamily: 'inherit', fontSize: 14, cursor: 'pointer',
   },
-  cardBody: { flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 6 },
+  cardBody: { flex: '1 1 170px', minWidth: 0, display: 'flex', flexDirection: 'column', gap: 6, overflowWrap: 'anywhere' },
   cardHead: { display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap', marginBottom: 4 },
   townName: { fontFamily: fonts.display, fontSize: 20, fontWeight: 600, letterSpacing: '-0.01em', margin: 0, color: t.textPrimary },
   meta: { fontSize: 12, color: t.textMuted, fontVariantNumeric: 'tabular-nums' },

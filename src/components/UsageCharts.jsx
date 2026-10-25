@@ -234,7 +234,7 @@ const c = {
   title:    { ...type.cardTitle, color: t.textPrimary, margin: 0 },
   controls: { display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
   muted:    { fontSize: 13, color: t.textMuted, margin: 0 },
-  grid:     { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '18px 24px' },
+  grid:     { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(260px, 100%), 1fr))', gap: '18px 24px' },
   panel:    { minWidth: 0 },
   panelHead: { display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap', marginBottom: 8 },
   panelTitle: { fontSize: 13.5, fontWeight: 600, color: t.textPrimary, margin: 0, display: 'flex', alignItems: 'center', gap: 7 },

@@ -695,6 +695,13 @@ a.sa-cell:hover { background: var(--sa-shell-raised); }
   .sa-cell-value { font-size: 25px; }
   .sa-usage .usage-grid { grid-template-columns: minmax(0, 1fr) !important; }
 }
+/* Small phones (320–360px): the top bar closes up so the page's name fits
+   beside the menu, bell and theme buttons. */
+@media (max-width: 360px) {
+  .sa-topbar { gap: 6px; padding-left: 6px; padding-right: 10px; }
+  .sa-topbar-title { font-size: 16px; }
+  .sa-band-title { font-size: 24px; }
+}
 
 @media (prefers-reduced-motion: reduce) {
   .sa-rail, .sa-menu, .sa-dialog, .sa-dialog-backdrop, .sa-switch::after { transition: none !important; animation: none !important; }

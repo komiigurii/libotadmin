@@ -391,7 +391,8 @@ const d = {
   rowIconWarn: { background: 'var(--warning-bg)', color: 'var(--warning)', borderColor: 'transparent' },
   rowText:  { display: 'flex', flexDirection: 'column', minWidth: 0, flex: 1 },
   rowLabel: { display: 'flex', alignItems: 'center', gap: 7, fontSize: 16, fontWeight: 700, color: 'var(--text-primary)' },
-  rowDetail: { fontSize: 14.5, color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  // Up to two lines on any screen.
+  rowDetail: { fontSize: 14.5, color: 'var(--text-muted)', overflowWrap: 'anywhere', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' },
   chevron:  { display: 'inline-flex', flexShrink: 0, color: 'var(--text-muted)' },
   badge:    { flexShrink: 0, minWidth: 30, textAlign: 'center', fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 19, lineHeight: 1, padding: '5px 10px 4px', borderRadius: 8, background: 'var(--accent)', color: 'var(--on-accent)' },
   clear:    { flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 15, fontWeight: 700, color: 'var(--success)' },
@@ -411,7 +412,7 @@ const d = {
   factV:      { margin: 0, color: 'var(--text-primary)', textAlign: 'right' },
 
   staffRow:   { display: 'flex', alignItems: 'center', gap: 11, padding: '9px 16px', borderBottom: '1px solid var(--divider)' },
-  staffName:  { display: 'block', fontSize: 16, fontWeight: 700, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  staffName:  { display: 'block', fontSize: 16, fontWeight: 700, color: 'var(--text-primary)', overflowWrap: 'anywhere' },
   staffSub:   { display: 'block', fontSize: 14, color: 'var(--text-muted)' },
 
   note:       { padding: '11px 16px', borderBottom: '1px solid var(--divider)' },
@@ -420,6 +421,6 @@ const d = {
   noteSub:    { fontSize: 14.5, color: 'var(--text-secondary)', lineHeight: 1.35 },
 
   // Two across when the side column is wide enough, one when it isn't (tablet).
-  actions:    { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 8, padding: 12 },
+  actions:    { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(150px, 100%), 1fr))', gap: 8, padding: 12 },
   action:     { display: 'flex', alignItems: 'center', gap: 9, padding: '11px 12px', borderRadius: 10, border: '1px solid var(--border)', background: 'var(--sidebar-bg)', color: 'var(--text-primary)', fontSize: 16, fontWeight: 700, textDecoration: 'none' },
 };

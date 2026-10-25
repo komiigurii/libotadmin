@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { bannedAccountsAPI, appealAPI, inactiveUsersAPI, userProgressAPI, userReportAPI } from '../api/api';
 import { notify, confirmAction, promptAction } from '../components/AppAlert';
@@ -62,16 +62,24 @@ function TravelerCell({ src, name, email, createdAt, pills }) {
 
 // ─── Tab bar ──────────────────────────────────────────────────────────────────
 
+// One line of tabs at every width: on a narrow screen the row scrolls
+// sideways inside itself (the page never does), and the open tab is scrolled
+// into view. The line under the row is an inset shadow rather than a border,
+// so the open tab's underline still covers it inside the scrolling box.
 const tabBarStyle = {
   display: 'flex',
   gap: 4,
-  borderBottom: '1px solid var(--border, #e5e7eb)',
+  boxShadow: 'inset 0 -1px 0 var(--border, #e5e7eb)',
   marginBottom: 24,
+  overflowX: 'auto',
+  scrollbarWidth: 'none',
 };
 
 function tabStyle(active) {
   return {
     padding: '8px 16px',
+    flexShrink: 0,
+    whiteSpace: 'nowrap',
     fontSize: 14,
     fontWeight: active ? 600 : 400,
     color: active ? 'var(--color-primary, #2563eb)' : 'var(--color-muted, #6b7280)',
@@ -81,7 +89,6 @@ function tabStyle(active) {
       ? '2px solid var(--color-primary, #2563eb)'
       : '2px solid transparent',
     cursor: 'pointer',
-    marginBottom: -1,
     transition: 'color 0.15s, border-color 0.15s',
   };
 }
@@ -1210,6 +1217,19 @@ export default function UserManagement() {
   const tab = Object.values(TAB).includes(asked) ? asked : TAB.ALL;
   const setTab = (key) => setParams(key === TAB.ALL ? {} : { tab: key }, { replace: true });
 
+  // The open tab in view when the row scrolls (a phone, or ?tab= opening one
+  // at the far end). Only the row moves, never the page.
+  const tabBar = useRef(null);
+  useEffect(() => {
+    const bar = tabBar.current;
+    const on = bar?.querySelector('[aria-current="page"]');
+    if (!on) return;
+    const b = bar.getBoundingClientRect();
+    const r = on.getBoundingClientRect();
+    if (r.left < b.left) bar.scrollLeft += r.left - b.left;
+    else if (r.right > b.right) bar.scrollLeft += r.right - b.right;
+  }, [tab]);
+
   // One name for the page whichever tab is open, like the rail's link: the
   // heading and the browser tab used to change with every tab (mock defense
   // notes, 2026-10-23: "tab name … changing … but still in the same page").
@@ -1217,9 +1237,14 @@ export default function UserManagement() {
     <Page>
       <PageHeader title="User Management" />
 
-      <div style={tabBarStyle}>
+      <div ref={tabBar} style={tabBarStyle}>
         {Object.values(TAB).map(key => (
-          <button key={key} style={tabStyle(tab === key)} onClick={() => setTab(key)}>
+          <button
+            key={key}
+            aria-current={tab === key ? 'page' : undefined}
+            style={tabStyle(tab === key)}
+            onClick={() => setTab(key)}
+          >
             {TAB_META[key].label}
           </button>
         ))}

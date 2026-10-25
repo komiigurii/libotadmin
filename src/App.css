@@ -201,12 +201,45 @@ tr.row-open:focus-visible td { background: var(--card-bg-hover); }
    becoming a drawer on a phone, the page gutters, the grids) live in
    console.css. */
 
-/* Tables are the one thing that genuinely cannot reflow — a 7-column
-   moderation table has no sensible 360px layout. They scroll horizontally
-   inside their card instead, which keeps the row intact. */
-@media (max-width: 720px) {
-  .table-scroll { -webkit-overflow-scrolling: touch; }
+/* A table wider than its box (Layout's useFitTable sets .stacked): each row
+   is a card. The main column (data-main) heads it on its own line, the other
+   columns sit beside each other as small labelled facts, as many to a line as
+   fit, and a column with no name (the row's buttons) takes a line of its own.
+   The cells' inline padding and alignment are the table's, hence !important. */
+.table-scroll.stacked table,
+.table-scroll.stacked tbody { display: block; width: 100%; }
+.table-scroll.stacked thead {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
 }
+.table-scroll.stacked tr {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(min(132px, 100%), 1fr));
+  gap: 10px 18px; padding: 14px 16px; border-bottom: 1px solid var(--divider);
+}
+.table-scroll.stacked tr:last-child { border-bottom: none; }
+.table-scroll.stacked td {
+  display: block; min-width: 0; padding: 0 !important; border: none !important;
+  text-align: left !important; overflow-wrap: anywhere;
+}
+.table-scroll.stacked td[data-main] { order: -1; }
+.table-scroll.stacked td[data-main],
+.table-scroll.stacked td[data-label=''],
+.table-scroll.stacked td:has(button),
+.table-scroll.stacked td[colspan] { grid-column: 1 / -1; }
+.table-scroll.stacked td:not([data-main], :has(button))[data-label]:not([data-label=''])::before {
+  content: attr(data-label); display: block; margin-bottom: 2px;
+  font-size: 12px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase;
+  color: var(--text-muted);
+}
+/* A row's buttons: a line of their own under the facts, from the left. */
+.table-scroll.stacked td:has(button) { order: 1; }
+.table-scroll.stacked td:has(button) > * { justify-content: flex-start !important; align-items: flex-start !important; }
+/* A card has room for what a row cut to one line (a ban's reason). */
+.table-scroll.stacked td [style*='text-overflow: ellipsis'] { white-space: normal !important; max-width: none !important; }
+/* The hover tint is the card's, not each cell's. */
+.table-scroll.stacked tbody tr:hover { background: var(--card-bg-hover); }
+.table-scroll.stacked tbody tr:hover td { background: transparent; }
+.table-scroll.stacked tr.row-open:focus-visible { outline-offset: -2px; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {

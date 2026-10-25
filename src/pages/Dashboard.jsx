@@ -659,8 +659,9 @@ const d = {
   itemRow:  { display: 'flex', alignItems: 'center', gap: 12, padding: '11px 16px', borderBottom: `1px solid ${t.divider}` },
   rowIcon:  { width: 36, height: 36, borderRadius: 10, flexShrink: 0, display: 'grid', placeItems: 'center', background: t.sidebarBg, color: t.textSecondary, border: `1px solid ${t.divider}` },
   rowText:  { display: 'flex', flexDirection: 'column', minWidth: 0, flex: 1 },
-  rowLabel: { fontSize: 16, fontWeight: 700, color: t.textPrimary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
-  rowDetail: { fontSize: 14.5, color: t.textMuted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  rowLabel: { fontSize: 16, fontWeight: 700, color: t.textPrimary, overflowWrap: 'anywhere' },
+  // Up to two lines on any screen (a visitor's spots can be a long list).
+  rowDetail: { fontSize: 14.5, color: t.textMuted, overflowWrap: 'anywhere', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' },
   chevron:  { display: 'inline-flex', flexShrink: 0, color: t.textMuted },
   badge:    { flexShrink: 0, minWidth: 30, textAlign: 'center', fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 19, lineHeight: 1, padding: '5px 10px 4px', borderRadius: 8, background: t.accent, color: t.onAccent },
   clear:    { flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 15, fontWeight: 700, color: t.success },
@@ -671,20 +672,20 @@ const d = {
   pagedRows: { margin: '0 -16px' },
 
   personRow:  { display: 'flex', alignItems: 'center', gap: 11, padding: '9px 16px', borderBottom: `1px solid ${t.divider}` },
-  personName: { fontSize: 16, fontWeight: 700, color: t.textPrimary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  personName: { fontSize: 16, fontWeight: 700, color: t.textPrimary, overflowWrap: 'anywhere' },
   when:       { flexShrink: 0, color: t.textMuted, whiteSpace: 'nowrap' },
   rank:       { width: 22, textAlign: 'center', fontFamily: 'var(--font-display)', fontSize: 19, fontWeight: 700, color: t.textMuted, flexShrink: 0 },
   points:     { flexShrink: 0, fontFamily: 'var(--font-display)', fontSize: 21, fontWeight: 700, color: t.textPrimary, whiteSpace: 'nowrap' },
   pointsUnit: { fontFamily: 'var(--font-sans)', fontSize: 14, fontWeight: 400, color: t.textMuted },
 
   // Two across when the column is wide enough, one when it isn't (tablet).
-  actions:  { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 8, padding: 12 },
+  actions:  { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(150px, 100%), 1fr))', gap: 8, padding: 12 },
   action:   { display: 'flex', alignItems: 'center', gap: 9, padding: '11px 12px', borderRadius: 10, border: `1px solid ${t.border}`, background: t.sidebarBg, color: t.textPrimary, fontSize: 16, fontWeight: 700, textDecoration: 'none' },
 };
 
 // The coverage meters and category bars.
 const s = {
-  contentGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 24, padding: '14px 16px 16px' },
+  contentGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(220px, 100%), 1fr))', gap: 24, padding: '14px 16px 16px' },
   miniHead: { fontSize: 15, fontWeight: 700, color: t.textSecondary, margin: '0 0 10px' },
   meterList: { listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 11 },
   meterRow: { display: 'flex', flexDirection: 'column', gap: 5 },
@@ -697,7 +698,7 @@ const s = {
 
   barList: { listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 9 },
   barRow: { display: 'grid', gridTemplateColumns: '92px minmax(0, 1fr)', alignItems: 'center', gap: 10 },
-  barLabel: { fontSize: 15.5, color: t.textPrimary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  barLabel: { fontSize: 15.5, color: t.textPrimary, overflowWrap: 'anywhere' },
   barTrack: { display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 },
   // Square at the baseline, 4px round at the data end; 12px thick (≤ 24).
   barFill: { height: 12, borderRadius: '0 4px 4px 0', background: t.data1, minWidth: 2, flexShrink: 0, maxWidth: 'calc(100% - 30px)' },
@@ -709,7 +710,7 @@ const s = {
 // (under it when the panel is narrow).
 const vp = {
   body:   { display: 'flex', flexDirection: 'column', gap: 12, padding: '12px 16px 16px' },
-  grid:   { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px 28px', alignItems: 'start' },
+  grid:   { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(280px, 100%), 1fr))', gap: '16px 28px', alignItems: 'start' },
   muted:  { margin: 0, fontSize: 15, color: t.textMuted },
   note:   { fontSize: 14, color: t.textMuted, margin: '6px 0 0', lineHeight: 1.4 },
   // Wider labels than the category bars: these are spot names.

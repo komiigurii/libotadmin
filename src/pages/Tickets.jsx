@@ -514,7 +514,7 @@ const x = {
   subjectCell: { minWidth: 220 },
   subjectMeta: { fontSize: 13, color: t.textMuted, marginTop: 2, whiteSpace: 'nowrap' },
   subjectLink: { fontSize: 14, fontWeight: 700, color: t.textPrimary, textDecoration: 'none', overflowWrap: 'break-word' },
-  formGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '12px 16px' },
+  formGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(240px, 100%), 1fr))', gap: '12px 16px' },
   // Shorthand, like the s.select / s.textarea it's spread over.
   invalid: { border: `1px solid ${t.danger}` },
   error:   { fontSize: 12, color: t.danger, margin: '5px 0 0', display: 'flex', alignItems: 'center', gap: 4 },

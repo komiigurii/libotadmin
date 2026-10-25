@@ -454,7 +454,7 @@ const f = {
   card:     { ...s.item, padding: '18px 20px' },
   title:    { fontSize: 16, fontWeight: 700, margin: 0, color: t.textPrimary },
   lead:     { fontSize: 13, color: t.textSecondary, lineHeight: 1.5, margin: '4px 0 14px', maxWidth: 680 },
-  grid:     { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px 16px' },
+  grid:     { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(220px, 100%), 1fr))', gap: '12px 16px' },
   hint:     { fontSize: 12, color: t.textMuted, margin: '5px 0 0' },
   error:    { fontSize: 12, color: t.danger, margin: '5px 0 0', display: 'flex', alignItems: 'center', gap: 4 },
   invalid:  { border: `1px solid ${t.danger}` },
