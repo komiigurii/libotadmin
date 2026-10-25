@@ -473,9 +473,6 @@ function ThemeMenu() {
   );
 }
 
-// "Moderator · Malolos City"; the super admin's role says it all.
-const roleLine = (account) => (account.superAdmin ? account.role : `${account.role} · ${account.scope}`);
-
 function AccountMenu({ account, onProfile, onPassword, onSignOut }) {
   const { username } = account;
   const [open, setOpen] = useState(false);
@@ -483,8 +480,9 @@ function AccountMenu({ account, onProfile, onPassword, onSignOut }) {
   const close = useCallback(() => setOpen(false), []);
   useDismiss(open, close, ref);
   const pick = (fn) => () => { setOpen(false); fn(); };
-  // No profile photo or initials for staff (the user, 2026-10-25); the folded
-  // rail shows a plain person icon so the button still has something to click.
+  // No profile photo or initials for staff (the user, 2026-10-25): one line,
+  // "name · Role ⌄"; the municipality is in the menu's head. The folded rail
+  // shows a plain person icon so the button still has something to click.
   return (
     <div className="sa-account" ref={ref}>
       {open && (
@@ -505,9 +503,11 @@ function AccountMenu({ account, onProfile, onPassword, onSignOut }) {
         <span className="sa-show-collapsed" aria-hidden="true"><Icon name="user" size={20} /></span>
         <span className="sa-account-text sa-hide-collapsed">
           <span className="sa-account-name">{username || account.role}</span>
-          <span className="sa-account-role">{roleLine(account)}</span>
+          <span className="sa-account-role">
+            {username && `· ${account.role}`}
+            <span className="sa-account-caret" aria-hidden="true"><Icon name="chevron-down" size={12} /></span>
+          </span>
         </span>
-        <span className="sa-account-caret sa-hide-collapsed" aria-hidden="true"><Icon name="chevrons-up-down" size={16} /></span>
       </button>
     </div>
   );

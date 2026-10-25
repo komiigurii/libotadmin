@@ -227,26 +227,24 @@
   font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums;
 }
 
-.sa-account { position: relative; padding: 10px; border-top: 1px solid var(--sa-shell-line); }
+.sa-account { position: relative; padding: 8px; border-top: 1px solid var(--sa-shell-line); }
 .sa-account-btn {
-  display: flex; align-items: center; gap: 10px; width: 100%;
-  padding: 7px 8px 7px 10px; border-radius: 10px; border: 1px solid var(--sa-shell-line-strong); background: var(--sa-band-cell);
+  display: flex; align-items: center; gap: 10px; width: 100%; min-height: 44px;
+  padding: 7px 8px; border-radius: 10px; border: none; background: transparent;
   color: var(--sa-shell-text); cursor: pointer; text-align: left;
-  transition: background-color 0.14s ease, border-color 0.14s ease;
 }
-/* No photo to click on, so the button wears an edge and a picker caret to
-   read as something that opens. */
-.sa-account-btn:hover, .sa-account-btn[aria-expanded='true'] { background: var(--sa-shell-raised); border-color: var(--sa-shell-muted); }
-.sa-account-btn:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+.sa-account-btn:hover, .sa-account-btn[aria-expanded='true'] { background: var(--sa-shell-raised); }
+/* Staff have no photo: the account button is one line, "name · Role" and a
+   down caret (the caret is what says it opens), and a person icon only when
+   the rail is folded. The name is never cut: small enough that
+   "sanjosedelmontemod · Moderator" fits, and a longer one
+   ("donaremediostrinidadmod") puts the role under it instead. */
+.sa-show-collapsed { display: none; }
+.sa-account-text { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; align-items: center; column-gap: 4px; font-size: 12px; line-height: 1.25; }
+.sa-account-name { min-width: 0; font-weight: 700; overflow-wrap: anywhere; }
+.sa-account-role { display: flex; align-items: center; gap: 4px; flex-shrink: 0; white-space: nowrap; color: var(--sa-shell-muted); }
 .sa-account-caret { display: grid; place-items: center; flex-shrink: 0; color: var(--sa-shell-muted); }
 .sa-account-btn:hover .sa-account-caret, .sa-account-btn[aria-expanded='true'] .sa-account-caret { color: var(--sa-shell-text); }
-/* Staff have no photo: the account button is name + role, and a person icon
-   only when the rail is folded. */
-.sa-show-collapsed { display: none; }
-.sa-account-btn { min-height: 48px; }
-.sa-account-text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-.sa-account-name { font-size: 16px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.sa-account-role { font-size: 14px; color: var(--sa-shell-muted); white-space: nowrap; }
 
 /* Menus (account, theme): white panels that open over the page. */
 .sa-menu {
