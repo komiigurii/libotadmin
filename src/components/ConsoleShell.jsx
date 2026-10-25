@@ -62,7 +62,7 @@ const ADMIN_NAV = [
   ] },
   { group: 'Content', items: [
     { label: 'Spot Management', path: '/spots', icon: 'map-pin', badge: 'approvals', hint: 'Every spot, and the moderators’ requests in the Approval Queue', keys: 'spots add edit delete approval queue requests map ar food' },
-    { label: 'Municipality & District Badges', path: '/town-badges', icon: 'star', hint: 'The municipalities and districts travelers have finished, and their badge images', keys: 'badge municipality town district title bronze silver gold goat' },
+    { label: 'Badges', path: '/town-badges', icon: 'star', hint: 'Every spot’s, municipality’s and district’s badge image, and who earned it', keys: 'badge spot municipality town district title iron bronze silver gold goat' },
   ] },
   { group: 'Community', items: [
     { label: 'Rate and Review', path: '/comments', icon: 'message-square', hint: 'Every review travelers have left', keys: 'reviews comments filter warn suspend ban delete' },

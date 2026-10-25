@@ -356,10 +356,7 @@ function FileUploadField({ label, required, hint, accept, uploadType, value, onU
     setError('');
     setUploading(true);
     try {
-      const isImageUpload = uploadType === 'image' || uploadType === 'badge';
-      const fileToUpload = isImageUpload
-        ? await resizeImageFile(file, uploadType === 'badge' ? 512 : 1600)
-        : file;
+      const fileToUpload = uploadType === 'image' ? await resizeImageFile(file, 1600) : file;
 
       // Images are downscaled above, so this realistically only catches 3D
       // models — which is exactly where it's needed, since a .glb straight out
@@ -393,13 +390,7 @@ function FileUploadField({ label, required, hint, accept, uploadType, value, onU
   };
 
   const thumb =
-    previewType === 'badge' ? (
-      value ? (
-        <img src={value} alt="" style={styles.thumbBadge} onError={() => { setError('Broken link — cleared, please re-upload.'); onUploaded(''); }} />
-      ) : (
-        <div style={styles.thumbEmpty}>—</div>
-      )
-    ) : previewType === 'image' ? (
+    previewType === 'image' ? (
       value ? (
         <img src={value} alt="" style={styles.thumbImg} onError={() => { setError('Broken link — cleared, please re-upload.'); onUploaded(''); }} />
       ) : (
@@ -1305,7 +1296,8 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
     image:           initial?.image            || '',
     modelUrl:        initial?.modelUrl         || '',
     ARModelUrl:      initial?.AR3DModelURL     || '',
-    Badge:           initial?.Badge            || '',
+    // No badge image: since 2026-10-25 only an admin sets it, on the Badges
+    // page (pages/TownBadges.jsx), once the spot is live.
     coordinates_lat: initial?.coordinates?.lat || '',
     coordinates_lng: initial?.coordinates?.lng || '',
     // What the spot uses now — its own, or the default for one that never
@@ -1712,7 +1704,6 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
   if (!form.image) {
     return fail('media', 'Spot image is required');
   }
-  if (isNew && !form.Badge) return fail('media', 'Badge image is required');
   // Nature and Festivals spots have no 3D model (the paper's limitation).
   if (isNew && withAR && !form.modelUrl) return fail('media', 'Display 3D model is required');
   // Typed coordinates can be blank, half-finished ("14.") or out of range, so
@@ -1776,7 +1767,6 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
     image: form.image,
     modelUrl: form.modelUrl || null,
     AR3DModelURL: form.ARModelUrl || null,
-    Badge: form.Badge || null,
     coordinates: { lat: spotLatNum, lng: spotLngNum },
     modelsCoordinates: arModels
       .map(model => ({
@@ -1837,7 +1827,7 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
   const ok = await confirmAction(
     !isModerator
       ? (isNew
-        ? `"${payload.name}" goes live in the app now, with its missions and badge.`
+        ? `"${payload.name}" goes live in the app now, with its missions. Add its badge image on the Badges page.`
         : `Your changes to "${initial.name}" go live in the app now.`)
       : isNew
         ? `"${payload.name}" goes to an admin for approval. It shows in the app once it's approved.`
@@ -1911,7 +1901,6 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
   const hasAR = spotHasAR(form.category);
   const missingMedia = [
     !form.image && 'spot image',
-    isNew && !form.Badge && 'badge image',
     isNew && hasAR && !form.modelUrl && 'display 3D model',
   ].filter(Boolean);
   const missingAr = isNew && hasAR ? [
@@ -2212,11 +2201,11 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
               <section style={styles.section}>
                 <p style={styles.panelIntro}>
                   What the app shows on this spot's page. The AR model and the restaurant
-                  photo are on the AR and Food mission tabs.
+                  photo are on the AR and Food mission tabs. The spot's badge image is set
+                  by an admin on the Badges page.
                 </p>
                 <div style={styles.uploadGrid}>
                   <FileUploadField label="Spot image" required accept="image/*" uploadType="image" previewType="image" value={form.image} onUploaded={setField('image')} />
-                  <FileUploadField label="Badge image" required={isNew} hint="Reward for visiting" accept="image/*" uploadType="badge" previewType="badge" value={form.Badge} onUploaded={setField('Badge')} />
                   <FileUploadField label="Display 3D model" required={isNew && hasAR} hint=".glb — spot detail screen" accept=".glb,.gltf" uploadType="model" previewType="file" value={form.modelUrl} onUploaded={setField('modelUrl')} />
                 </div>
               </section>
@@ -2573,7 +2562,6 @@ const styles = {
   uploadCardBody: { display: 'flex', flexDirection: 'column', gap: 6, minWidth: 0, flex: 1 },
 
   thumbImg:   { width: 56, height: 56, objectFit: 'cover', borderRadius: radius.md, flexShrink: 0, border: `1px solid ${t.border}` },
-  thumbBadge: { width: 56, height: 56, objectFit: 'contain', borderRadius: radius.md, flexShrink: 0, border: `1px solid ${t.border}`, background: t.cardBg },
   thumbEmpty: { width: 56, height: 56, borderRadius: radius.md, flexShrink: 0, border: `1px dashed ${t.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: t.textMuted, fontSize: 18 },
 
   uploadRow: { display: 'flex', alignItems: 'center', gap: 8 },

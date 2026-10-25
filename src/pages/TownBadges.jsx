@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import api, { townBadgeAPI, uploadAPI } from '../api/api';
+import api, { townBadgeAPI, spotBadgeAPI, uploadAPI } from '../api/api';
 import { theme as t, radius, fonts } from '../theme';
 import { Page, PageHeader, Toolbar, FilterTabs, Button, Loading, ErrorBanner, EmptyState, pageStyles } from '../components/Layout';
 import Icon from '../components/Icon';
@@ -7,9 +7,11 @@ import { Paged, usePaged } from '../components/Pagination';
 import { notify, confirmAction } from '../components/AppAlert';
 import { useLive } from '../api/live';
 
-// Town & District Badges — the tiers of achievement (LibotBackend
-// utils/achievements.js; the thesis panel, 2026-10-24): finishing every mission
-// at every spot in a town earns its badge and "<Town> Traveler" (bronze);
+// Badges — the tiers of achievement (LibotBackend utils/achievements.js; the
+// thesis panel, 2026-10-24): finishing every mission at a spot earns its badge
+// (iron, set only here since 2026-10-25: the spot form no longer has it, so a
+// new spot goes live without one until an admin adds it, and an image can only
+// be replaced, not removed); every spot in a town, its badge and "<Town> Traveler" (bronze);
 // every town in a district that has spots, the district's badge and "District
 // 1 Traveler" (silver); every town in Bulacan, the Bulacan badge and The GOAT
 // Traveler (gold, 2026-10-25). Here the admin sets each town's and district's
@@ -52,7 +54,20 @@ function shrinkBadge(file, max = 512) {
 
 // What each kind of badge says, and how its image is saved. Every town's badge
 // says the same thing about its own town; a district's about its district.
+// A spot badge comes with no title: it counts toward its town's.
 const KINDS = {
+  spot: {
+    tier: 'Iron',
+    id: (x) => x.spotId,
+    name: (x) => x.name,
+    meta: (x) => `${x.municipality || 'No municipality'} · ${x.earnedBy} earned`,
+    wording: (x) => `Finished every mission at ${x.name}`,
+    reward: (x) => (x.municipality
+      ? <span>· Counts toward the <strong style={s.titleName}>{x.municipality}</strong> badge</span>
+      : null),
+    canRemove: false,
+    save: (x, image) => spotBadgeAPI.save(x.spotId, image),
+  },
   town: {
     tier: 'Bronze',
     id: (x) => x.municipality,
@@ -79,7 +94,7 @@ const KINDS = {
   },
 };
 
-const KIND_METAL = { town: 'bronze', district: 'silver', bulacan: 'gold' };
+const KIND_METAL = { spot: 'iron', town: 'bronze', district: 'silver', bulacan: 'gold' };
 
 function BadgeCard({ item, kind, onSaved }) {
   const k = KINDS[kind];
@@ -148,23 +163,29 @@ function BadgeCard({ item, kind, onSaved }) {
         <div style={s.cardHead}>
           <h2 style={s.townName}>{name}</h2>
           <span style={s.meta}>
-            {item.spots ? `${item.spots} spot${item.spots === 1 ? '' : 's'}` : 'No spots yet'}
-            {' · '}
-            {item.earnedBy} earned
+            {k.meta ? k.meta(item) : (
+              <>
+                {item.spots ? `${item.spots} spot${item.spots === 1 ? '' : 's'}` : 'No spots yet'}
+                {' · '}
+                {item.earnedBy} earned
+              </>
+            )}
           </span>
         </div>
         <p style={s.wording}>{k.wording(item)}</p>
         <p style={s.titleLine}>
           <span aria-hidden="true" style={{ ...s.dot, background: s[KIND_METAL[kind]] }} />
           <span style={s.tier}>{k.tier}</span>
-          <span>· Comes with the title <strong style={s.titleName}>{k.title(item)}</strong></span>
+          {k.reward
+            ? k.reward(item)
+            : <span>· Comes with the title <strong style={s.titleName}>{k.title(item)}</strong></span>}
         </p>
 
         <div style={s.actions}>
           <Button size="sm" icon="image" onClick={() => fileRef.current?.click()} disabled={busy}>
             {busy ? 'Saving…' : image ? 'Replace image' : 'Upload image'}
           </Button>
-          {image && <Button size="sm" variant="danger" onClick={remove} disabled={busy}>Remove image</Button>}
+          {image && k.canRemove !== false && <Button size="sm" variant="danger" onClick={remove} disabled={busy}>Remove image</Button>}
           <input ref={fileRef} type="file" accept="image/png,image/webp,image/jpeg" onChange={pick} style={{ display: 'none' }} />
         </div>
         {error && <p style={s.error} role="alert"><Icon name="alert-triangle" size={12} /> {error}</p>}
@@ -173,13 +194,18 @@ function BadgeCard({ item, kind, onSaved }) {
   );
 }
 
+// Spots still missing their badge image first, so they're the first thing seen.
+const byMissingThenName = (a, b) =>
+  (!!a.saved.image - !!b.saved.image) || a.name.localeCompare(b.name);
+
 export default function TownBadges() {
+  const [spotBadges, setSpotBadges] = useState([]);
   const [towns, setTowns] = useState([]);
   const [districts, setDistricts] = useState([]);
   const [bulacan, setBulacan] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [show, setShow] = useState('spots');
+  const [show, setShow] = useState('spotBadges');
 
   // `quiet`: a live update. Each card keeps what is being typed into it.
   const load = async ({ quiet = false } = {}) => {
@@ -188,7 +214,10 @@ export default function TownBadges() {
       setError(null);
     }
     try {
-      const [townList, above] = await Promise.all([townBadgeAPI.getAdmin(), districtBadgeAPI.getAdmin()]);
+      const [spotList, townList, above] = await Promise.all([
+        spotBadgeAPI.getAdmin(), townBadgeAPI.getAdmin(), districtBadgeAPI.getAdmin(),
+      ]);
+      setSpotBadges([...spotList].sort(byMissingThenName));
       setTowns(townList);
       setDistricts(above.districts);
       setBulacan(above.bulacan);
@@ -205,16 +234,23 @@ export default function TownBadges() {
   const withSpots = towns.filter((x) => x.spots > 0);
   const districtsWithSpots = districts.filter((x) => x.spots > 0);
   // Under Districts, the Bulacan badge comes first: it takes every district.
-  const kindOf = (item) => (show !== 'districts' ? 'town' : item.key === 'bulacan' ? 'bulacan' : 'district');
-  const visible = show === 'spots' ? withSpots : show === 'all' ? towns : [...(bulacan ? [bulacan] : []), ...districts];
+  const kindOf = (item) => (show === 'spotBadges' ? 'spot'
+    : show !== 'districts' ? 'town' : item.key === 'bulacan' ? 'bulacan' : 'district');
+  const visible = show === 'spotBadges' ? spotBadges
+    : show === 'spots' ? withSpots : show === 'all' ? towns : [...(bulacan ? [bulacan] : []), ...districts];
   const paged = usePaged(visible, show);
+  const missingSpotArt = spotBadges.filter((x) => !x.saved.image).length;
   const missingTownArt = withSpots.filter((x) => !x.saved.image).length;
   const missingDistrictArt = districtsWithSpots.filter((x) => !x.saved.image).length;
   const missingBulacanArt = bulacan?.spots > 0 && !bulacan.saved.image;
+  const missingCount = missingSpotArt + missingTownArt + missingDistrictArt + (missingBulacanArt ? 1 : 0);
 
+  // A spot keeps its place in the list when its image is saved: re-sorting
+  // under the admin's cursor would move the card they just used.
   const onSaved = (savedKind, id, badge) => {
     const merge = (x) => ({ ...x, ...badge, saved: { ...x.saved, ...badge.saved } });
-    if (savedKind === 'town') setTowns((prev) => prev.map((x) => (x.municipality === id ? merge(x) : x)));
+    if (savedKind === 'spot') setSpotBadges((prev) => prev.map((x) => (x.spotId === id ? merge(x) : x)));
+    else if (savedKind === 'town') setTowns((prev) => prev.map((x) => (x.municipality === id ? merge(x) : x)));
     else if (savedKind === 'bulacan') setBulacan((prev) => prev && merge(prev));
     else setDistricts((prev) => prev.map((x) => (x.district === id ? merge(x) : x)));
   };
@@ -222,21 +258,23 @@ export default function TownBadges() {
   return (
     <Page>
       <PageHeader
-        title="Municipality & District Badges"
-        count={loading ? '…' : withSpots.length + districtsWithSpots.length + (bulacan?.spots > 0 ? 1 : 0)}
+        title="Badges"
+        count={loading ? '…' : spotBadges.length + withSpots.length + districtsWithSpots.length + (bulacan?.spots > 0 ? 1 : 0)}
       />
 
       {error && <ErrorBanner onDismiss={() => setError(null)}>{error}</ErrorBanner>}
 
-      {!loading && (missingTownArt + missingDistrictArt > 0 || missingBulacanArt) && (
+      {!loading && missingCount > 0 && (
         <div style={s.note}>
           <Icon name="info" size={14} />
           <span>
             {[
+              missingSpotArt && `${missingSpotArt} of ${spotBadges.length} spots`,
               missingTownArt && `${missingTownArt} of ${withSpots.length} municipalities with spots`,
               missingDistrictArt && `${missingDistrictArt} of ${districtsWithSpots.length} districts with spots`,
               missingBulacanArt && 'the Bulacan badge',
-            ].filter(Boolean).join(', ').replace(/, ([^,]*)$/, ' and $1')} {missingTownArt + missingDistrictArt + (missingBulacanArt ? 1 : 0) === 1 ? 'has' : 'have'} no badge image yet.
+            ].filter(Boolean).join(', ').replace(/, ([^,]*)$/, ' and $1')} {missingCount === 1 ? 'has' : 'have'} no badge image yet.
+            {missingSpotArt > 0 && ' A spot without one can’t be earned yet.'}
           </span>
         </div>
       )}
@@ -248,6 +286,7 @@ export default function TownBadges() {
           value={show}
           onChange={setShow}
           options={[
+            { value: 'spotBadges', label: 'Spots', count: spotBadges.length },
             { value: 'spots',     label: 'Municipalities with spots', count: withSpots.length },
             { value: 'all',       label: 'All 24 municipalities', count: towns.length },
             { value: 'districts', label: 'Districts & Bulacan', count: districts.length + (bulacan ? 1 : 0) },
@@ -258,9 +297,11 @@ export default function TownBadges() {
       {loading ? (
         <Loading label="Loading the badges…" kind="tiles" />
       ) : visible.length === 0 ? (
-        <EmptyState icon="map-pin" title="No municipality has spots yet" subtitle="A municipality's badge can be earned once it has at least one spot." />
+        show === 'spotBadges'
+          ? <EmptyState icon="map-pin" title="No spots yet" subtitle="Each spot's badge shows here once the spot is live." />
+          : <EmptyState icon="map-pin" title="No municipality has spots yet" subtitle="A municipality's badge can be earned once it has at least one spot." />
       ) : (
-        <Paged {...paged} label={show === 'districts' ? 'District pages' : 'Municipality pages'}>
+        <Paged {...paged} label={show === 'spotBadges' ? 'Spot pages' : show === 'districts' ? 'District pages' : 'Municipality pages'}>
           <div style={s.grid}>
             {paged.rows.map((item) => (
               <BadgeCard key={KINDS[kindOf(item)].id(item)} item={item} kind={kindOf(item)} onSaved={onSaved} />
@@ -274,8 +315,9 @@ export default function TownBadges() {
 
 const s = {
   ...pageStyles,
-  // The tiers' metals (the app's bronze, silver and gold), only as the cards'
+  // The tiers' metals (the app's iron, bronze, silver and gold), only as the cards'
   // top edge and the dot by the tier's name: the words stay in the theme's colours.
+  iron: '#5E5A57',
   bronze: '#B4703A',
   silver: '#8E9AA3',
   gold: '#D9B21A',

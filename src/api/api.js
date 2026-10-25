@@ -218,6 +218,13 @@ export const townBadgeAPI = {
     api.put(`/api/municipality-badges/${encodeURIComponent(municipality)}`, data).then(r => r.data.badge),
 };
 
+// Each spot's badge image (iron). Only an admin sets it, on the Badges page;
+// the spot form doesn't have it (2026-10-25).
+export const spotBadgeAPI = {
+  getAdmin: () => api.get('/api/spot-badges/admin').then(r => r.data.spots || []),
+  save: (spotId, image) => api.put(`/api/spot-badges/${spotId}`, { image }).then(r => r.data.badge),
+};
+
 // The moderator accounts, for admins (QA 2026-10-16), with their request
 // counts. Making and changing them goes through accountsAPI.
 export const moderatorsAPI = {
