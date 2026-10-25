@@ -11,17 +11,19 @@ import { useLive } from '../api/live';
 // utils/achievements.js; the thesis panel, 2026-10-24): finishing every mission
 // at every spot in a town earns its badge and "<Town> Traveler" (bronze);
 // every town in a district that has spots, the district's badge and "District
-// 1 Traveler" (silver); every town in Bulacan, The GOAT Traveler (gold, a title
-// only). Here the admin sets each town's and district's badge image, and that
-// image is the badge — no drawn stand-in. The name and wording are the same
+// 1 Traveler" (silver); every town in Bulacan, the Bulacan badge and The GOAT
+// Traveler (gold, 2026-10-25). Here the admin sets each town's and district's
+// badge image, and Bulacan's (first under Districts), and that image is the
+// badge — no drawn stand-in. The name and wording are the same
 // pattern for every one and can't be edited (mock defense notes, 2026-10-23:
 // edited wording would make the achievements inconsistent), so a save also
 // puts back any town wording changed before. Admins only, like the backend
 // routes.
 
-// The district badges' images (LibotBackend routes/districtBadges.js).
+// The district badges' and the Bulacan badge's images (LibotBackend routes/districtBadges.js).
 const districtBadgeAPI = {
-  getAdmin: () => api.get('/api/achievements/district-badges/admin').then((r) => r.data.districts || []),
+  getAdmin: () => api.get('/api/achievements/district-badges/admin')
+    .then((r) => ({ districts: r.data.districts || [], bulacan: r.data.bulacan || null })),
   save: (district, data) =>
     api.put(`/api/achievements/district-badges/${encodeURIComponent(district)}`, data).then((r) => r.data.badge),
 };
@@ -67,7 +69,17 @@ const KINDS = {
     title: (x) => x.title?.name || `${x.name} Traveler`,
     save: (x, image) => districtBadgeAPI.save(x.district, { image }),
   },
+  bulacan: {
+    tier: 'Gold',
+    id: () => 'bulacan',
+    name: () => 'Bulacan',
+    wording: () => 'Finished every mission in every municipality of Bulacan with spots',
+    title: (x) => x.title?.name || 'The GOAT Traveler',
+    save: (x, image) => districtBadgeAPI.save('bulacan', { image }),
+  },
 };
+
+const KIND_METAL = { town: 'bronze', district: 'silver', bulacan: 'gold' };
 
 function BadgeCard({ item, kind, onSaved }) {
   const k = KINDS[kind];
@@ -119,7 +131,7 @@ function BadgeCard({ item, kind, onSaved }) {
   };
 
   return (
-    <article style={{ ...s.card, borderTop: `3px solid ${kind === 'town' ? s.bronze : s.silver}` }} aria-label={`${name} badge`}>
+    <article style={{ ...s.card, borderTop: `3px solid ${s[KIND_METAL[kind]]}` }} aria-label={`${name} badge`}>
       <div style={s.art}>
         {image ? (
           <img src={image} alt="" style={s.artImg} onError={() => setError('That image link is broken — upload it again.')} />
@@ -143,7 +155,7 @@ function BadgeCard({ item, kind, onSaved }) {
         </div>
         <p style={s.wording}>{k.wording(item)}</p>
         <p style={s.titleLine}>
-          <span aria-hidden="true" style={{ ...s.dot, background: kind === 'town' ? s.bronze : s.silver }} />
+          <span aria-hidden="true" style={{ ...s.dot, background: s[KIND_METAL[kind]] }} />
           <span style={s.tier}>{k.tier}</span>
           <span>· Comes with the title <strong style={s.titleName}>{k.title(item)}</strong></span>
         </p>
@@ -164,6 +176,7 @@ function BadgeCard({ item, kind, onSaved }) {
 export default function TownBadges() {
   const [towns, setTowns] = useState([]);
   const [districts, setDistricts] = useState([]);
+  const [bulacan, setBulacan] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [show, setShow] = useState('spots');
@@ -175,9 +188,10 @@ export default function TownBadges() {
       setError(null);
     }
     try {
-      const [townList, districtList] = await Promise.all([townBadgeAPI.getAdmin(), districtBadgeAPI.getAdmin()]);
+      const [townList, above] = await Promise.all([townBadgeAPI.getAdmin(), districtBadgeAPI.getAdmin()]);
       setTowns(townList);
-      setDistricts(districtList);
+      setDistricts(above.districts);
+      setBulacan(above.bulacan);
     } catch (err) {
       console.error('[TownBadges]', err);
       if (!quiet) setError('Couldn’t load the badges.');
@@ -190,15 +204,18 @@ export default function TownBadges() {
 
   const withSpots = towns.filter((x) => x.spots > 0);
   const districtsWithSpots = districts.filter((x) => x.spots > 0);
-  const kind = show === 'districts' ? 'district' : 'town';
-  const visible = show === 'spots' ? withSpots : show === 'all' ? towns : districts;
+  // Under Districts, the Bulacan badge comes first: it takes every district.
+  const kindOf = (item) => (show !== 'districts' ? 'town' : item.key === 'bulacan' ? 'bulacan' : 'district');
+  const visible = show === 'spots' ? withSpots : show === 'all' ? towns : [...(bulacan ? [bulacan] : []), ...districts];
   const paged = usePaged(visible, show);
   const missingTownArt = withSpots.filter((x) => !x.saved.image).length;
   const missingDistrictArt = districtsWithSpots.filter((x) => !x.saved.image).length;
+  const missingBulacanArt = bulacan?.spots > 0 && !bulacan.saved.image;
 
   const onSaved = (savedKind, id, badge) => {
     const merge = (x) => ({ ...x, ...badge, saved: { ...x.saved, ...badge.saved } });
     if (savedKind === 'town') setTowns((prev) => prev.map((x) => (x.municipality === id ? merge(x) : x)));
+    else if (savedKind === 'bulacan') setBulacan((prev) => prev && merge(prev));
     else setDistricts((prev) => prev.map((x) => (x.district === id ? merge(x) : x)));
   };
 
@@ -206,19 +223,20 @@ export default function TownBadges() {
     <Page>
       <PageHeader
         title="Municipality & District Badges"
-        count={loading ? '…' : withSpots.length + districtsWithSpots.length}
+        count={loading ? '…' : withSpots.length + districtsWithSpots.length + (bulacan?.spots > 0 ? 1 : 0)}
       />
 
       {error && <ErrorBanner onDismiss={() => setError(null)}>{error}</ErrorBanner>}
 
-      {!loading && missingTownArt + missingDistrictArt > 0 && (
+      {!loading && (missingTownArt + missingDistrictArt > 0 || missingBulacanArt) && (
         <div style={s.note}>
           <Icon name="info" size={14} />
           <span>
             {[
               missingTownArt && `${missingTownArt} of ${withSpots.length} municipalities with spots`,
               missingDistrictArt && `${missingDistrictArt} of ${districtsWithSpots.length} districts with spots`,
-            ].filter(Boolean).join(' and ')} have no badge image yet.
+              missingBulacanArt && 'the Bulacan badge',
+            ].filter(Boolean).join(', ').replace(/, ([^,]*)$/, ' and $1')} {missingTownArt + missingDistrictArt + (missingBulacanArt ? 1 : 0) === 1 ? 'has' : 'have'} no badge image yet.
           </span>
         </div>
       )}
@@ -232,7 +250,7 @@ export default function TownBadges() {
           options={[
             { value: 'spots',     label: 'Municipalities with spots', count: withSpots.length },
             { value: 'all',       label: 'All 24 municipalities', count: towns.length },
-            { value: 'districts', label: 'Districts',        count: districts.length },
+            { value: 'districts', label: 'Districts & Bulacan', count: districts.length + (bulacan ? 1 : 0) },
           ]}
         />
       </Toolbar>
@@ -242,10 +260,10 @@ export default function TownBadges() {
       ) : visible.length === 0 ? (
         <EmptyState icon="map-pin" title="No municipality has spots yet" subtitle="A municipality's badge can be earned once it has at least one spot." />
       ) : (
-        <Paged {...paged} label={kind === 'town' ? 'Municipality pages' : 'District pages'}>
+        <Paged {...paged} label={show === 'districts' ? 'District pages' : 'Municipality pages'}>
           <div style={s.grid}>
             {paged.rows.map((item) => (
-              <BadgeCard key={KINDS[kind].id(item)} item={item} kind={kind} onSaved={onSaved} />
+              <BadgeCard key={KINDS[kindOf(item)].id(item)} item={item} kind={kindOf(item)} onSaved={onSaved} />
             ))}
           </div>
         </Paged>
@@ -256,10 +274,11 @@ export default function TownBadges() {
 
 const s = {
   ...pageStyles,
-  // The tiers' metals (the app's bronze and silver), only as the cards' top
-  // edge and the dot by the tier's name: the words stay in the theme's colours.
+  // The tiers' metals (the app's bronze, silver and gold), only as the cards'
+  // top edge and the dot by the tier's name: the words stay in the theme's colours.
   bronze: '#B4703A',
   silver: '#8E9AA3',
+  gold: '#D9B21A',
   dot: { width: 8, height: 8, borderRadius: 4, flexShrink: 0, alignSelf: 'center' },
   grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: 14 },
   card: {
