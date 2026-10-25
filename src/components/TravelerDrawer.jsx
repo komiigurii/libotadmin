@@ -155,7 +155,7 @@ function ModerationBar({ u, name, onDone }) {
   const [busy, setBusy] = useState(false);
 
   if (u.status === 'banned') {
-    return <p style={d.note}>Banned. The ban is lifted from the Suspended &amp; Banned tab.</p>;
+    return <p style={d.note}>Banned. The ban is lifted from the Warned, Suspended &amp; Banned tab.</p>;
   }
 
   const run = async (a) => {

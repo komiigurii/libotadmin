@@ -35,7 +35,7 @@ const MEDAL_INK = '#2C2810';
 const TAB = { ALL: 'all', REPORTED: 'reported', BANS: 'bans', INACTIVE: 'inactive', PROGRESS: 'progress' };
 
 // A row in any panel opens that traveler's overview (TravelerDrawer); the
-// Suspended & Banned one adds the ban, its reason and the appeal on top, and
+// Warned, Suspended & Banned one adds the ban, the warnings and the appeal, and
 // an appeal is decided there.
 const overviewOf = (u) => ({ id: u.clerkUserId, name: u.name, email: u.email });
 
@@ -449,12 +449,18 @@ const rl = {
   meta: { fontSize: 12, color: t.textMuted, lineHeight: 1.5 },
 };
 
-// ─── Suspensions & Bans panel ─────────────────────────────────────────────────
+// ─── Warned, Suspended & Banned panel ─────────────────────────────────────────
+// Warned travelers too (2026-10-25): anyone with a warning on record. A warning
+// only mutes reviews, so a warned row has nothing to unban.
+
+const recordOf = (u) => standingLabel({ warnings: u.warningsGiven ?? u.warningCount, suspensions: u.suspensionCount });
+const isMuted  = (u) => new Date(u.commentMuteUntil) > Date.now();
 
 function BannedAccountsPanel() {
   const [users,      setUsers]      = useState([]);
   const [loading,    setLoading]    = useState(true);
   const [search,     setSearch]     = useState('');
+  const [show,       setShow]       = useState('all');
   const [error,      setError]      = useState('');
   const [busyId,     setBusyId]     = useState(null);
   const [openId,     setOpenId]     = useState(null);
@@ -468,7 +474,7 @@ function BannedAccountsPanel() {
       setUsers(data || []);
     } catch (err) {
       console.error('Failed to load banned accounts:', err);
-      if (!quiet) setError("Couldn't load suspended and banned accounts.");
+      if (!quiet) setError("Couldn't load warned, suspended and banned accounts.");
     }
     if (!quiet) setLoading(false);
   };
@@ -481,7 +487,8 @@ function BannedAccountsPanel() {
     setBusyId(clerkUserId);
     try {
       await bannedAccountsAPI.unban(clerkUserId);
-      setUsers(prev => prev.filter(u => u.clerkUserId !== clerkUserId));
+      // A traveler with warnings on record stays, as warned.
+      await load({ quiet: true });
     } catch (err) {
       notify('Failed to unban: ' + (err.message || 'Unknown error'), { tone: 'danger' });
     }
@@ -507,43 +514,62 @@ function BannedAccountsPanel() {
     setBusyId(null);
   };
 
+  // An older backend sends no status: those rows are suspensions and bans.
+  const statusOf = (u) => u.status || (u.isPermanent ? 'banned' : 'suspended');
+  const count = (s) => users.filter(u => statusOf(u) === s).length;
+
   const filtered = users.filter(u => {
+    if (show !== 'all' && statusOf(u) !== show) return false;
     const q = search.toLowerCase();
     return (
       (u.name?.toLowerCase()  || '').includes(q) ||
       (u.email?.toLowerCase() || '').includes(q)
     );
   });
-  const paged = usePaged(filtered, search);
+  const paged = usePaged(filtered, `${search}|${show}`);
 
   return (
     <>
       {error && <ErrorBanner onDismiss={() => setError('')}>{error}</ErrorBanner>}
 
-      {users.length > 0 && (
-        <Toolbar>
-          <SearchInput
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            placeholder="Search by name or email…"
-          />
-        </Toolbar>
-      )}
+      <Toolbar>
+        <FilterTabs
+          label="Show"
+          pending={loading}
+          value={show}
+          onChange={setShow}
+          options={[
+            { value: 'all',       label: 'All',       count: users.length },
+            { value: 'warned',    label: 'Warned',    count: count('warned') },
+            { value: 'suspended', label: 'Suspended', count: count('suspended') },
+            { value: 'banned',    label: 'Banned',    count: count('banned') },
+          ]}
+        />
+        <SearchInput
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          placeholder="Search by name or email…"
+        />
+      </Toolbar>
 
       {loading ? (
-        <Loading label="Loading suspended and banned accounts…" cols={5} media="avatar" />
+        <Loading label="Loading warned, suspended and banned accounts…" cols={5} media="avatar" />
       ) : users.length === 0 ? (
         <EmptyState
           icon="check"
-          title="No suspended or banned accounts"
-          subtitle="Nobody is currently suspended or banned."
+          title="No warned, suspended or banned accounts"
+          subtitle="Nobody has been warned, suspended or banned."
         />
       ) : filtered.length === 0 ? (
-        <EmptyState icon="users" title="No accounts match" subtitle="Try a different name or email." />
+        <EmptyState
+          icon="users"
+          title={search ? 'No accounts match' : `No ${show} accounts`}
+          subtitle={search ? 'Try a different name or email.' : 'Try another filter.'}
+        />
       ) : (
-        <Paged {...paged} label="Suspended and banned pages">
+        <Paged {...paged} label="Warned, suspended and banned pages">
         <Table
-          caption="Suspended and banned accounts"
+          caption="Warned, suspended and banned accounts"
           head={<>
             <Th>Traveler</Th>
             <Th>Reason</Th>
@@ -556,6 +582,8 @@ function BannedAccountsPanel() {
             const hasAppeal = !!u.appealStatus && u.appealStatus !== 'none';
             const appeal    = APPEAL_STATUS[u.appealStatus];
             const busy      = busyId === u.clerkUserId;
+            const status    = statusOf(u);
+            const reason    = status === 'warned' ? u.warnings?.[0]?.reason : u.banReason;
 
             return (
               <Row key={u.clerkUserId} onOpen={() => setOpenId(u.clerkUserId)} label={`Details of ${u.name || 'this traveler'}`}>
@@ -568,26 +596,29 @@ function BannedAccountsPanel() {
                   />
                 </Td>
                 <Td>
-                  <span style={pageStyles.clampCell} title={u.banReason}>
-                    {u.banReason || '—'}
+                  <span style={pageStyles.clampCell} title={reason}>
+                    {reason || '—'}
                   </span>
                 </Td>
                 {/* "Warning 3 · Suspension 1": every warning ever given (QA
                     2026-10-16), not warningCount, which restarts after two. */}
-                <Td muted={!standingLabel({ warnings: u.warningsGiven ?? u.warningCount, suspensions: u.suspensionCount })}>
-                  {standingLabel({ warnings: u.warningsGiven ?? u.warningCount, suspensions: u.suspensionCount }) || 'No warnings'}
+                <Td muted={!recordOf(u)}>
+                  {recordOf(u) || 'No warnings'}
                 </Td>
                 <Td>
                   <div style={pageStyles.pillStack}>
-                    {u.isPermanent
-                      ? <StatusPill tone="danger"  icon="slash">Permanent ban</StatusPill>
-                      : <StatusPill tone="warning" icon="clock">{remaining(u.suspendedUntil)}</StatusPill>}
+                    {status === 'banned' && <StatusPill tone="danger" icon="slash">Permanent ban</StatusPill>}
+                    {status === 'suspended' && <StatusPill tone="warning" icon="clock">{remaining(u.suspendedUntil)}</StatusPill>}
+                    {status === 'warned' && (isMuted(u)
+                      ? <StatusPill tone="warning" icon="alert-triangle">Muted · {remaining(u.commentMuteUntil).toLowerCase()}</StatusPill>
+                      : <StatusPill tone="neutral" icon="alert-triangle">Warned</StatusPill>)}
                     {appeal && (
                       <StatusPill tone={appeal.tone} icon={appeal.icon}>{appeal.label}</StatusPill>
                     )}
                   </div>
                 </Td>
                 <Td align="right">
+                  {status === 'warned' ? '—' : (
                   <div style={pageStyles.cellActions}>
                     {hasAppeal && (
                       <Button size="sm" icon="message-square" onClick={() => setOpenId(u.clerkUserId)}>
@@ -603,6 +634,7 @@ function BannedAccountsPanel() {
                       Unban
                     </Button>
                   </div>
+                  )}
                 </Td>
               </Row>
             );
@@ -620,21 +652,42 @@ function BannedAccountsPanel() {
   );
 }
 
-// The ban or suspension, its reason in full, and the appeal with its decision.
-// The standing itself (Banned, Suspended) is the overview's own pill above.
+// The ban or suspension, its reason in full, every warning, and the appeal
+// with its decision. The standing itself (Banned, Suspended) is the overview's
+// own pill above.
 function BanDetails({ u, busy, onDecide }) {
-  const appeal = APPEAL_STATUS[u.appealStatus];
-  const record = standingLabel({ warnings: u.warningsGiven ?? u.warningCount, suspensions: u.suspensionCount });
+  const appeal   = APPEAL_STATUS[u.appealStatus];
+  const warned   = u.status === 'warned';
+  const suspended = u.status ? u.status === 'suspended' : !u.isPermanent;
+  const warnings = u.warnings || [];
   return (
     <>
       <Facts items={[
         ['Banned', u.isPermanent ? (u.bannedAt ? fmtDay(u.bannedAt) : 'For good') : null],
-        ['Suspended until', !u.isPermanent && u.suspendedUntil ? `${fmtDateTime(u.suspendedUntil)} (${remaining(u.suspendedUntil).toLowerCase()})` : null],
-        ['Record', record || 'No warnings'],
+        ['Suspended until', suspended && u.suspendedUntil ? `${fmtDateTime(u.suspendedUntil)} (${remaining(u.suspendedUntil).toLowerCase()})` : null],
+        ['Reviews muted until', isMuted(u) ? `${fmtDateTime(u.commentMuteUntil)} (${remaining(u.commentMuteUntil).toLowerCase()})` : null],
+        ['Record', recordOf(u) || 'No warnings'],
       ]} />
-      <DetailSection title="Reason">
-        <DetailText>{u.banReason || 'No reason was written down.'}</DetailText>
-      </DetailSection>
+      {!warned && (
+        <DetailSection title="Reason">
+          <DetailText>{u.banReason || 'No reason was written down.'}</DetailText>
+        </DetailSection>
+      )}
+      {warnings.length > 0 && (
+        <DetailSection title={`Warnings (${warnings.length})`}>
+          <ul style={rl.list}>
+            {warnings.map((w, i) => (
+              <li key={i} style={rl.item}>
+                <DetailText>{w.reason || 'No reason was written down.'}</DetailText>
+                <div style={rl.meta}>
+                  {w.issuedAt ? fmtDateTime(w.issuedAt) : 'Date not recorded'}
+                  {w.muteUntil ? ` · reviews muted until ${fmtDay(w.muteUntil)}` : ''}
+                </div>
+              </li>
+            ))}
+          </ul>
+        </DetailSection>
+      )}
       {appeal && (
         <DetailSection title={`Appeal${u.appealedAt ? `, sent ${fmtDateTime(u.appealedAt)}` : ''}`}>
           <DetailText>{u.appealText || '(No appeal text provided.)'}</DetailText>
@@ -936,7 +989,7 @@ function TravelerProgressPanel() {
 const TAB_META = {
   [TAB.ALL]:      { label: 'All Users' },
   [TAB.REPORTED]: { label: 'Reported' },
-  [TAB.BANS]:     { label: 'Suspended & Banned' },
+  [TAB.BANS]:     { label: 'Warned, Suspended & Banned' },
   [TAB.INACTIVE]: { label: 'Inactive' },
   [TAB.PROGRESS]: { label: 'Leaderboard' },
 };
