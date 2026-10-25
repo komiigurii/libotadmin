@@ -483,13 +483,13 @@ function AccountMenu({ account, onProfile, onPassword, onSignOut }) {
   const close = useCallback(() => setOpen(false), []);
   useDismiss(open, close, ref);
   const pick = (fn) => () => { setOpen(false); fn(); };
-  const initial = (username || account.role).charAt(0).toUpperCase();
+  // No profile photo or initials for staff (the user, 2026-10-25); the folded
+  // rail shows a plain person icon so the button still has something to click.
   return (
     <div className="sa-account" ref={ref}>
       {open && (
         <div className="sa-menu" role="menu" aria-label="Your account" style={{ left: 10, right: 10, bottom: 'calc(100% - 4px)' }}>
           <div className="sa-menu-head">
-            <span className="sa-avatar" aria-hidden="true">{initial}</span>
             <span style={{ minWidth: 0 }}>
               <span style={{ display: 'block', fontWeight: 700, fontSize: 16, overflowWrap: 'anywhere' }}>{username || account.role}</span>
               <span style={{ display: 'block', fontSize: 14, color: 'var(--text-muted)' }}>{account.role} · {account.scope}</span>
@@ -502,7 +502,7 @@ function AccountMenu({ account, onProfile, onPassword, onSignOut }) {
       )}
       <button type="button" className="sa-account-btn" onClick={() => setOpen((v) => !v)} aria-haspopup="menu" aria-expanded={open}
         aria-label={`Your account${username ? `, ${username}` : ''}`}>
-        <span className="sa-avatar" aria-hidden="true">{initial}</span>
+        <span className="sa-show-collapsed" aria-hidden="true"><Icon name="user" size={20} /></span>
         <span className="sa-account-text sa-hide-collapsed">
           <span className="sa-account-name">{username || account.role}</span>
           <span className="sa-account-role">{roleLine(account)}</span>
@@ -640,7 +640,6 @@ function ProfileDialog({ account, onClose, onPassword }) {
     <div className="sa-dialog-backdrop" style={{ alignItems: 'center', paddingTop: 16 }} onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="sa-dialog" role="dialog" aria-modal="true" aria-labelledby={titleId} ref={ref} style={{ maxWidth: 420 }}>
         <div style={{ background: 'var(--sa-band)', color: 'var(--sa-shell-text)', padding: '22px 22px 18px', display: 'flex', alignItems: 'center', gap: 14 }}>
-          <span className="sa-avatar" style={{ width: 54, height: 54, fontSize: 24 }} aria-hidden="true">{(username || account.role).charAt(0).toUpperCase()}</span>
           <div style={{ minWidth: 0, flex: 1 }}>
             <h2 id={titleId} style={{ margin: 0, fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 26, lineHeight: 1.05, overflowWrap: 'anywhere' }}>{username || account.role}</h2>
             <p style={{ margin: '4px 0 0', fontSize: 15, color: 'var(--sa-shell-muted)' }}>Your account</p>

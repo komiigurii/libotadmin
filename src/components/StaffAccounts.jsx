@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { accountsAPI } from '../api/api';
-import { Button, StatusPill, Table, Th, Td, Row, Avatar, Loading, EmptyState, pageStyles as s } from './Layout';
+import { Button, StatusPill, Table, Th, Td, Row, Loading, EmptyState, pageStyles as s } from './Layout';
 import { notify, confirmAction } from './AppAlert';
 import CredentialSlip from './CredentialSlip';
 import Drawer from './Drawer';
@@ -267,7 +267,6 @@ export function StaffTable({ accounts, extra, onChanged, canManage, canReset = f
             <Row key={a.id} onOpen={() => setOpenId(a.id)} label={`Details of ${a.username}`}>
               <Td>
                 <div style={s.person}>
-                  <Avatar name={a.username} size={32} />
                   <div style={{ minWidth: 0 }}>
                     <div style={s.personName}>{a.username}</div>
                     <div style={s.personSub}>

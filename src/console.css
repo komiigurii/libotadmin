@@ -234,12 +234,10 @@
   color: var(--sa-shell-text); cursor: pointer; text-align: left;
 }
 .sa-account-btn:hover, .sa-account-btn[aria-expanded='true'] { background: var(--sa-shell-raised); }
-.sa-avatar {
-  width: 34px; height: 34px; border-radius: 50%; flex-shrink: 0;
-  display: grid; place-items: center;
-  background: var(--accent); color: var(--on-accent);
-  font-family: var(--font-display); font-weight: 700; font-size: 15px;
-}
+/* Staff have no photo: the account button is name + role, and a person icon
+   only when the rail is folded. */
+.sa-show-collapsed { display: none; }
+.sa-account-btn { min-height: 48px; }
 .sa-account-text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .sa-account-name { font-size: 16px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .sa-account-role { font-size: 14px; color: var(--sa-shell-muted); white-space: nowrap; }
@@ -365,6 +363,7 @@ button.sa-bell-item:hover, button.sa-bell-item:focus-visible { background: var(-
 .sa-shell[data-rail='collapsed'] .sa-link { justify-content: center; padding: 7px 0; }
 .sa-shell[data-rail='collapsed'] .sa-link .sa-count { position: absolute; top: 2px; right: 4px; min-width: 17px; height: 17px; padding: 0 4px; font-size: 11px; }
 .sa-shell[data-rail='collapsed'] .sa-account-btn { justify-content: center; padding: 7px 0; }
+.sa-shell[data-rail='collapsed'] .sa-show-collapsed { display: grid; place-items: center; color: var(--sa-shell-muted); }
 .sa-shell[data-rail='collapsed'] .sa-account .sa-menu { left: 8px; }
 
 /* Short windows: the rail closes up so every link fits without scrolling.
@@ -643,6 +642,7 @@ a.sa-cell:hover { background: var(--sa-shell-raised); }
   .sa-shell .sa-link { justify-content: center; padding: 7px 0; }
   .sa-shell .sa-link .sa-count { position: absolute; top: 2px; right: 4px; min-width: 17px; height: 17px; padding: 0 4px; font-size: 11px; }
   .sa-shell .sa-account-btn { justify-content: center; padding: 7px 0; }
+  .sa-shell .sa-show-collapsed { display: grid; place-items: center; color: var(--sa-shell-muted); }
   .sa-rail-toggle { display: none !important; }
 }
 @media (max-width: 860px) {

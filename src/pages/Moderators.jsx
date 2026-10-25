@@ -87,7 +87,7 @@ export default function Moderators() {
       )}
 
       {loading ? (
-        <Loading label="Loading moderator accounts…" cols={5} media="avatar" />
+        <Loading label="Loading moderator accounts…" cols={5} />
       ) : mods.length === 0 ? (
         <EmptyState icon="users" title="No moderator accounts" subtitle="Use Add moderator to make the first one." />
       ) : visible.length === 0 ? (

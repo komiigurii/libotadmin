@@ -360,14 +360,13 @@ function StaffPanel({ staff, loading }) {
         <h2 id="dash-staff" className="sa-panel-title">Staff sign-ins</h2>
         <Link to="/accounts">Account Management <Icon name="chevron-right" size={13} /></Link>
       </div>
-      {loading ? <Loading label="Loading staff sign-ins…" kind="rows" media="avatar" rows={5} />
+      {loading ? <Loading label="Loading staff sign-ins…" kind="rows" rows={5} />
         : !staff ? <p style={d.pad}>Couldn’t load the staff accounts.</p>
           : rows.length === 0 ? <p style={d.pad}>No admin or moderator accounts yet.</p>
             : (
               <ul style={d.list}>
                 {rows.map((a) => (
                   <li key={a.id} style={d.staffRow}>
-                    <span style={d.staffAvatar} aria-hidden="true">{a.username.charAt(0).toUpperCase()}</span>
                     <span style={{ minWidth: 0, flex: 1 }}>
                       <span style={d.staffName}>{a.username}</span>
                       <span style={d.staffSub}>{a.lastLoginAt ? <>Signed in <span className="sa-mono">{timeAgo(a.lastLoginAt)}</span></> : 'Never signed in'}</span>
@@ -412,7 +411,6 @@ const d = {
   factV:      { margin: 0, color: 'var(--text-primary)', textAlign: 'right' },
 
   staffRow:   { display: 'flex', alignItems: 'center', gap: 11, padding: '9px 16px', borderBottom: '1px solid var(--divider)' },
-  staffAvatar: { width: 32, height: 32, borderRadius: '50%', flexShrink: 0, display: 'grid', placeItems: 'center', background: 'var(--s-blue-soft)', color: 'var(--text-primary)', fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 15 },
   staffName:  { display: 'block', fontSize: 16, fontWeight: 700, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   staffSub:   { display: 'block', fontSize: 14, color: 'var(--text-muted)' },
 

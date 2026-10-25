@@ -373,7 +373,7 @@ function StaffView({ accounts, all, title, canMake, loading, error, onDismissErr
         <SearchInput value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search by username or municipality…" />
       </Toolbar>
 
-      {loading ? <Loading label="Loading accounts…" cols={5} media="avatar" />
+      {loading ? <Loading label="Loading accounts…" cols={5} />
         : visible.length === 0 ? <EmptyState icon="users" title="No accounts match" subtitle="Try another filter or search." />
           : (
             <StaffTable
@@ -407,7 +407,7 @@ function DeletedStaffView({ accounts, loading, canMake, onChanged, hideWhenEmpty
       <Toolbar>
         <span style={a.scope}>Deleted staff · {loading ? <Bone inline w={20} h={12} /> : fmtNum(accounts.length)}</span>
       </Toolbar>
-      {loading ? <Loading label="Loading deleted staff…" cols={5} media="avatar" />
+      {loading ? <Loading label="Loading deleted staff…" cols={5} />
         : accounts.length === 0 ? <EmptyState icon="archive" title="No deleted staff" subtitle="An admin or moderator account that’s deleted shows here, kept with its history, until it’s restored." />
           : (
             <StaffTable
@@ -606,7 +606,7 @@ function LockedView({ locked, kind, title, error, onDismissError, reload, onUnlo
                 <tr key={`${acc.kind}-${acc.id}`}>
                   <Td>
                     <div style={s.person}>
-                      <Avatar name={acc.label} size={32} />
+                      {acc.kind === 'traveler' && <Avatar name={acc.label} size={32} />}
                       <div style={{ minWidth: 0 }}>
                         <div style={s.personName}>{acc.label}</div>
                         {(acc.kind === 'traveler' ? acc.email : acc.municipality) && (
