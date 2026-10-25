@@ -381,6 +381,7 @@ function StaffView({ accounts, all, title, canMake, loading, error, onDismissErr
               accounts={visible}
               canManage={(acc) => canMake.includes(acc.role)}
               canReset
+              canMove
               onChanged={onChanged}
               onUnlock={onUnlock}
             />

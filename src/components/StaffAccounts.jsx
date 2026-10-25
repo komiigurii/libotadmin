@@ -25,7 +25,7 @@ const sq = { width: 34, minHeight: 34, padding: 0 };
  *     shown once on the credential slip.
  *   - StaffTable: each account's status, last sign-in and "Last changed by …",
  *     with Reset password (a new slip; the super admin's page only),
- *     Delete (to the archive) or Restore, Move town,
+ *     Delete (to the archive) or Restore, Move town (the super admin's only),
  *     and Unlock on a locked row (the super admin's page only). A row (or its
  *     History button) opens the account's details and history. Ten a page.
  * Usernames are permanent and a moderator's name comes from the town, so
@@ -193,8 +193,10 @@ export function AddAccountForm({ roles, accounts, onCancel, onMade }) {
  * canReset: Reset password on the rows, the super admin's only; the admin's
  * Moderators page has none (user rule 2026-10-24). Delete moves an account to
  * the archive; a deleted row (Archived → Deleted staff) has Restore.
+ * canMove: Move to another municipality on moderator rows, likewise the super
+ * admin's only (user rule 2026-10-25).
  */
-export function StaffTable({ accounts, extra, onChanged, canManage, canReset = false, onUnlock, caption = 'Staff accounts', townInName = false }) {
+export function StaffTable({ accounts, extra, onChanged, canManage, canReset = false, canMove = false, onUnlock, caption = 'Staff accounts', townInName = false }) {
   const [slip, setSlip] = useState(null);
   const [moving, setMoving] = useState(null);
   const [openId, setOpenId] = useState(null);
@@ -302,7 +304,7 @@ export function StaffTable({ accounts, extra, onChanged, canManage, canReset = f
                       <Button variant="warning" icon="key" style={sq} disabled={busy === a.id} onClick={() => reset(a)}
                         aria-label={`Reset the password of ${a.username}`} title="Reset password" />
                     )}
-                    {a.role === 'moderator' && (
+                    {canMove && a.role === 'moderator' && (
                       <Button variant="subtle" icon="move" style={sq} disabled={busy === a.id} onClick={() => setMoving(a)}
                         aria-label={`Move ${a.username} to another municipality`} title="Move to another municipality" />
                     )}
