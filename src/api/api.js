@@ -149,6 +149,15 @@ export const reportAPI = {
     api.patch(`/api/reports/${id}`, { decision: 'ban', banReason }).then(r => r.data),
 };
 
+// Travelers reported by other travelers from their profile in the app
+// (User Management → Reported). One row per reported traveler; a decision
+// closes every report waiting on them. decision: warn | suspend | ban | dismiss.
+export const userReportAPI = {
+  getAll: () => api.get('/api/reports/users').then(r => r.data.travelers),
+  decide: (clerkUserId, decision, note) =>
+    api.patch(`/api/reports/user/${clerkUserId}`, { decision, note }).then(r => r.data),
+};
+
 export const authAPI = {
   // Sign-in is by assigned username (the backend still accepts an email), for
   // all three roles.

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { bannedAccountsAPI, appealAPI, inactiveUsersAPI, userProgressAPI } from '../api/api';
-import { notify, confirmAction } from '../components/AppAlert';
+import { bannedAccountsAPI, appealAPI, inactiveUsersAPI, userProgressAPI, userReportAPI } from '../api/api';
+import { notify, confirmAction, promptAction } from '../components/AppAlert';
 import {
   Page, PageHeader, Toolbar, SearchInput, FilterTabs, Table, Th, Td, Row, Button, StatusPill,
   Loading, EmptyState, ErrorBanner, Avatar, pageStyles,
@@ -32,7 +32,7 @@ const APPEAL_STATUS = {
 const MEDAL     = { 1: '#F2CE1B', 2: '#C7D0D2', 3: '#CD8B54' };
 const MEDAL_INK = '#2C2810';
 
-const TAB = { ALL: 'all', BANS: 'bans', INACTIVE: 'inactive', PROGRESS: 'progress' };
+const TAB = { ALL: 'all', REPORTED: 'reported', BANS: 'bans', INACTIVE: 'inactive', PROGRESS: 'progress' };
 
 // A row in any panel opens that traveler's overview (TravelerDrawer); the
 // Suspended & Banned one adds the ban, its reason and the appeal on top, and
@@ -181,6 +181,273 @@ function AllUsersPanel() {
     </>
   );
 }
+
+// ─── Reported panel ───────────────────────────────────────────────────────────
+// Travelers other travelers reported from their profile in the app
+// (2026-10-25). One row per reported traveler; their row opens every report on
+// them, and one decision closes all the ones waiting: Warn, Suspend or Ban (the
+// same ladders as everywhere; the backend decides each step), or Dismiss.
+
+const REPORT_STATUS = {
+  pending:   { tone: 'warning', icon: 'clock', label: 'Waiting' },
+  resolved:  { tone: 'success', icon: 'check', label: 'Action taken' },
+  dismissed: { tone: 'neutral', icon: 'x',     label: 'Dismissed' },
+};
+
+const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
+
+function StandingPills({ standing }) {
+  if (!standing) return <StatusPill tone="neutral" icon="user">Account deleted</StatusPill>;
+  return (
+    <>
+      {standing.banned    && <StatusPill tone="danger"  icon="slash">Banned</StatusPill>}
+      {!standing.banned && standing.suspended && <StatusPill tone="danger" icon="pause">Suspended</StatusPill>}
+      {!standing.banned && !standing.suspended && standing.muted && <StatusPill tone="warning" icon="pause">Muted</StatusPill>}
+    </>
+  );
+}
+
+function ReportedPanel() {
+  const [rows,    setRows]    = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error,   setError]   = useState(null);
+  const [search,  setSearch]  = useState('');
+  const [show,    setShow]    = useState('waiting');
+  const [openId,  setOpenId]  = useState(null);
+  // From the live list, so a decision shows in the open drawer at once.
+  const opened = openId && rows.find(r => r.clerkUserId === openId);
+
+  const load = async ({ quiet = false } = {}) => {
+    if (!quiet) { setLoading(true); setError(null); }
+    try {
+      setRows(await userReportAPI.getAll() || []);
+    } catch (err) {
+      console.error('[Reported]', err);
+      if (!quiet) { setError("Couldn't load reported travelers."); setRows([]); }
+    }
+    if (!quiet) setLoading(false);
+  };
+
+  useEffect(() => { load(); }, []);
+  // A new report, and any change to a reported traveler's standing.
+  useLive(['travelers'], () => load({ quiet: true }));
+
+  const waiting = rows.filter(r => r.pending > 0).length;
+  const visible = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return rows.filter(r => {
+      if (show === 'waiting' && !r.pending) return false;
+      if (show === 'decided' && r.pending) return false;
+      if (!q) return true;
+      return [r.user?.name, r.user?.email].some(v => (v || '').toLowerCase().includes(q));
+    });
+  }, [rows, search, show]);
+  const paged = usePaged(visible, `${search}|${show}`);
+
+  return (
+    <>
+      {error && <ErrorBanner onDismiss={() => setError(null)}>{error}</ErrorBanner>}
+
+      <Toolbar>
+        <FilterTabs
+          label="Show"
+          pending={loading}
+          value={show}
+          onChange={setShow}
+          options={[
+            { value: 'waiting', label: 'Waiting', count: waiting },
+            { value: 'decided', label: 'Decided', count: rows.length - waiting },
+            { value: 'all',     label: 'All',     count: rows.length },
+          ]}
+        />
+        <SearchInput
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          placeholder="Search by name or email…"
+        />
+      </Toolbar>
+
+      {loading ? (
+        <Loading label="Loading reported travelers…" cols={5} media="avatar" />
+      ) : visible.length === 0 ? (
+        <EmptyState
+          icon={rows.length === 0 || show === 'waiting' ? 'check' : 'users'}
+          title={rows.length === 0 ? 'No reported travelers'
+            : search ? 'No travelers match'
+            : show === 'waiting' ? 'Nothing waiting' : 'Nothing decided yet'}
+          subtitle={rows.length === 0
+            ? 'Travelers can report another traveler from their profile in the app.'
+            : search ? 'Try a different name or email.'
+            : show === 'waiting' ? 'Every report has been decided.' : 'Decided reports appear here.'}
+        />
+      ) : (
+        <Paged {...paged} label="Reported traveler pages">
+        <Table
+          caption="Reported travelers"
+          head={<>
+            <Th>Traveler</Th>
+            <Th>Reported for</Th>
+            <Th align="right">Reports</Th>
+            <Th align="right">Last reported</Th>
+            <Th>Status</Th>
+          </>}
+        >
+          {paged.rows.map(r => {
+            const latest = r.reports[0];
+            const reasons = r.pending ? r.reasons : [latest?.reasonLabel].filter(Boolean);
+            const st = r.pending ? null : REPORT_STATUS[latest?.status] || REPORT_STATUS.resolved;
+            return (
+              <Row key={r.clerkUserId} onOpen={() => setOpenId(r.clerkUserId)} label={`Reports on ${r.user?.name || 'this traveler'}`}>
+                <Td>
+                  <TravelerCell
+                    src={r.user?.profileImage}
+                    name={r.user?.name}
+                    email={r.user?.email}
+                    pills={<StandingPills standing={r.user?.standing} />}
+                  />
+                </Td>
+                <Td>
+                  <span style={pageStyles.clampCell} title={reasons.join(', ')}>{reasons.join(', ') || '—'}</span>
+                </Td>
+                <Td align="right" strong>{fmtNum(r.reports.length)}</Td>
+                <Td align="right" muted>{timeAgo(r.latestAt)}</Td>
+                <Td>
+                  {r.pending
+                    ? <StatusPill tone="warning" icon="clock">{r.pending} waiting</StatusPill>
+                    : <StatusPill tone={st.tone} icon={st.icon}>{st.label}</StatusPill>}
+                </Td>
+              </Row>
+            );
+          })}
+        </Table>
+        </Paged>
+      )}
+
+      {opened && (
+        <TravelerDrawer traveler={overviewOf({ ...opened.user, clerkUserId: opened.clerkUserId })} onClose={() => setOpenId(null)}>
+          <ReportDetails row={opened} onDone={() => load({ quiet: true })} />
+        </TravelerDrawer>
+      )}
+    </>
+  );
+}
+
+// Each decision asks for the reason (it's recorded on the account, and shown
+// on an appeal); Dismiss only asks to confirm.
+const REPORT_DECISIONS = [
+  {
+    key: 'warn', label: 'Warn', icon: 'alert-triangle', variant: 'warning', tone: 'warning',
+    ask: (n) => `Warn ${n}? A 1st warning mutes their reviews for 7 days; a 2nd mutes them for 14 days and suspends the account.`,
+  },
+  {
+    key: 'suspend', label: 'Suspend', icon: 'clock', variant: 'warning', tone: 'warning',
+    ask: (n) => `Suspend ${n}? They can't use their account until it ends. A 1st suspension lasts 7 days and a 2nd 14 days; a 3rd bans them permanently instead.`,
+  },
+  {
+    key: 'ban', label: 'Ban', icon: 'slash', variant: 'dangerSolid', danger: true,
+    ask: (n) => `Permanently ban ${n}? Their account is archived (never deleted), and they have 30 days to appeal.`,
+  },
+];
+
+function ReportDetails({ row, onDone }) {
+  const [busy, setBusy] = useState(false);
+  const name = row.user?.name || 'this traveler';
+  const waiting = row.reports.filter(r => r.status === 'pending');
+  const decided = row.reports.filter(r => r.status !== 'pending');
+  // A banned or deleted account can't be warned again; its reports are dismissed.
+  const canAct = !!row.user?.standing && !row.user.standing.banned;
+
+  const decide = async (key, note = '') => {
+    setBusy(true);
+    try {
+      const res = await userReportAPI.decide(row.clerkUserId, key, note);
+      notify(res?.summary || 'Done.', { tone: 'success' });
+      onDone();
+    } catch (err) {
+      notify(err?.response?.data?.message || 'Couldn’t do that. Try again.', { tone: 'danger' });
+    }
+    setBusy(false);
+  };
+
+  const act = async (a) => {
+    const note = await promptAction(a.ask(name), {
+      title: `${a.label} ${name}`,
+      label: 'Reason',
+      placeholder: `Why is ${name} being ${a.key === 'warn' ? 'warned' : a.key === 'ban' ? 'banned' : 'suspended'}?`,
+      confirmText: a.key === 'ban' ? 'Ban permanently' : a.label,
+      danger: a.danger,
+      tone: a.tone,
+    });
+    if (note != null) decide(a.key, note);
+  };
+
+  const dismiss = async () => {
+    const question = `Dismiss ${plural(waiting.length, 'report')} on ${name}? Nothing happens to their account.`;
+    if (await confirmAction(question, { confirmText: 'Dismiss' })) decide('dismiss');
+  };
+
+  return (
+    <>
+      {waiting.length > 0 && (
+        <DetailSection title={`Waiting (${waiting.length})`}>
+          <ReportList reports={waiting} />
+          <p style={pageStyles.panelNote}>
+            {canAct
+              ? `One decision closes every waiting report on ${name}.`
+              : `${name} is ${row.user?.standing ? 'already banned' : 'no longer in the app'}, so these can only be dismissed.`}
+          </p>
+          <div style={pageStyles.buttonRow}>
+            {REPORT_DECISIONS.map(a => (
+              <Button key={a.key} variant={a.variant} icon={a.icon} disabled={busy || !canAct} onClick={() => act(a)}>
+                {a.label}
+              </Button>
+            ))}
+            <Button variant="subtle" icon="x" disabled={busy} onClick={dismiss}>Dismiss</Button>
+          </div>
+        </DetailSection>
+      )}
+      {decided.length > 0 && (
+        <DetailSection title={`Decided (${decided.length})`}>
+          <ReportList reports={decided} />
+        </DetailSection>
+      )}
+    </>
+  );
+}
+
+function ReportList({ reports }) {
+  return (
+    <ul style={rl.list}>
+      {reports.map(r => {
+        const st = REPORT_STATUS[r.status] || REPORT_STATUS.pending;
+        return (
+          <li key={r._id} style={rl.item}>
+            <div style={rl.head}>
+              <strong style={{ color: t.textPrimary }}>{r.reasonLabel}</strong>
+              {r.status !== 'pending' && <StatusPill tone={st.tone} icon={st.icon}>{st.label}</StatusPill>}
+            </div>
+            {r.details && <DetailText>{r.details}</DetailText>}
+            <div style={rl.meta}>
+              By {r.reporter?.name || 'Deleted user'} · {fmtDateTime(r.createdAt)}
+            </div>
+            {r.resultSummary && r.status !== 'pending' && (
+              <div style={rl.meta}>
+                {r.adminNote ? `${r.adminNote} — ` : ''}{r.resultSummary}
+              </div>
+            )}
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+const rl = {
+  list: { listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 10 },
+  item: { padding: '10px 12px', borderRadius: radius.md, border: `1px solid ${t.divider}`, background: t.sidebarBg, display: 'flex', flexDirection: 'column', gap: 4 },
+  head: { display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', fontSize: 13.5 },
+  meta: { fontSize: 12, color: t.textMuted, lineHeight: 1.5 },
+};
 
 // ─── Suspensions & Bans panel ─────────────────────────────────────────────────
 
@@ -668,6 +935,7 @@ function TravelerProgressPanel() {
 
 const TAB_META = {
   [TAB.ALL]:      { label: 'All Users' },
+  [TAB.REPORTED]: { label: 'Reported' },
   [TAB.BANS]:     { label: 'Suspended & Banned' },
   [TAB.INACTIVE]: { label: 'Inactive' },
   [TAB.PROGRESS]: { label: 'Leaderboard' },
@@ -697,6 +965,7 @@ export default function UserManagement() {
       </div>
 
       {tab === TAB.ALL      && <AllUsersPanel />}
+      {tab === TAB.REPORTED && <ReportedPanel />}
       {tab === TAB.BANS     && <BannedAccountsPanel />}
       {tab === TAB.INACTIVE && <InactiveUsersPanel />}
       {tab === TAB.PROGRESS && <TravelerProgressPanel />}
