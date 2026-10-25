@@ -5,7 +5,7 @@ import {
   Page, PageHeader, Toolbar, SearchInput, Table, Th, Td, Row,
   Loading, EmptyState, ErrorBanner, pageStyles as s,
 } from '../components/Layout';
-import Pagination from '../components/Pagination';
+import Pagination, { PagerFoot } from '../components/Pagination';
 import Drawer from '../components/Drawer';
 import { Facts, DetailSection, DetailText, detailStyles as d } from '../components/Details';
 import { theme as t } from '../theme';
@@ -164,10 +164,10 @@ export default function ActivityLog() {
                   );
                 })}
               </Table>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+              <PagerFoot pinned={data.pages > 1}>
                 <span style={s.itemDate}>{fmtNum(data.total)} entr{data.total === 1 ? 'y' : 'ies'} · {PAGE_SIZE} a page</span>
                 <Pagination page={data.page} pages={data.pages} onChange={setPage} label="Activity log pages" />
-              </div>
+              </PagerFoot>
             </>
           )}
 

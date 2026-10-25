@@ -8,7 +8,7 @@ import {
 import { AddAccountForm, StaffTable } from '../components/StaffAccounts';
 import { notify, confirmAction, promptAction } from '../components/AppAlert';
 import CredentialSlip from '../components/CredentialSlip';
-import Pagination, { PAGE_SIZE, Paged, usePaged } from '../components/Pagination';
+import Pagination, { PAGE_SIZE, PagerFoot, Paged, usePaged } from '../components/Pagination';
 import { Bone } from '../components/Skeleton';
 import Drawer from '../components/Drawer';
 import TravelerDrawer, { Standing } from '../components/TravelerDrawer';
@@ -502,7 +502,7 @@ function TravelersView({ status, title, onShowDeleted }) {
                   </Row>
                 ))}
               </Table>
-              <div style={a.footer}>
+              <PagerFoot pinned={data.pages > 1}>
                 <span style={s.itemDate}>
                   {fmtNum(data.total)} traveler{data.total === 1 ? '' : 's'}
                   {data.deletedKept > 0 && <> · <button type="button" style={a.link} onClick={onShowDeleted}>
@@ -510,7 +510,7 @@ function TravelersView({ status, title, onShowDeleted }) {
                   </button></>}
                 </span>
                 <Pagination page={data.page} pages={data.pages} onChange={setPage} label="Traveler pages" />
-              </div>
+              </PagerFoot>
             </>
           )}
 
@@ -746,13 +746,13 @@ function ArchivedView({ reason, title }) {
                   );
                 })}
               </Table>
-              <div style={a.footer}>
+              <PagerFoot pinned={data.pages > 1}>
                 <span style={s.itemDate}>
                   {fmtNum(data.total)} archived account{data.total === 1 ? '' : 's'}. Each is kept for good and hidden from
                   the leaderboard, reviews and ratings until it’s restored.
                 </span>
                 <Pagination page={data.page} pages={data.pages} onChange={setPage} label="Archived pages" />
-              </div>
+              </PagerFoot>
             </>
           )}
 
@@ -837,7 +837,6 @@ function ArchivedDrawer({ acc, onClose }) {
 
 const a = {
   scope:  { fontSize: 15, fontWeight: 700, color: t.textPrimary, whiteSpace: 'nowrap' },
-  footer: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' },
   toolbarEnd: { marginLeft: 'auto', display: 'flex', gap: 8, flexWrap: 'wrap' },
   warn:   { display: 'flex', alignItems: 'flex-start', gap: 6, margin: 0, fontSize: 13, color: t.textSecondary, lineHeight: 1.45 },
   link:   { padding: 0, border: 'none', background: 'none', font: 'inherit', color: t.brand, textDecoration: 'underline', cursor: 'pointer' },

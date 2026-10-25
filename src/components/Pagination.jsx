@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { theme as t, radius, type } from '../theme';
+import { theme as t } from '../theme';
 import Icon from './Icon';
 import { pageNumbers } from '../utils/pagination';
 import { fmtNum } from '../utils/format';
@@ -18,30 +18,45 @@ export const PAGE_SIZE = 10;
 export default function Pagination({ page, pages, onChange, label = 'Pages' }) {
   if (!pages || pages <= 1) return null;
   const go = (n) => { if (n >= 1 && n <= pages && n !== page) onChange(n); };
+  // The buttons are styled in App.css (.pager-btn): the page you're on is a
+  // solid fill, the others plain. Inline styles mixed `border` with a
+  // `borderColor` override, and React clearing that override left the page
+  // you'd just left with a bright edge, so it looked chosen (2026-10-25).
   return (
-    <nav aria-label={label} style={s.wrap}>
-      <button type="button" style={{ ...s.btn, ...(page <= 1 ? s.off : null) }} onClick={() => go(page - 1)} disabled={page <= 1} aria-label="Previous page">
-        <Icon name="chevron-left" size={14} />
+    <nav aria-label={label} className="pager">
+      <button type="button" className="pager-btn" onClick={() => go(page - 1)} disabled={page <= 1} aria-label="Previous page">
+        <Icon name="chevron-left" size={15} />
       </button>
       {pageNumbers(page, pages).map((n, i) => (n == null
-        ? <span key={`gap-${i}`} style={s.gap} aria-hidden="true">…</span>
+        ? <span key={`gap-${i}`} className="pager-gap" aria-hidden="true">…</span>
         : (
           <button
             key={n}
             type="button"
+            className="pager-btn"
             onClick={() => go(n)}
             aria-current={n === page ? 'page' : undefined}
             aria-label={`Page ${n}`}
-            style={{ ...s.btn, ...(n === page ? s.on : null) }}
           >
             {n}
           </button>
         )))}
-      <button type="button" style={{ ...s.btn, ...(page >= pages ? s.off : null) }} onClick={() => go(page + 1)} disabled={page >= pages} aria-label="Next page">
-        <Icon name="chevron-right" size={14} />
+      <button type="button" className="pager-btn" onClick={() => go(page + 1)} disabled={page >= pages} aria-label="Next page">
+        <Icon name="chevron-right" size={15} />
       </button>
     </nav>
   );
+}
+
+/**
+ * The line under a list: what's in view on the left, the page numbers on the
+ * right. `pinned` keeps it on the bottom edge of the screen while the list
+ * runs on below it, and the page drops its bottom gutter for it, so there's
+ * no empty band under the numbers (user, 2026-10-25). Lists inside a card or
+ * a drawer, or with more of the page after them, leave it unpinned.
+ */
+export function PagerFoot({ pinned = false, children }) {
+  return <div className={`pager-foot${pinned ? ' pinned' : ''}`}>{children}</div>;
 }
 
 /**
@@ -67,7 +82,7 @@ export function usePaged(items, resetKey = '') {
  * it fits on one page. Turning the page brings the list's top back into view
  * when it has gone up under the top bar.
  */
-export function Paged({ page, pages, total, count, onChange, label, children }) {
+export function Paged({ page, pages, total, count, onChange, label, pinned = true, children }) {
   const ref = useRef(null);
   const turn = (n) => {
     onChange(n);
@@ -79,10 +94,10 @@ export function Paged({ page, pages, total, count, onChange, label, children }) 
     <div ref={ref} style={s.paged}>
       {children}
       {pages > 1 && (
-        <div style={s.foot}>
+        <PagerFoot pinned={pinned}>
           <span style={s.range}>{fmtNum(from)}–{fmtNum(from + count - 1)} of {fmtNum(total)}</span>
           <Pagination page={page} pages={pages} onChange={turn} label={label} />
-        </div>
+        </PagerFoot>
       )}
     </div>
   );
@@ -92,17 +107,6 @@ export function Paged({ page, pages, total, count, onChange, label, children }) 
 const TOP_BAR = 68;
 
 const s = {
-  wrap: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, flexWrap: 'wrap' },
-  btn: {
-    minWidth: 34, height: 34, padding: '0 10px', borderRadius: radius.sm,
-    border: `1px solid ${t.border}`, background: t.cardBg, color: t.textSecondary,
-    fontFamily: 'inherit', fontSize: 13, fontWeight: 600, cursor: 'pointer',
-    display: 'inline-flex', alignItems: 'center', justifyContent: 'center', ...type.num,
-  },
-  on:  { background: t.brandSoft, color: t.brand, borderColor: 'transparent' },
-  off: { opacity: 0.45, cursor: 'not-allowed' },
-  gap: { color: t.textMuted, padding: '0 4px' },
   paged: { display: 'flex', flexDirection: 'column', gap: 12, minWidth: 0, scrollMarginTop: TOP_BAR },
-  foot:  { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' },
-  range: { fontSize: 12, color: t.textMuted, ...type.num },
+  range: { fontSize: 12, color: t.textMuted, fontVariantNumeric: 'tabular-nums' },
 };

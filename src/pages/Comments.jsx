@@ -5,7 +5,7 @@ import {
   Page, PageHeader, Toolbar, SearchInput, FilterTabs, List, Button, Tag, StatusPill,
   Loading, ErrorBanner, EmptyState, Avatar, ReviewPhotos, pageStyles as s,
 } from '../components/Layout';
-import Pagination, { PAGE_SIZE } from '../components/Pagination';
+import Pagination, { PAGE_SIZE, PagerFoot } from '../components/Pagination';
 import { fmtDateTime, fmtNum } from '../utils/format';
 import Icon from '../components/Icon';
 import { theme as t, radius } from '../theme';
@@ -119,12 +119,12 @@ export default function Comments() {
               />
             ))}
           </List>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+          <PagerFoot pinned={data.pages > 1}>
             <span style={s.itemDate}>
               {fmtNum((data.page - 1) * PAGE_SIZE + 1)}–{fmtNum((data.page - 1) * PAGE_SIZE + reviews.length)} of {fmtNum(data.total)}
             </span>
             <Pagination page={data.page} pages={data.pages} onChange={(p) => { setPage(p); window.scrollTo?.(0, 0); }} label="Review pages" />
-          </div>
+          </PagerFoot>
         </div>
       )}
     </Page>

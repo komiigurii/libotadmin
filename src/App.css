@@ -100,6 +100,35 @@ tr.row-open { cursor: pointer; }
 tr.row-open:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px; border-radius: 0; }
 tr.row-open:focus-visible td { background: var(--card-bg-hover); }
 
+/* ── Page numbers (components/Pagination.jsx) ──
+   The page you're on is the one solid fill in the row; the rest are plain
+   until hovered. */
+.pager { display: flex; align-items: center; justify-content: center; gap: 4px; flex-wrap: wrap; }
+.pager-btn {
+  min-width: 34px; height: 34px; padding: 0 10px; border-radius: 8px;
+  border: 1px solid var(--border); background: var(--card-bg); color: var(--text-secondary);
+  font-family: inherit; font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums;
+  display: inline-flex; align-items: center; justify-content: center; cursor: pointer;
+  transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease;
+}
+.pager-btn:hover:not(:disabled):not([aria-current]) {
+  background: var(--card-bg-hover); border-color: var(--text-muted); color: var(--text-primary);
+}
+.pager-btn[aria-current='page'] {
+  background: var(--brand-solid); border-color: var(--brand-solid); color: var(--on-brand-solid);
+  font-weight: 700; cursor: default;
+}
+.pager-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.pager-gap { color: var(--text-muted); padding: 0 4px; }
+
+/* The line under a list. Pinned, it rides the bottom edge of the screen
+   while the list runs on under it, on the page's own background. */
+.pager-foot { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+.pager-foot.pinned {
+  position: sticky; bottom: 0; z-index: 5;
+  padding: 10px 0 12px; background: var(--bg);
+}
+
 /* The console's rail, top bar and page bands are styled in console.css. */
 
 /* ── Dashboard ── */

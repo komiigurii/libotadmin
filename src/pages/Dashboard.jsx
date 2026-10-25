@@ -399,7 +399,7 @@ function SubmissionsPanel({ submissions, loading, tab = 'recent', onTab, innerRe
         // The page numbers sit inside the panel's padding; the rows still run
         // edge to edge.
         <div style={d.pagedWrap}>
-          <Paged {...paged} label={`${current.title} pages`}>
+          <Paged {...paged} label={`${current.title} pages`} pinned={false}>
             <div style={d.pagedRows}>{items}</div>
           </Paged>
         </div>

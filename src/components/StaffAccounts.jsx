@@ -390,7 +390,7 @@ export function HistoryList({ entries }) {
   const paged = usePaged(entries);
   if (!entries.length) return <EmptyState icon="history" title="Nothing yet" subtitle="Changes and sign-ins show here." />;
   return (
-    <Paged {...paged} label="History pages">
+    <Paged {...paged} label="History pages" pinned={false}>
     <ol style={f.history}>
       {paged.rows.map((e) => {
         const a = actionLabel(e.action);

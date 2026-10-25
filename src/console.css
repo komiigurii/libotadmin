@@ -352,6 +352,19 @@ button.sa-bell-item:hover, button.sa-bell-item:focus-visible { background: var(-
   padding: 16px 18px 32px !important;
   gap: 16px !important;
 }
+/* A page that ends in pinned page numbers: the numbers' bar is the bottom
+   edge, with no gutter left under it. */
+[data-console] .admin-page:has(.pager-foot.pinned) { padding-bottom: 0 !important; }
+/* A short list (the last page, a narrow filter) still has its numbers on the
+   bottom edge, in the same place as on a full page: the page fills the screen
+   below the top bar and the list, its column and its bar take what's left. */
+.sa-main { display: flex; flex-direction: column; }
+[data-console] .admin-page:has(.pager-foot.pinned) { flex: 1 0 auto; }
+.admin-page > .sa-rail-split:has(.pager-foot.pinned) { flex: 1 0 auto; }
+.sa-rail-split > .sa-col:has(.pager-foot.pinned) { align-self: stretch; }
+:is(.admin-page, .sa-col) > :has(> .pager-foot.pinned) { flex: 1 0 auto; }
+:is(.admin-page, .sa-col) > .pager-foot.pinned,
+:is(.admin-page, .sa-col) > * > .pager-foot.pinned { margin-top: auto; }
 [data-console] .admin-banner { max-width: none !important; padding: 14px 18px 0 !important; }
 
 /* Collapsed rail: icons only. Labels are visually hidden, not removed, so the

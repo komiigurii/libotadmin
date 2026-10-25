@@ -9,7 +9,7 @@ import {
 } from '../components/Layout';
 import { fmtNum, plural } from '../utils/format';
 import Icon from '../components/Icon';
-import Pagination, { PAGE_SIZE } from '../components/Pagination';
+import Pagination, { PAGE_SIZE, PagerFoot } from '../components/Pagination';
 import { useLive } from '../api/live';
 
 const role = () => localStorage.getItem('role');
@@ -312,7 +312,7 @@ export default function Spots({ embedded = false, onCount }) {
             );
           })}
         </div>
-        <div style={s.pageFoot}>
+        <PagerFoot pinned={pages > 1}>
           <span style={s.itemDate}>
             {filtered.length > PAGE_SIZE
               ? `${fmtNum((at - 1) * PAGE_SIZE + 1)}–${fmtNum((at - 1) * PAGE_SIZE + shown.length)} of ${plural(filtered.length, 'spot')}`
@@ -320,7 +320,7 @@ export default function Spots({ embedded = false, onCount }) {
             {narrowed && ` · ${fmtNum(spots.length)} in all`}
           </span>
           <Pagination page={at} pages={pages} onChange={(n) => { setPage(n); window.scrollTo?.(0, 0); }} label="Spot pages" />
-        </div>
+        </PagerFoot>
         </>
       )}
     </Shell>
@@ -343,7 +343,6 @@ const s = {
 
   grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 16 },
   filterSelect: { ...pageStyles.select, width: 'auto', minWidth: 170, flex: '0 1 auto' },
-  pageFoot: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' },
 
   spotCard:    { ...pageStyles.item, display: 'flex', flexDirection: 'column' },
   cardImgWrap: { position: 'relative', width: '100%', height: 140, background: t.sidebarBg },
