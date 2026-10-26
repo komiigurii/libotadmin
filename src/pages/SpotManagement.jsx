@@ -123,14 +123,6 @@ export function ModeratorSpotManagement() {
       value:   spotCount == null ? '…' : fmtNum(spotCount),
       hint:    'live in the app',
     },
-    {
-      label:   'Waiting for approval',
-      to:      '/spots/waiting',
-      current: onWaiting,
-      value:   waiting == null ? '…' : fmtNum(waiting),
-      tone:    waiting ? 'warn' : waiting === 0 ? 'good' : undefined,
-      hint:    waiting ? 'your requests an admin hasn’t decided yet' : 'nothing waiting on an admin',
-    },
   ];
 
   return (
