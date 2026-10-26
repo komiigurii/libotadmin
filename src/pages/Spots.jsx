@@ -291,7 +291,7 @@ export default function Spots({ embedded = false, onCount }) {
                     <div>
                       {spot.pendingDelete
                         ? <StatusPill tone="danger" icon="trash">Deletion waiting for approval</StatusPill>
-                        : <StatusPill tone="warning" icon="clock">Edit waiting for approval</StatusPill>}
+                        : undefined}
                     </div>
                   )}
 
