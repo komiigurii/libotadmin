@@ -47,11 +47,13 @@ export function PasswordForm({ forced, onDone }) {
     return () => { live = false; };
   }, []);
 
+  // First sign-in: the slip's password was typed a moment ago to sign in, so
+  // it isn't asked for again (the server skips that check too).
   const errors = {};
-  if (!current) errors.currentPassword = forced ? 'Enter the temporary password from your slip.' : 'Enter your current password.';
+  if (!forced && !current) errors.currentPassword = 'Enter your current password.';
   const p = passwordProblem(next, username);
   if (p) errors.newPassword = p;
-  else if (next === current) errors.newPassword = 'Choose a password different from the current one.';
+  else if (!forced && next === current) errors.newPassword = 'Choose a password different from the current one.';
   if (!again) errors.confirmPassword = 'Type the new password again.';
   else if (again !== next) errors.confirmPassword = 'The two passwords don’t match.';
   const shown = { ...(tried ? errors : {}), ...serverError };
@@ -68,7 +70,7 @@ export function PasswordForm({ forced, onDone }) {
     }
     setSaving(true);
     try {
-      const data = await authAPI.changePassword(current, next, again);
+      const data = await authAPI.changePassword(forced ? undefined : current, next, again);
       saveSession({ token: data.token, role: data.role, city: data.city, mustChangePassword: false });
       onDone();
     } catch (err) {
@@ -83,7 +85,8 @@ export function PasswordForm({ forced, onDone }) {
     <div style={f.field}>
       <label htmlFor={id} style={f.label}>{label}</label>
       <input
-        id={id} type={show ? 'text' : 'password'} value={value} maxLength={PASSWORD_MAX} autoFocus={key === 'currentPassword'}
+        id={id} type={show ? 'text' : 'password'} value={value} maxLength={PASSWORD_MAX}
+        autoFocus={key === (forced ? 'newPassword' : 'currentPassword')}
         onChange={(e) => { setter(e.target.value); setServerError({}); }}
         autoComplete={autoComplete} className="modern-input"
         aria-invalid={!!shown[key]} aria-describedby={shown[key] ? `${id}-err` : undefined}
@@ -96,7 +99,7 @@ export function PasswordForm({ forced, onDone }) {
   return (
     <form onSubmit={submit} noValidate aria-describedby={ids.err}>
       {username && <p style={f.who}>Signed in as <strong style={{ fontFamily: fonts.mono }}>{username}</strong></p>}
-      {field('currentPassword', ids.cur, forced ? 'Temporary password' : 'Current password', current, setCurrent, 'current-password')}
+      {!forced && field('currentPassword', ids.cur, 'Current password', current, setCurrent, 'current-password')}
       {field('newPassword', ids.next, 'New password', next, setNext, 'new-password')}
       <ul style={f.checks} aria-label="The new password needs">
         {checks.map((c) => (
@@ -144,7 +147,7 @@ export function SetPassword() {
           <h1 style={f.title}>Choose your own password</h1>
           <p style={f.subtitle}>
             You signed in with the temporary password from your slip. Choose one that only you know before you continue;
-            the temporary one then stops working.
+            the temporary one then stops working. No need to type the temporary one again.
           </p>
           <PasswordForm forced onDone={() => {
             notify('Your password is saved. Use it from now on.', { tone: 'success' });

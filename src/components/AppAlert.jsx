@@ -171,7 +171,9 @@ function PromptModal({ data, onClose }) {
         {data.title && <h2 id={titleId} style={s.title}>{data.title}</h2>}
         {data.message && <p id={messageId} style={s.message}>{data.message}</p>}
         <label htmlFor={fieldId} style={s.label}>
-          {data.label || 'Note'}{!required && <span style={s.optional}> (optional)</span>}
+          {data.label || 'Note'}{required
+            ? <span style={s.required} aria-hidden="true"> *</span>
+            : <span style={s.optional}> (optional)</span>}
         </label>
         <textarea
           id={fieldId}
@@ -181,6 +183,7 @@ function PromptModal({ data, onClose }) {
           maxLength={max}
           rows={4}
           autoFocus
+          required={required}
           aria-invalid={tried && !!problem}
           aria-describedby={tried && problem ? errorId : undefined}
           style={{ ...s.textarea, ...(tried && problem ? s.textareaInvalid : null) }}
@@ -284,6 +287,7 @@ const s = {
   // ── promptAction ──
   label:    { display: 'block', fontSize: 13, fontWeight: 600, color: t.textPrimary, margin: '16px 0 6px' },
   optional: { fontWeight: 500, color: t.textMuted },
+  required: { fontWeight: 700, color: t.danger },
   textarea: {
     width: '100%', boxSizing: 'border-box', padding: '10px 12px', borderRadius: radius.md,
     borderWidth: 1, borderStyle: 'solid', borderColor: t.border, background: t.sidebarBg,

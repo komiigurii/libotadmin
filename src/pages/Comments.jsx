@@ -17,9 +17,10 @@ import { useLive } from '../api/live';
 // permanently, or delete the review itself.
 //
 // Mock defense 2026-10-21: travelers no longer report reviews; the server
-// masks bad words with *** as a review is posted. Those reviews carry a
+// masked bad words with *** as a review was posted. Those reviews carry a
 // "Filtered" tag and have their own tab, and the admin can read what was
-// actually written, to warn the writer.
+// actually written, to warn the writer. Since 2026-10-28 a review with a bad
+// word is blocked instead (never posted), so no new ones join that tab.
 
 const STARS = [{ value: '', label: 'Any rating' }, ...[5, 4, 3, 2, 1].map((n) => ({ value: String(n), label: `${n} star${n === 1 ? '' : 's'}` }))];
 
@@ -235,7 +236,10 @@ function CommentRow({ comment, expanded, onToggle, onUpdated }) {
 
       {expanded && (
         <div style={s.panel}>
-          <p style={s.panelLabel}>Reason (recorded, and shown on the traveler&rsquo;s appeal if they send one)</p>
+          <p style={s.panelLabel}>
+            Reason <span style={{ color: t.danger, fontWeight: 700 }} aria-hidden="true">*</span>{' '}
+            (recorded, and shown on the traveler&rsquo;s appeal if they send one)
+          </p>
           <textarea
             value={reason}
             onChange={e => setReason(e.target.value)}
