@@ -173,45 +173,45 @@
    card, card hover and on its own tinted badge. */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) {
-    --bg:              #0E1C1E;
-    --sidebar-bg:      #16292C;
-    --card-bg:         #172C2F;
-    --card-bg-hover:   #1B3134;
-    --border:          #2A4443;
-    --divider:         #233C3C;
+    --bg:              #17140F;
+    --sidebar-bg:      #1F1B15;
+    --card-bg:         #221E18;
+    --card-bg-hover:   #29241D;
+    --border:          #3A3329;
+    --divider:         #2F2A22;
 
-    --text-primary:    #EDF4F4;
-    --text-secondary:  #B4C7C8;
-    --text-muted:      #97AEAF;
+    --text-primary:    #F3EEE4;
+    --text-secondary:  #C9C0B0;
+    --text-muted:      #A99F8D;
 
-    --brand:           #56D6E2;
+    --brand:           #5CCFD9;
     --brand-solid:     #0C7A84;
     --brand-solid-hover:#129AA6;
-    --brand-soft:      rgba(86,214,226,0.14);
+    --brand-soft:      rgba(92,207,217,0.14);
 
     --accent:          #F2CE1B;
     --accent-bg:       rgba(242,206,27,0.16);
     --on-accent:       #2C2810;
 
-    --danger:          #F58E8E;
-    --danger-bg:       rgba(245,142,142,0.14);
-    --danger-border:   rgba(245,142,142,0.34);
+    --danger:          #F29A8E;
+    --danger-bg:       rgba(242,154,142,0.14);
+    --danger-border:   rgba(242,154,142,0.34);
     --on-danger:       #2A0E0E;
-    --success:         #5FD69A;
-    --success-bg:      rgba(95,214,154,0.14);
+    --success:         #6FD3A0;
+    --success-bg:      rgba(111,211,160,0.14);
     --warning:         #F0C264;
     --warning-bg:      rgba(240,194,100,0.14);
     --info:            #7FB4F5;
     --info-bg:         rgba(127,180,245,0.14);
-    --flagged:         #FB7185;
-    --flagged-bg:      rgba(251,113,133,0.16);
+    --flagged:         #FC8296;
+    --flagged-bg:      rgba(252,130,150,0.16);
     --purple:          #B39BFB;
     --purple-bg:       rgba(179,155,251,0.16);
 
     --on-brand-solid:       #FFFFFF;
     --on-brand-solid-muted: rgba(255,255,255,0.96); /* 0.86 was 4.19:1 on the darker-mode teal */
     --on-brand-solid-soft:  rgba(255,255,255,0.22);
-    --photo-veil:      rgba(8,20,22,0.38);
+    --photo-veil:      rgba(23,20,15,0.38);
     --data-1:          #12A7B5;
     --data-1-track:    rgba(18,167,181,0.20);
 
@@ -220,8 +220,8 @@
     --shadow-lg:       0 18px 48px rgba(0,0,0,0.46);
     --overlay:         rgba(0,0,0,0.6);
 
-    --scrollbar-thumb:       #2A4443;
-    --scrollbar-thumb-hover: #415B59;
+    --scrollbar-thumb:       #3A3329;
+    --scrollbar-thumb-hover: #52483A;
 
     color-scheme: dark;
   }
@@ -231,45 +231,45 @@
    shared because a :is() / :where() list would lose to the media-query block
    above on specificity grounds in some browsers. */
 :root[data-theme='dark'] {
-  --bg:              #0E1C1E;
-  --sidebar-bg:      #16292C;
-  --card-bg:         #172C2F;
-  --card-bg-hover:   #1B3134;
-  --border:          #2A4443;
-  --divider:         #233C3C;
+  --bg:              #17140F;
+  --sidebar-bg:      #1F1B15;
+  --card-bg:         #221E18;
+  --card-bg-hover:   #29241D;
+  --border:          #3A3329;
+  --divider:         #2F2A22;
 
-  --text-primary:    #EDF4F4;
-  --text-secondary:  #B4C7C8;
-  --text-muted:      #97AEAF;
+  --text-primary:    #F3EEE4;
+  --text-secondary:  #C9C0B0;
+  --text-muted:      #A99F8D;
 
-  --brand:           #56D6E2;
+  --brand:           #5CCFD9;
   --brand-solid:     #0C7A84;
   --brand-solid-hover:#129AA6;
-  --brand-soft:      rgba(86,214,226,0.14);
+  --brand-soft:      rgba(92,207,217,0.14);
 
   --accent:          #F2CE1B;
   --accent-bg:       rgba(242,206,27,0.16);
   --on-accent:       #2C2810;
 
-  --danger:          #F58E8E;
-  --danger-bg:       rgba(245,142,142,0.14);
-  --danger-border:   rgba(245,142,142,0.34);
+  --danger:          #F29A8E;
+  --danger-bg:       rgba(242,154,142,0.14);
+  --danger-border:   rgba(242,154,142,0.34);
   --on-danger:       #2A0E0E;
-  --success:         #5FD69A;
-  --success-bg:      rgba(95,214,154,0.14);
+  --success:         #6FD3A0;
+  --success-bg:      rgba(111,211,160,0.14);
   --warning:         #F0C264;
   --warning-bg:      rgba(240,194,100,0.14);
   --info:            #7FB4F5;
   --info-bg:         rgba(127,180,245,0.14);
-  --flagged:         #FB7185;
-  --flagged-bg:      rgba(251,113,133,0.16);
+  --flagged:         #FC8296;
+  --flagged-bg:      rgba(252,130,150,0.16);
   --purple:          #B39BFB;
   --purple-bg:       rgba(179,155,251,0.16);
 
   --on-brand-solid:       #FFFFFF;
   --on-brand-solid-muted: rgba(255,255,255,0.96); /* 0.86 was 4.19:1 on the darker-mode teal */
   --on-brand-solid-soft:  rgba(255,255,255,0.22);
-  --photo-veil:      rgba(8,20,22,0.38);
+  --photo-veil:      rgba(23,20,15,0.38);
   --data-1:          #12A7B5;
   --data-1-track:    rgba(18,167,181,0.20);
 
@@ -278,8 +278,8 @@
   --shadow-lg:       0 18px 48px rgba(0,0,0,0.46);
   --overlay:         rgba(0,0,0,0.6);
 
-  --scrollbar-thumb:       #2A4443;
-  --scrollbar-thumb-hover: #415B59;
+  --scrollbar-thumb:       #3A3329;
+  --scrollbar-thumb-hover: #52483A;
 
   color-scheme: dark;
 }
