@@ -3,6 +3,7 @@
  * component file so it only exports components (React Fast Refresh needs
  * that). Used by the Approval Queue and My Submissions.
  */
+import { formatRun } from './festivalDates';
 
 // A spot has no `location`, `history` or `recommendations` any more (removed
 // 2026-10-04; food recommendations are the spot's Food mission).
@@ -11,6 +12,7 @@ export const FIELD_LABELS = {
   entranceFee: 'Entrance fee', image: 'Image', modelUrl: '3D display model', AR3DModelURL: 'AR model',
   Badge: 'Badge', city: 'City', coordinates: 'Coordinates', modelsCoordinates: 'AR positions',
   trivia: 'AR trivia', arrivalRadiusMeters: 'Arrival radius', nearbyRadiusMeters: 'Nearby alert radius',
+  festivalDates: 'Festival dates',
 };
 
 // A spot that never set its radii uses these (components/SpotForm.jsx,
@@ -28,7 +30,7 @@ export const MISSION_FIELD_LABELS = {
 // Bookkeeping keys on a pendingChange that aren't spot fields.
 export const META_KEYS = new Set(['submittedBy', 'submittedByName', 'submittedAt', 'status']);
 
-export const LONG_FIELDS = new Set(['description', 'trivia', 'locationInfo', 'modelsCoordinates']);
+export const LONG_FIELDS = new Set(['description', 'trivia', 'locationInfo', 'modelsCoordinates', 'festivalDates']);
 export const THUMB_FIELDS = new Set(['image', 'Badge']);
 export const FILE_LINK_FIELDS = new Set(['modelUrl', 'AR3DModelURL']);
 
@@ -57,6 +59,11 @@ export function fmtVal(key, v) {
   // them would blur where one fact ends and the next begins.
   if (key === 'trivia' && Array.isArray(v)) {
     return v.length ? v.map((line, i) => `${i + 1}. ${line}`).join('\n') : '—';
+  }
+  if (key === 'festivalDates' && Array.isArray(v)) {
+    return v.length
+      ? v.map((r) => `${formatRun({ start: r.start, end: r.end }, { year: !r.everyYear })}${r.everyYear ? ', every year' : ''}`).join('\n')
+      : '—';
   }
   if (Array.isArray(v)) return v.length ? v.join(', ') : '—';
   if (typeof v === 'object') return JSON.stringify(v);

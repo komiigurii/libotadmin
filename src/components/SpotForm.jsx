@@ -9,6 +9,8 @@ import { notify, confirmAction } from './AppAlert';
 import Icon from './Icon';
 import { Loading } from './Skeleton';
 import VisitingHoursField from './VisitingHoursField';
+import FestivalDatesField from './FestivalDatesField';
+import { isFestival, festivalDatesProblem } from '../utils/festivalDates';
 import { spotHasAR } from '../utils/spotHasAR';
 import { insideBoundary } from '../utils/geo';
 import { parseEntranceFee, formatEntranceFee, entranceFeeProblem, cleanFeeAmount } from '../utils/entranceFee';
@@ -1293,6 +1295,10 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
     city:            initial?.city             || lockedCity || '',
     entranceFee:     initial?.entranceFee      || '',
     visitingHours:   initial?.visitingHours    || '',
+    // A festival's dates (FestivalDatesField); kept, unused, for other spots.
+    festivalDates:   Array.isArray(initial?.festivalDates)
+      ? initial.festivalDates.map(({ start, end, everyYear }) => ({ start, end, everyYear: !!everyYear }))
+      : [],
     image:           initial?.image            || '',
     modelUrl:        initial?.modelUrl         || '',
     ARModelUrl:      initial?.AR3DModelURL     || '',
@@ -1698,6 +1704,11 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
   if (!form.visitingHours.trim()) {
     return fail('details', 'Visiting hours are required');
   }
+  // Travelers can visit a festival only on its dates (the server checks too).
+  if (isFestival(form.category)) {
+    const datesErr = festivalDatesProblem(form.festivalDates);
+    if (datesErr) return fail('details', datesErr);
+  }
   if (!form.description.trim()) {
     return fail('details', 'Description is required');
   }
@@ -1761,6 +1772,7 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
     city: form.city.trim(),
     entranceFee: form.entranceFee.trim(),
     visitingHours: form.visitingHours.trim(),
+    ...(isFestival(form.category) && { festivalDates: form.festivalDates }),
     // With every position's own fact, the server rewrites the spot's trivia
     // list from them; otherwise the list is kept as it was.
     ...(!arAllFacts && { trivia: Array.isArray(initial?.trivia) ? initial.trivia : [] }),
@@ -1896,6 +1908,7 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
     !form.category.length && 'category',
     !!feeProblem && 'entrance fee',
     !form.visitingHours.trim() && 'visiting hours',
+    isFestival(form.category) && !!festivalDatesProblem(form.festivalDates) && 'festival dates',
     !form.description.trim() && 'description',
   ].filter(Boolean);
   const hasAR = spotHasAR(form.category);
@@ -2185,6 +2198,13 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
                   <span style={styles.label}>Visiting hours <span style={styles.required}>*</span></span>
                   <VisitingHoursField value={form.visitingHours} onChange={setField('visitingHours')} />
                 </div>
+
+                {isFestival(form.category) && (
+                  <div style={styles.field}>
+                    <span style={styles.label}>Festival dates <span style={styles.required}>*</span></span>
+                    <FestivalDatesField value={form.festivalDates} onChange={setField('festivalDates')} />
+                  </div>
+                )}
 
                 <div style={styles.field}>
                   <label style={styles.label}>Description <span style={styles.required}>*</span></label>
