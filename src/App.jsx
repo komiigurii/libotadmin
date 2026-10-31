@@ -141,7 +141,7 @@ export default function App() {
 
                       {/* Old addresses: the Approval Queue is a tab of Spot
                           Management, and travelers no longer report reviews
-                          (the automatic filter masks bad words instead). */}
+                          (a review with a bad word is blocked instead). */}
                       <Route path="/mod-requests"       element={<Navigate to="/spots/approvals" replace />} />
                       <Route path="/reported-comments"  element={<Navigate to="/comments" replace />} />
                       {/* Traveler Progress, Suspensions & Bans and Inactive

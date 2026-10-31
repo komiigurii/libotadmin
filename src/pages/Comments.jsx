@@ -2,13 +2,13 @@ import { useCallback, useEffect, useState } from 'react';
 import { commentAPI, bannedAccountsAPI } from '../api/api';
 import { notify, confirmAction } from '../components/AppAlert';
 import {
-  Page, PageHeader, Toolbar, SearchInput, FilterTabs, List, Button, Tag, StatusPill,
+  Page, PageHeader, Toolbar, SearchInput, List, Button, Tag,
   Loading, ErrorBanner, EmptyState, Avatar, ReviewPhotos, pageStyles as s,
 } from '../components/Layout';
 import Pagination, { PAGE_SIZE, PagerFoot } from '../components/Pagination';
 import { fmtDateTime, fmtNum } from '../utils/format';
 import Icon from '../components/Icon';
-import { theme as t, radius } from '../theme';
+import { theme as t } from '../theme';
 import { useLive } from '../api/live';
 
 // Rate and Review — admin only (named as the paper names it; it was "Reviews
@@ -16,11 +16,8 @@ import { useLive } from '../api/live';
 // spec's user-management actions on its author: warn, suspend, ban
 // permanently, or delete the review itself.
 //
-// Mock defense 2026-10-21: travelers no longer report reviews; the server
-// masked bad words with *** as a review was posted. Those reviews carry a
-// "Filtered" tag and have their own tab, and the admin can read what was
-// actually written, to warn the writer. Since 2026-10-28 a review with a bad
-// word is blocked instead (never posted), so no new ones join that tab.
+// Since 2026-10-28 a review with a bad word is blocked (never posted), so the
+// old "Filtered" tab and tag for masked reviews are gone (2026-10-31).
 
 const STARS = [{ value: '', label: 'Any rating' }, ...[5, 4, 3, 2, 1].map((n) => ({ value: String(n), label: `${n} star${n === 1 ? '' : 's'}` }))];
 
@@ -30,7 +27,6 @@ export default function Comments() {
   const [error,    setError]    = useState(null);
   const [query,    setQuery]    = useState('');
   const [search,   setSearch]   = useState('');
-  const [tab,      setTab]      = useState('');
   const [rating,   setRating]   = useState('');
   const [page,     setPage]     = useState(1);
   const [expandedId, setExpandedId] = useState(null);
@@ -51,21 +47,20 @@ export default function Comments() {
       setData(await commentAPI.getAll({
         page, limit: PAGE_SIZE,
         ...(search ? { q: search } : {}),
-        ...(tab === 'filtered' ? { filtered: 1 } : {}),
         ...(rating ? { rating } : {}),
       }));
     } catch {
       if (!quiet) setError('Couldn’t load reviews.');
     }
     if (!quiet) setLoading(false);
-  }, [page, search, tab, rating]);
+  }, [page, search, rating]);
 
   useEffect(() => { load(); }, [load]);
   // New reviews as travelers post them; a warning changes the writer's standing.
   useLive(['reviews', 'travelers'], () => load({ quiet: true }));
 
   const reviews = (data?.reviews || []).filter((c) => c?._id);
-  const filtersOn = !!(search || tab || rating);
+  const filtersOn = !!(search || rating);
 
   return (
     <Page>
@@ -75,15 +70,6 @@ export default function Comments() {
       />
 
       <Toolbar>
-        <FilterTabs
-          label="Which reviews"
-          value={tab}
-          onChange={(v) => { setTab(v); setPage(1); }}
-          options={[
-            { value: '', label: 'All', count: data?.counts?.all },
-            { value: 'filtered', label: 'Filtered', count: data?.counts?.filtered },
-          ]}
-        />
         <select value={rating} onChange={(e) => { setRating(e.target.value); setPage(1); }} aria-label="Rating"
           style={{ ...s.select, width: 'auto' }}>
           {STARS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
@@ -103,7 +89,7 @@ export default function Comments() {
           icon="message-square"
           title={filtersOn ? 'No reviews match' : 'No reviews yet'}
           subtitle={filtersOn
-            ? (tab === 'filtered' && !search && !rating ? 'No review has needed masking.' : 'Try a different search or filter.')
+            ? 'Try a different search or filter.'
             : 'Reviews travelers leave in the app will appear here.'}
         />
       ) : (
@@ -208,14 +194,8 @@ function CommentRow({ comment, expanded, onToggle, onUpdated }) {
             <span style={s.itemTitle}>{userName}</span>
             <span style={s.itemDate}>{fmtDateTime(comment.createdAt)}</span>
             <Tag icon="map-pin">{spotName}{spotCity ? ` · ${spotCity}` : ''}</Tag>
-            {comment.filtered && <StatusPill tone="warning" icon="eye-off">Filtered</StatusPill>}
           </div>
           <p style={s.itemText}>{comment.comment}</p>
-          {comment.filtered && comment.commentOriginal && (
-            <p style={orig.box}>
-              <span style={orig.label}>What they wrote (only admins see this):</span> {comment.commentOriginal}
-            </p>
-          )}
           <ReviewPhotos photos={comment.photos} />
           <div style={s.itemFacts}>
             {comment.rating != null && <span style={s.itemFact}><Icon name="star" size={12} /> {comment.rating}/5</span>}
@@ -269,9 +249,3 @@ function CommentRow({ comment, expanded, onToggle, onUpdated }) {
     </div>
   );
 }
-
-// The original of a masked review: muted, set apart, for the admin only.
-const orig = {
-  box:   { fontSize: 12.5, color: t.textSecondary, lineHeight: 1.5, margin: '8px 0 0', padding: '8px 10px', borderRadius: radius.md, background: t.sidebarBg, border: `1px solid ${t.divider}`, overflowWrap: 'anywhere' },
-  label: { fontWeight: 600, color: t.textMuted },
-};
