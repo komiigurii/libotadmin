@@ -4,16 +4,20 @@ import Icon from './Icon';
 import {
   DAYS, TIME_OPTIONS, formatTime, formatHours, parseHours,
 } from '../utils/visitingHours';
+import { runFromPicks, isOnNow, nextRun, formatRun } from '../utils/festivalDates';
 
 /*
  * Visiting hours, picked rather than typed (QA 2026-10-16: start and end time
  * dropdowns with a clock icon, and the recurring part kept separate).
  *
  * First the kind: "Regular hours" repeat every week (days + time ranges),
- * "Open anytime", or "Specific dates" for festivals and anything else (typed).
- * It still saves one line of text, the same the app shows; see
- * utils/visitingHours.js. `onChange` gets '' while the choice is incomplete,
- * so the form's required check catches it.
+ * "Open anytime", or "Specific dates" for festivals: first and last day of
+ * each run, and "Every year" for one that falls on the same days each year.
+ * A festival can be visited only on those days (2026-11-01; LibotBackend
+ * utils/festivalDates.js reads the same line). It still saves one line of
+ * text, the same the app shows; see utils/visitingHours.js. `onChange` gets ''
+ * while the choice is incomplete, so the form's required check catches it.
+ * `festival`: the spot is filed under Festivals, so dates are what it needs.
  */
 
 const KINDS = [
@@ -29,8 +33,9 @@ const SHORTCUTS = [
 ];
 
 const MAX_RANGES = 3;
+const MAX_RUNS = 6;
 
-export default function VisitingHoursField({ value, onChange }) {
+export default function VisitingHoursField({ value, onChange, festival = false }) {
   const [hours, setHours] = useState(() => parseHours(value));
 
   const update = (patch) => {
@@ -48,9 +53,28 @@ export default function VisitingHoursField({ value, onChange }) {
   };
   const removeRange = (i) => update({ ranges: hours.ranges.filter((_, j) => j !== i) });
 
+  // Festival runs. A one-day festival is the usual case: the last day follows
+  // the first until it's picked on its own.
+  const setRun = (i, patch) => update({
+    runs: hours.runs.map((r, j) => {
+      if (j !== i) return r;
+      const next = { ...r, ...patch };
+      if ('start' in patch && (!r.end || r.end === r.start || r.end < patch.start)) next.end = patch.start;
+      return next;
+    }),
+  });
+  const addRun = () => update({ runs: [...hours.runs, { start: '', end: '', everyYear: false }] });
+  const removeRun = (i) => update({ runs: hours.runs.filter((_, j) => j !== i) });
+
   const preview = formatHours(hours);
   const badRange = hours.kind === 'weekly' && hours.ranges.some((r) => !(r.end > r.start));
   const noDays = hours.kind === 'weekly' && hours.days.length === 0;
+  const picked = hours.kind === 'dates' ? hours.runs.map(runFromPicks) : [];
+  const badRun = picked.findIndex((r, i) => !r && hours.runs[i].start && hours.runs[i].end);
+  const runsOk = picked.length > 0 && picked.every(Boolean);
+  const next = runsOk ? nextRun(picked) : null;
+  const status = !runsOk ? '' : isOnNow(picked) ? `open now, until ${formatRun({ start: next.end, end: next.end })}`
+    : next ? `locked until ${formatRun(next)}` : 'locked — none of these days is still to come';
 
   return (
     <div style={st.wrap}>
@@ -130,19 +154,51 @@ export default function VisitingHoursField({ value, onChange }) {
         </>
       )}
 
+      {festival && hours.kind !== 'dates' && (
+        <p style={st.error}>A festival’s visiting hours are its dates: choose “Specific dates”. Travelers can only open it on those days.</p>
+      )}
+
       {hours.kind === 'dates' && (
-        <input
-          value={hours.text}
-          onChange={(e) => update({ text: e.target.value })}
-          style={st.input}
-          className="modern-input"
-          placeholder="Celebrated on June 23"
-          aria-label="Dates or schedule"
-        />
+        <div>
+          {!!hours.text && !hours.runs.length && (
+            <p style={st.was}>
+              It said “{hours.text}”, which the app can’t turn into days. Pick them below.
+            </p>
+          )}
+          {hours.runs.map((r, i) => (
+            <div key={i} style={st.runRow}>
+              <label style={st.dateWrap}>
+                <span style={st.sub}>First day</span>
+                <input type="date" value={r.start || ''} onChange={(e) => setRun(i, { start: e.target.value })} style={st.input} className="modern-input" />
+              </label>
+              <label style={st.dateWrap}>
+                <span style={st.sub}>Last day</span>
+                <input type="date" value={r.end || ''} onChange={(e) => setRun(i, { end: e.target.value })} style={st.input} className="modern-input" />
+              </label>
+              <label style={st.check}>
+                <input type="checkbox" checked={!!r.everyYear} onChange={(e) => setRun(i, { everyYear: e.target.checked })} />
+                Every year
+              </label>
+              <button type="button" onClick={() => removeRun(i)} style={st.removeRun} aria-label={`Remove dates ${i + 1}`}>
+                <Icon name="x" size={14} />
+              </button>
+            </div>
+          ))}
+          {badRun !== -1 && <p style={st.error}>The last day comes before the first{hours.runs.length > 1 ? ` (dates ${badRun + 1})` : ''}.</p>}
+          {hours.runs.length < MAX_RUNS && (
+            <button type="button" onClick={addRun} style={st.link}>
+              <Icon name="plus" size={13} /> {hours.runs.length ? 'Add more dates' : 'Add the dates'}
+            </button>
+          )}
+          <p style={st.hint}>
+            Travelers can open a festival and have their visit counted only on these days (Philippine time).
+            If the date moves each year, add this year’s and come back for next year’s.
+          </p>
+        </div>
       )}
 
       <p style={st.preview} aria-live="polite">
-        <Icon name="eye" size={13} /> In the app: <strong>{preview || '…'}</strong>
+        <Icon name="eye" size={13} /> In the app: <strong>{preview || '…'}</strong>{status && ` — ${status}`}
       </p>
     </div>
   );
@@ -199,6 +255,12 @@ const st = {
   remove: { width: 30, height: 30, borderRadius: radius.md, border: `1px solid ${t.border}`, background: t.cardBg, color: t.textSecondary, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 },
   input: { width: '100%', padding: '10px 12px', borderRadius: radius.md, border: `1px solid ${t.border}`, fontSize: 14, color: t.textPrimary, outline: 'none', background: t.cardBg, boxSizing: 'border-box' },
   error: { fontSize: 12, color: t.danger, margin: '4px 0 0' },
+  runRow:   { display: 'flex', alignItems: 'flex-end', gap: 8, flexWrap: 'wrap', marginBottom: 8 },
+  dateWrap: { display: 'flex', flexDirection: 'column', flex: '1 1 140px', minWidth: 0 },
+  check:    { display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600, color: t.textPrimary, padding: '9px 2px', cursor: 'pointer' },
+  removeRun: { width: 36, height: 36, borderRadius: radius.md, border: `1px solid ${t.border}`, background: t.cardBg, color: t.textSecondary, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 },
+  hint: { fontSize: 12, color: t.textMuted, margin: '6px 0 0' },
+  was:  { fontSize: 12.5, color: t.textSecondary, margin: '0 0 8px' },
   preview: { display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5, color: t.textSecondary, margin: 0 },
   srOnly: { position: 'absolute', width: 1, height: 1, padding: 0, margin: -1, overflow: 'hidden', clip: 'rect(0 0 0 0)', whiteSpace: 'nowrap', border: 0 },
 };

@@ -10,9 +10,13 @@
  *
  *   weekly   repeats every week: which days, and one or two time ranges
  *   anytime  open any time, any day
- *   dates    anything else, typed: festivals ("Celebrated on June 23"),
- *            seasons, and any old line the parser can't read
+ *   dates    festivals: picked days, "Celebrated on June 23" (every year) or
+ *            "Celebrated on January 31, 2027" (2026-11-01: a festival can be
+ *            visited only on these, utils/festivalDates.js). A line nothing
+ *            can read ("the last Sunday of January") opens here with no days
+ *            picked and the old line kept in `text`, to show what it said.
  */
+import { datesFromHours, formatDatesLine, picksFromRun, runFromPicks } from './festivalDates';
 
 export const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 export const ANYTIME_TEXT = 'Open anytime, any day';
@@ -45,9 +49,12 @@ export function formatDays(days) {
  * day picked, a range that ends before it starts, an empty dates line), so the
  * form's "visiting hours is required" check catches it.
  */
-export function formatHours({ kind, days = [], ranges = [], text = '' }) {
+export function formatHours({ kind, days = [], ranges = [], runs = [] }) {
   if (kind === 'anytime') return ANYTIME_TEXT;
-  if (kind === 'dates') return text.trim();
+  if (kind === 'dates') {
+    const picked = runs.map(runFromPicks);
+    return picked.length && picked.every(Boolean) ? formatDatesLine(picked) : '';
+  }
   const dayText = formatDays(days);
   if (!dayText || ranges.length === 0) return '';
   if (ranges.some((r) => !(r.end > r.start))) return '';
@@ -78,12 +85,12 @@ function parseDays(part) {
   return found;
 }
 
-/** An existing line read back into the form's choices. Unreadable text becomes kind "dates", kept word for word. */
+/** An existing line read back into the form's choices. Anything else becomes kind "dates": its days, or none and the old line in `text`. */
 export function parseHours(value) {
   const text = String(value || '').trim();
   // No day picked to start with: a new spot's hours must be chosen, not
   // saved as a default nobody looked at.
-  const empty = { kind: 'weekly', days: [], ranges: [{ start: 480, end: 1020 }], text: '' };
+  const empty = { kind: 'weekly', days: [], ranges: [{ start: 480, end: 1020 }], runs: [], text: '' };
   if (!text) return empty;
   if (/^(open\s+)?any\s*time|free to visit any\s*time/i.test(text)) return { ...empty, kind: 'anytime' };
 
@@ -93,10 +100,13 @@ export function parseHours(value) {
   if (times.length >= 2 && times.length % 2 === 0 && days) {
     const ranges = [];
     for (let i = 0; i < times.length; i += 2) ranges.push({ start: times[i], end: times[i + 1] });
-    const parsed = { kind: 'weekly', days, ranges, text: '' };
+    const parsed = { ...empty, kind: 'weekly', days, ranges };
     // Only when it writes back the way it was read, near enough; otherwise
     // the line is kept as typed rather than quietly changed.
     if (ranges.every((r) => r.end > r.start && r.start % 30 === 0 && r.end % 30 === 0)) return parsed;
   }
-  return { ...empty, kind: 'dates', text };
+  const runs = datesFromHours(text);
+  return runs.length
+    ? { ...empty, kind: 'dates', runs: runs.map((r) => picksFromRun(r)) }
+    : { ...empty, kind: 'dates', text };
 }
