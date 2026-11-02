@@ -69,9 +69,14 @@ function SignInForm() {
   const [notice, setNotice]     = useState(() => ENDED[reason] || '');
   // Signed out by a pause: the super admin's own message.
   const [pauseNote] = useState(() => (reason === 'restricted' ? readSignOutNote()?.note || '' : ''));
-  // Seconds left on a server-side account lockout (HTTP 423). Purely a UX
-  // affordance — the backend enforces the lock regardless of what this says.
-  const [lockedFor, setLockedFor] = useState(0);
+  // Server-side account lockouts (HTTP 423) seen here, as username → when it
+  // ends. Purely a UX affordance — the backend enforces the lock regardless.
+  // Only the locked username waits; typing another account's username signs
+  // in as usual (user rule, 2026-11-02: lock the account, not the screen).
+  const [locks, setLocks] = useState({});
+  const [now, setNow] = useState(() => Date.now());
+  const lockKey = username.trim().toLowerCase();
+  const lockedFor = Math.max(0, Math.ceil(((locks[lockKey] || 0) - now) / 1000));
   // "Forgot your password?" swaps the form for the request to the super admin.
   const [forgot, setForgot] = useState(false);
   // The tab says where you are. After signing out it kept the last console
@@ -102,17 +107,20 @@ function SignInForm() {
   };
   const showErr = (f) => (submitted ? fieldErrors[f] : '');
 
-  // Tick the lockout down once a second and clear the banner when it ends.
+  // Tick the lockouts down once a second while any is still running.
+  const anyLocked = Object.values(locks).some((until) => until > now);
   useEffect(() => {
-    if (lockedFor <= 0) return undefined;
-    const timer = setInterval(() => {
-      setLockedFor((s) => {
-        if (s <= 1) { setError(''); return 0; }
-        return s - 1;
-      });
-    }, 1000);
+    if (!anyLocked) return undefined;
+    const timer = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(timer);
-  }, [lockedFor > 0]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [anyLocked]);
+  // The lock message belongs to the username it was for: clear it when that
+  // lock runs out, or when another username is typed.
+  const [errorFor, setErrorFor] = useState('');
+  useEffect(() => {
+    if (errorFor && locks[errorFor] && locks[errorFor] <= now) { setError(''); setErrorFor(''); }
+  }, [now]); // eslint-disable-line react-hooks/exhaustive-deps
+  const shownError = error && (!errorFor || errorFor === lockKey) ? error : '';
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -124,6 +132,7 @@ function SignInForm() {
 
     try {
       setError('');
+      setErrorFor('');
       setLoading(true);
       const data = await authAPI.login(username.trim(), password);
       if (data.success && data.token) {
@@ -137,9 +146,14 @@ function SignInForm() {
       }
     } catch (err) {
       const res = err?.response;
-      // 423 Locked — the account hit the failed-attempt threshold. Count it
-      // down so the button doesn't sit there rejecting every press.
-      if (res?.status === 423 && res.data?.retryAfterSeconds) setLockedFor(res.data.retryAfterSeconds);
+      // 423 Locked — this account hit the failed-attempt threshold. Count it
+      // down so the button doesn't sit there rejecting every press for it.
+      if (res?.status === 423 && res.data?.retryAfterSeconds) {
+        const t = Date.now();
+        setNow(t);
+        setLocks((prev) => ({ ...prev, [lockKey]: t + res.data.retryAfterSeconds * 1000 }));
+      }
+      if (res?.status === 423 || res?.status === 429) setErrorFor(lockKey);
       // Maintenance: the strip above already gives the details and the super
       // admin's message, so this says only that (mock defense notes,
       // 2026-10-23: the two boxes said the same thing). A paused role carries
@@ -205,11 +219,11 @@ function SignInForm() {
             </div>
           )}
 
-          {error && (
+          {shownError && (
             <div role="alert" style={{ ...s.banner, ...s.bannerError }}>
               <Icon name={locked ? 'lock' : 'alert-circle'} size={15} />
               <span>
-                {error}
+                {shownError}
                 {locked && <> <strong>Try again in {lockLabel(lockedFor)}.</strong></>}
               </span>
             </div>
