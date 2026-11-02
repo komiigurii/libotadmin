@@ -4,6 +4,7 @@
  * Keep the two the same.
  *
  * Mock defense 2026-10-21: a password needs a special character too.
+ * 2026-11-02: no "commonly used password" check any more.
  */
 
 export const PASSWORD_MIN = 8;
@@ -12,13 +13,6 @@ export const PASSWORD_MAX = 128;
 export const RESERVED_USERNAMES = new Set([
   'admin', 'administrator', 'moderator', 'mod', 'root', 'system', 'support', 'libot', 'libotbulacan',
   'superadmin', 'super-admin', 'super.admin', 'super_admin',
-]);
-
-const COMMON_PASSWORDS = new Set([
-  'password1', 'password12', 'password123', 'passw0rd', 'p@ssw0rd', 'p@ssword1', 'p@ssw0rd1', 'qwerty123', 'qwerty12',
-  'abc12345', 'abcd1234', 'admin123', 'admin1234', 'admin@123', 'welcome1', 'welcome123', 'welcome@1', 'letmein1',
-  'iloveyou1', 'moderator1', 'moderator123', 'libot123', 'libot2026', 'libot@123', 'bulacan123', 'bulacan2026',
-  'bulacan@123',
 ]);
 
 /** The first problem with a username, or ''. */
@@ -52,6 +46,5 @@ export function passwordProblem(password, username = '') {
     return 'Use at least one letter, one number and one special character (like ! # @ -).';
   }
   if (username && p.toLowerCase().includes(username.toLowerCase())) return 'Don’t put the username in the password.';
-  if (COMMON_PASSWORDS.has(p.toLowerCase())) return 'This password is too easy to guess. Choose another.';
   return '';
 }

@@ -13,9 +13,8 @@ describe('passwordProblem', () => {
     }
   });
 
-  it('refuses the username inside it and the common ones', () => {
+  it('refuses the username inside it', () => {
     expect(passwordProblem('baliwagmod#1', 'baliwagmod')).toMatch(/username/);
-    expect(passwordProblem('P@ssw0rd1')).toMatch(/easy to guess/);
   });
 });
 
