@@ -168,21 +168,22 @@
 
 /* ── DARK ────────────────────────────────────────────────────────────────────
    The mobile app's dark mode, value for value (context/ThemeContext.js
-   darkColors), and the website's too: the thesis panel asked for one palette
-   across app, admin and web. Every text token holds 4.5:1 on bg, sidebar,
+   darkColors), and the website's too: one palette across app, admin and web.
+   Since 2026-11-04 it is the app's teal turned down (deep teal page, teal
+   cards, cream text), replacing the warm brown. Every text token holds 4.5:1 on bg, sidebar,
    card, card hover and on its own tinted badge. */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) {
-    --bg:              #17140F;
-    --sidebar-bg:      #1F1B15;
-    --card-bg:         #221E18;
-    --card-bg-hover:   #29241D;
-    --border:          #3A3329;
-    --divider:         #2F2A22;
+    --bg:              #0E1C1E;
+    --sidebar-bg:      #122427;
+    --card-bg:         #16292C;
+    --card-bg-hover:   #1B3134;
+    --border:          #2B4649;
+    --divider:         #1E3538;
 
     --text-primary:    #F3EEE4;
-    --text-secondary:  #C9C0B0;
-    --text-muted:      #A99F8D;
+    --text-secondary:  #C8CEC8;
+    --text-muted:      #9DB0AF;
 
     --brand:           #5CCFD9;
     --brand-solid:     #0C7A84;
@@ -211,7 +212,7 @@
     --on-brand-solid:       #FFFFFF;
     --on-brand-solid-muted: rgba(255,255,255,0.96); /* 0.86 was 4.19:1 on the darker-mode teal */
     --on-brand-solid-soft:  rgba(255,255,255,0.22);
-    --photo-veil:      rgba(23,20,15,0.38);
+    --photo-veil:      rgba(14,28,30,0.38);
     --data-1:          #12A7B5;
     --data-1-track:    rgba(18,167,181,0.20);
 
@@ -220,8 +221,8 @@
     --shadow-lg:       0 18px 48px rgba(0,0,0,0.46);
     --overlay:         rgba(0,0,0,0.6);
 
-    --scrollbar-thumb:       #3A3329;
-    --scrollbar-thumb-hover: #52483A;
+    --scrollbar-thumb:       #2B4649;
+    --scrollbar-thumb-hover: #3D5E61;
 
     color-scheme: dark;
   }
@@ -231,16 +232,16 @@
    shared because a :is() / :where() list would lose to the media-query block
    above on specificity grounds in some browsers. */
 :root[data-theme='dark'] {
-  --bg:              #17140F;
-  --sidebar-bg:      #1F1B15;
-  --card-bg:         #221E18;
-  --card-bg-hover:   #29241D;
-  --border:          #3A3329;
-  --divider:         #2F2A22;
+  --bg:              #0E1C1E;
+  --sidebar-bg:      #122427;
+  --card-bg:         #16292C;
+  --card-bg-hover:   #1B3134;
+  --border:          #2B4649;
+  --divider:         #1E3538;
 
   --text-primary:    #F3EEE4;
-  --text-secondary:  #C9C0B0;
-  --text-muted:      #A99F8D;
+  --text-secondary:  #C8CEC8;
+  --text-muted:      #9DB0AF;
 
   --brand:           #5CCFD9;
   --brand-solid:     #0C7A84;
@@ -269,7 +270,7 @@
   --on-brand-solid:       #FFFFFF;
   --on-brand-solid-muted: rgba(255,255,255,0.96); /* 0.86 was 4.19:1 on the darker-mode teal */
   --on-brand-solid-soft:  rgba(255,255,255,0.22);
-  --photo-veil:      rgba(23,20,15,0.38);
+  --photo-veil:      rgba(14,28,30,0.38);
   --data-1:          #12A7B5;
   --data-1-track:    rgba(18,167,181,0.20);
 
@@ -278,8 +279,8 @@
   --shadow-lg:       0 18px 48px rgba(0,0,0,0.46);
   --overlay:         rgba(0,0,0,0.6);
 
-  --scrollbar-thumb:       #3A3329;
-  --scrollbar-thumb-hover: #52483A;
+  --scrollbar-thumb:       #2B4649;
+  --scrollbar-thumb-hover: #3D5E61;
 
   color-scheme: dark;
 }
