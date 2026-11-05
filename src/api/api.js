@@ -195,7 +195,6 @@ export const accountsAPI = {
   create:        (data)        => api.post('/api/admin/accounts', data).then(r => r.data),
   resetPassword: (id)          => api.post(`/api/admin/accounts/${id}/reset-password`).then(r => r.data),
   setActive:     (id, active)  => api.patch(`/api/admin/accounts/${id}`, { active }).then(r => r.data.account),
-  move:          (id, municipality) => api.patch(`/api/admin/accounts/${id}`, { municipality }).then(r => r.data.account),
   history:       (id)          => api.get(`/api/admin/accounts/${id}/history`).then(r => r.data.entries || []),
   // Super admin only.
   getTravelers:  (params = {}) => api.get('/api/admin/accounts/travelers', { params }).then(r => r.data),

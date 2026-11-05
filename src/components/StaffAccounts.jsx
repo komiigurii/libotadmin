@@ -7,7 +7,7 @@ import Drawer from './Drawer';
 import Pagination, { PAGE_SIZE, Paged, usePaged } from './Pagination';
 import { Facts, DetailSection, detailStyles as d } from './Details';
 import Icon from './Icon';
-import { theme as t, radius, shadow, type } from '../theme';
+import { theme as t, radius } from '../theme';
 import { fmtDateTime, fmtDay, timeAgo } from '../utils/format';
 import { BULACAN_MUNICIPALITIES } from '../utils/municipalities';
 import { usernameProblem } from '../utils/passwordRule';
@@ -25,7 +25,7 @@ const sq = { width: 34, minHeight: 34, padding: 0 };
  *     shown once on the credential slip.
  *   - StaffTable: each account's status, last sign-in and "Last changed by …",
  *     with Reset password (a new slip; the super admin's page only),
- *     Delete (to the archive) or Restore, Move town (the super admin's only),
+ *     Delete (to the archive) or Restore,
  *     and Unlock on a locked row (the super admin's page only). A row (or its
  *     History button) opens the account's details and history. Ten a page.
  * Usernames are permanent and a moderator's name comes from the town, so
@@ -193,12 +193,9 @@ export function AddAccountForm({ roles, accounts, onCancel, onMade }) {
  * canReset: Reset password on the rows, the super admin's only; the admin's
  * Moderators page has none (user rule 2026-10-24). Delete moves an account to
  * the archive; a deleted row (Archived → Deleted staff) has Restore.
- * canMove: Move to another municipality on moderator rows, likewise the super
- * admin's only (user rule 2026-10-25).
  */
-export function StaffTable({ accounts, extra, onChanged, canManage, canReset = false, canMove = false, onUnlock, caption = 'Staff accounts', townInName = false }) {
+export function StaffTable({ accounts, extra, onChanged, canManage, canReset = false, onUnlock, caption = 'Staff accounts', townInName = false }) {
   const [slip, setSlip] = useState(null);
-  const [moving, setMoving] = useState(null);
   const [openId, setOpenId] = useState(null);
   const [busy, setBusy] = useState('');
   const [page, setPage] = useState(1);
@@ -303,10 +300,6 @@ export function StaffTable({ accounts, extra, onChanged, canManage, canReset = f
                       <Button variant="warning" icon="key" style={sq} disabled={busy === a.id} onClick={() => reset(a)}
                         aria-label={`Reset the password of ${a.username}`} title="Reset password" />
                     )}
-                    {canMove && a.role === 'moderator' && (
-                      <Button variant="subtle" icon="move" style={sq} disabled={busy === a.id} onClick={() => setMoving(a)}
-                        aria-label={`Move ${a.username} to another municipality`} title="Move to another municipality" />
-                    )}
                     <Button variant="danger" icon="trash" style={sq} disabled={busy === a.id} onClick={() => toggle(a)}
                       aria-label={`Delete ${a.username}`} title="Delete" />
                   </>}
@@ -333,56 +326,8 @@ export function StaffTable({ accounts, extra, onChanged, canManage, canReset = f
         <CredentialSlip kind={slip.kind} account={slip.account} tempPassword={slip.tempPassword}
           expiresAt={slip.tempPasswordExpiresAt} onClose={() => setSlip(null)} />
       )}
-      {moving && (
-        <MoveDialog account={moving} accounts={accounts} onClose={() => setMoving(null)}
-          onMoved={(acc) => { onChanged(acc); setMoving(null); }} />
-      )}
       {opened && <AccountDrawer account={opened} onClose={() => setOpenId(null)} />}
     </>
-  );
-}
-
-function MoveDialog({ account, accounts, onClose, onMoved }) {
-  const [town, setTown] = useState('');
-  const [error, setError] = useState('');
-  const [saving, setSaving] = useState(false);
-  const taken = new Set(accounts.filter((a) => a.role === 'moderator' && a.active && a.id !== account.id).map((a) => a.municipality.toLowerCase()));
-
-  const save = async () => {
-    if (!town) { setError('Choose a municipality.'); return; }
-    setSaving(true);
-    try {
-      onMoved(await accountsAPI.move(account.id, town));
-      notify(`${account.username} now looks after ${town}.`, { tone: 'success' });
-    } catch (err) {
-      setError(err?.response?.data?.message || 'Couldn’t reach the server. Try again.');
-    }
-    setSaving(false);
-  };
-
-  return (
-    <div style={f.overlay} onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div style={f.dialog} role="dialog" aria-modal="true" aria-labelledby="move-title">
-        <h2 id="move-title" style={f.dialogTitle}>Move {account.username} to another municipality</h2>
-        <p style={f.lead}>
-          They look after {account.municipality || 'no municipality'} now. A moderator with requests still waiting can’t move until
-          those are decided. The username stays the same.
-        </p>
-        <label htmlFor="move-town" style={s.panelLabel}>New municipality</label>
-        <select id="move-town" value={town} onChange={(e) => { setTown(e.target.value); setError(''); }} style={s.select} autoFocus>
-          <option value="">Choose…</option>
-          {BULACAN_MUNICIPALITIES.filter((m) => m.toLowerCase() !== (account.municipality || '').toLowerCase()).map((m) => {
-            const has = taken.has(m.toLowerCase());
-            return <option key={m} value={m} disabled={has}>{has ? `${m} (has a moderator)` : m}</option>;
-          })}
-        </select>
-        {error && <p style={f.error}><Icon name="alert-circle" size={13} /> {error}</p>}
-        <div style={{ ...s.buttonRow, justifyContent: 'flex-end' }}>
-          <Button onClick={onClose} disabled={saving}>Cancel</Button>
-          <Button variant="primary" onClick={save} disabled={saving}>{saving ? 'Moving…' : 'Move'}</Button>
-        </div>
-      </div>
-    </div>
   );
 }
 
@@ -464,9 +409,6 @@ const f = {
   segment: { display: 'flex', gap: 2, padding: 3, border: `1px solid ${t.border}`, borderRadius: radius.md, background: t.cardBg },
   segBtn:   { flex: 1, padding: '7px 12px', border: 'none', borderRadius: radius.sm, background: 'transparent', color: t.textSecondary, fontFamily: 'inherit', fontSize: 13, fontWeight: 600, cursor: 'pointer' },
   segOn:    { background: t.brandSoft, color: t.brand },
-  overlay:  { position: 'fixed', inset: 0, background: t.overlay, zIndex: 1600, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 },
-  dialog:   { width: '100%', maxWidth: 420, background: t.cardBg, border: `1px solid ${t.border}`, borderRadius: radius.xl, boxShadow: shadow.lg, padding: '22px 24px 20px', boxSizing: 'border-box' },
-  dialogTitle: { ...type.dialogTitle, color: t.textPrimary, margin: '0 0 6px' },
   history:  { listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 14 },
   historyItem: { display: 'flex', gap: 12, alignItems: 'flex-start' },
   historyIcon: { width: 28, height: 28, borderRadius: '50%', background: t.sidebarBg, border: `1px solid ${t.border}`, display: 'grid', placeItems: 'center', color: t.textSecondary, flexShrink: 0 },
