@@ -1444,10 +1444,9 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
   // recommendation typed in and nothing else.
   const snapshotMission = (lat, lng, name, image, info, radius) =>
     JSON.stringify({ lat: toNum(lat), lng: toNum(lng), name, image, info, radius: Number(radius) || 60 });
-  const missionSnapshotRef = useRef(null);
-  if (missionSnapshotRef.current === null) {
-    missionSnapshotRef.current = snapshotMission('', '', '', '', '', MISSION_RADIUS_DEFAULT_M);
-  }
+  const [missionSnapshot, setMissionSnapshot] = useState(
+    () => snapshotMission('', '', '', '', '', MISSION_RADIUS_DEFAULT_M)
+  );
 
   useEffect(() => {
     if (!initial?._id) { setLoadingMission(false); return; }
@@ -1476,7 +1475,7 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
           setMissionImage(image);
           setLocationInfo(info);
           setRadiusMeters(radius);
-          missionSnapshotRef.current = snapshotMission(lat, lng, name, image, info, radius);
+          setMissionSnapshot(snapshotMission(lat, lng, name, image, info, radius));
         }
       })
       .catch(() => { if (!cancelled) setLocationMission(null); })
@@ -1511,7 +1510,7 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
         setMissionImage(image);
         setLocationInfo(info);
         setRadiusMeters(radius);
-        missionSnapshotRef.current = snapshotMission(lat, lng, name, image, info, radius);
+        setMissionSnapshot(snapshotMission(lat, lng, name, image, info, radius));
       }
     } catch (err) {
       setMissionError(err?.response?.data?.message || err.message || 'Failed to create missions.');
@@ -1535,7 +1534,7 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
   const missionSnapshotNow = () =>
     snapshotMission(missionLat, missionLng, locationName, missionImage, locationInfo, radiusMeters);
   // Whether Save would send a food-mission proposal for an existing spot.
-  const missionChanged = () => !!locationMission && missionSnapshotNow() !== missionSnapshotRef.current;
+  const missionChanged = () => !!locationMission && missionSnapshotNow() !== missionSnapshot;
 
   // A half-typed coordinate would otherwise be sent as null, silently
   // clearing a pin the moderator was in the middle of editing.
@@ -1569,7 +1568,7 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
         radiusMeters: Number(radiusMeters) || 60,
       });
       setLocationMission(data.mission);
-      missionSnapshotRef.current = currentSnapshot;
+      setMissionSnapshot(currentSnapshot);
       setSavingMission(false);
       return 'ok';
     } catch (err) {
@@ -1641,7 +1640,7 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
 
   const handleCancelClick = async () => {
     const currentSnapshot = snapshotSpot(form, arModels);
-    if (currentSnapshot !== initialSnapshotRef.current || missionSnapshotNow() !== missionSnapshotRef.current) {
+    if (currentSnapshot !== initialSnapshotRef.current || missionSnapshotNow() !== missionSnapshot) {
       if (!(await confirmAction('You have unsaved changes. Discard them and close this form?', { danger: true, confirmText: 'Discard' }))) return;
     }
     onCancel();
@@ -1657,7 +1656,10 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
   const arNoFact = arModels.findIndex((m) => !m.trivia.trim());
   const arAllFacts = arModels.length > 0 && arNoFact === -1;
 
-  // What a new spot's food recommendation still needs, as one message.
+  // What the food recommendation still needs, as one message. Checked on a
+  // new spot, and on an existing one only when its food mission was changed:
+  // old spots with an unfinished mission can still have other edits saved.
+  const foodRequired = () => spotHasAR(form.category) && (isNew || missionChanged());
   const foodProblem = () => {
     if (!locationName.trim()) return 'Restaurant name is required';
     if (toNum(missionLat) === null || toNum(missionLng) === null) {
@@ -1755,7 +1757,7 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
     return fail('ar', `AR ${arNoFact + 1} has no fact yet — every AR position needs its own once one has one.`);
   }
   // A Nature or Festivals spot is visit-only: no food recommendation.
-  if (isNew && withAR) {
+  if (foodRequired()) {
     const problem = foodProblem();
     if (problem) return fail('food', problem);
   }
@@ -1926,7 +1928,7 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
         || radiusProblem(form.arrivalRadius, form.nearbyRadius),
     },
     ar:       { count: hasAR ? arModels.length : 0, missing: stillNeeded(missingAr) },
-    food:     { missing: isNew && hasAR ? foodProblem() : '' },
+    food:     { missing: foodRequired() ? foodProblem() : '' },
   };
   // Where the footer is: Next until the last tab, then Submit.
   const tabIndex = TABS.findIndex((x) => x.id === tab);
@@ -1964,10 +1966,11 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
   };
   const busy = saving || savingMission;
 
-  // The Food mission tab's fields. A new spot fills them in with the rest of
-  // the form (all required) and approval pins its mission with them; an
-  // existing spot proposes changes to the mission it already has. A render
-  // helper, not a component, so typing never remounts the map.
+  // The Food mission tab's fields, all required. A new spot fills them in with
+  // the rest of the form and approval pins its mission with them; an existing
+  // spot proposes changes to the mission it already has. A render helper, not
+  // a component, so typing never remounts the map.
+  const foodMark = <span style={styles.required}>*</span>;
   const renderFoodFields = (forNewSpot) => (
     <>
       <section style={styles.section}>
@@ -1984,6 +1987,7 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
               when you press {isModerator
                 ? '"Submit for review" below — proposed for admin review, same as spot edits, only going live once approved.'
                 : '"Save changes" below, and go live at once.'}
+              {' '}If you change anything here, every field marked * has to be filled in.
             </>
           )}
         </p>
@@ -2008,7 +2012,7 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
 
         <div style={styles.twoCol}>
           <div style={styles.field}>
-            <label style={styles.label}>Restaurant name {forNewSpot && newSpotMark}</label>
+            <label style={styles.label}>Restaurant name {foodMark}</label>
             <input
               value={locationName}
               onChange={(e) => setLocationName(e.target.value)}
@@ -2017,7 +2021,7 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
             />
           </div>
           <div style={styles.field}>
-            <label style={styles.label}>Radius (meters) {forNewSpot && newSpotMark}</label>
+            <label style={styles.label}>Radius (meters) {foodMark}</label>
             <input
               type="number"
               min={MISSION_RADIUS_MIN_M}
@@ -2030,7 +2034,7 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
       </section>
 
       <section style={styles.section}>
-        <p style={styles.sectionTitle}>Restaurant location {forNewSpot && newSpotMark}</p>
+        <p style={styles.sectionTitle}>Restaurant location {foodMark}</p>
         <div style={styles.mapHintRow}>
           <p style={styles.mapHint}>{mapHintFor('mission')}</p>
           {missionPinned && (
@@ -2044,7 +2048,7 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
         <MapLegend mode="mission" {...legendProps} />
 
         <div style={styles.coordBlock}>
-          <p style={styles.coordBlockTitle}>Restaurant coordinates {forNewSpot && newSpotMark}</p>
+          <p style={styles.coordBlockTitle}>Restaurant coordinates {foodMark}</p>
           <CoordFields
             lat={missionLat}
             lng={missionLng}
@@ -2058,7 +2062,7 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
         <p style={styles.sectionTitle}>What users see</p>
         <FileUploadField
           label="Restaurant photo"
-          required={forNewSpot}
+          required
           hint="Shown beside the restaurant's name in the app"
           accept="image/*"
           uploadType="image"
@@ -2067,7 +2071,7 @@ export default function SpotForm({ initial, onSave, onCancel, saving = false, is
           onUploaded={setMissionImage}
         />
         <div style={styles.field}>
-          <label style={styles.label}>Restaurant info {forNewSpot && newSpotMark}</label>
+          <label style={styles.label}>Restaurant info {foodMark}</label>
           <textarea
             value={locationInfo}
             onChange={(e) => setLocationInfo(e.target.value)}
