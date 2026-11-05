@@ -24,7 +24,8 @@ import '../console.css';
  * its own links.
  *
  *   rail      the brand, Jump to page (Ctrl K), the links in groups, and the
- *             account at the foot (View profile, Change password, Sign out).
+ *             account at the foot (View profile, Notifications, Change
+ *             password, Sign out).
  *             Change password is a pop-up over the page you're on, not a page
  *             (mock defense notes, 2026-10-26).
  *             Folds to icons from the top bar's button (remembered), always on
@@ -265,7 +266,9 @@ export default function ConsoleShell({ children }) {
 
         <AccountMenu
           account={account}
+          unread={counts.unread}
           onProfile={() => setProfileOpen(true)}
+          onNotifications={() => { setDrawer(false); navigate('/notifications'); }}
           onPassword={() => setPasswordOpen(true)}
           onSignOut={signOut}
         />
@@ -512,7 +515,7 @@ function ThemeMenu() {
   );
 }
 
-function AccountMenu({ account, onProfile, onPassword, onSignOut }) {
+function AccountMenu({ account, unread, onProfile, onNotifications, onPassword, onSignOut }) {
   const { username } = account;
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
@@ -533,6 +536,11 @@ function AccountMenu({ account, onProfile, onPassword, onSignOut }) {
             </span>
           </div>
           <button type="button" role="menuitem" className="sa-menu-item" onClick={pick(onProfile)}><Icon name="user" size={16} /> View profile</button>
+          <button type="button" role="menuitem" className="sa-menu-item" onClick={pick(onNotifications)}>
+            <Icon name="bell" size={16} /> Notifications
+            {unread > 0 && <span className="visually-hidden">, {unread} unread</span>}
+            {unread > 0 && <span className="sa-count" style={{ marginLeft: 'auto' }} aria-hidden="true">{unread > 99 ? '99+' : unread}</span>}
+          </button>
           <button type="button" role="menuitem" className="sa-menu-item" onClick={pick(onPassword)}><Icon name="key" size={16} /> Change password</button>
           <button type="button" role="menuitem" className="sa-menu-item danger" onClick={pick(onSignOut)}><Icon name="log-out" size={16} /> Sign out</button>
         </div>
