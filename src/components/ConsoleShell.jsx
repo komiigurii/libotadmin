@@ -345,8 +345,9 @@ function StaffState({ system, scope }) {
   );
 }
 
-// The bell: the newest notifications in a panel under the button. Opening one
-// marks it read and goes where it points; "See all" is the whole list.
+// The bell: what's pending for this account right now, then the newest
+// notifications, in a panel under the button. Opening one marks it read and
+// goes where it points; "See all" is the whole list.
 function BellMenu({ unread }) {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
@@ -414,6 +415,20 @@ function BellMenu({ unread }) {
             )}
           </div>
           {error && <p className="sa-bell-note danger" role="alert">{error}</p>}
+          <div className="sa-bell-scroll">
+          {data?.waiting?.length > 0 && (
+            <ul className="sa-bell-waiting" aria-label="Waiting on you">
+              {data.waiting.map((w) => (
+                <li key={w.key}>
+                  <button type="button" className="sa-bell-wait" onClick={() => { setOpen(false); navigate(w.link); }}>
+                    <span className="sa-bell-wait-count">{w.count > 99 ? '99+' : w.count}</span>
+                    <span className="sa-bell-wait-label">{w.label}</span>
+                    <Icon name="arrow-right" size={14} />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
           {!data ? (!error && <Loading label="Loading notifications…" kind="rows" rows={4} />)
             : data.notifications.length === 0 ? (
               <div className="sa-bell-empty">
@@ -453,6 +468,7 @@ function BellMenu({ unread }) {
                 })}
               </ul>
             )}
+          </div>
           <button type="button" className="sa-bell-foot" onClick={seeAll}>
             See all notifications <Icon name="arrow-right" size={14} />
           </button>

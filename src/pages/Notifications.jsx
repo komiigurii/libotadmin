@@ -3,18 +3,18 @@ import { useNavigate } from 'react-router-dom';
 import { notificationsAPI } from '../api/api';
 import { Page, PageHeader, Button, Loading, EmptyState, ErrorBanner, Table, Th, Td } from '../components/Layout';
 import { PAGE_SIZE, Paged } from '../components/Pagination';
-import { publishHeartbeat, useHeartbeat } from '../auth/heartbeat';
+import { publishHeartbeat } from '../auth/heartbeat';
 import { useLive } from '../api/live';
-import { isAdminOnly, isSuperAdmin } from '../auth/roles';
 import { theme as t } from '../theme';
 import { fmtDateTime, fmtNum, timeAgo } from '../utils/format';
 import { noticeKind } from '../utils/notificationKinds';
 
 /*
- * Notifications — the bell, for every role (mock defense 2026-10-21): the
- * system going into maintenance or an update coming, changes someone made to
- * your account, and answers to the tickets you sent. The bell's dropdown in
- * the top bar shows the newest; this page is the whole list ("See all").
+ * Notifications — the bell, for every role (mock defense 2026-10-21; since
+ * 2026-11-05 it holds everything): what's pending for you, every action you and
+ * your team take, the system going into maintenance or an update coming, changes
+ * someone made to your account, and answers to the tickets you sent. The bell's
+ * dropdown in the top bar shows the newest; this page is the whole list ("See all").
  */
 
 export default function Notifications() {
@@ -58,17 +58,12 @@ export default function Notifications() {
     }
   };
 
-  const superAdmin = isSuperAdmin();
-  const admin = isAdminOnly();
-  const beat = useHeartbeat();
-  // Most of the super admin's bell is tickets, so the strip says how many
-  // still wait (the rail's Tickets badge, from the heartbeat); an admin's,
-  // how many requests wait in the Approval Queue (Spot Management's badge).
+  // Beside the two totals, what's pending for this account right now, counted
+  // live by the server; each cell opens the page to deal with it.
   const stats = [
     { label: 'Unread', value: data ? fmtNum(data.unread) : '…', tone: data?.unread ? 'warn' : 'good', hint: data?.unread ? 'marked with a dot below' : 'you’re up to date' },
     { label: 'All notifications', value: data ? fmtNum(data.total) : '…', hint: 'kept in your bell' },
-    ...(superAdmin ? [{ label: 'Tickets waiting', hue: 'marigold', to: '/tickets', value: beat?.openTickets != null ? fmtNum(beat.openTickets) : '…', hint: 'open or being worked on' }] : []),
-    ...(admin ? [{ label: 'Waiting for approval', to: '/spots/approvals', value: beat?.pendingApprovals != null ? fmtNum(beat.pendingApprovals) : '…', tone: beat?.pendingApprovals ? 'warn' : undefined, hint: 'in the Approval Queue' }] : []),
+    ...(data?.waiting || []).map((w) => ({ label: w.label, value: fmtNum(w.count), to: w.link, tone: 'warn', hint: 'still pending' })),
   ];
 
   return (
@@ -76,9 +71,7 @@ export default function Notifications() {
       <PageHeader
         title="Notifications"
         count={data?.unread || undefined}
-        subtitle={superAdmin
-          ? 'New tickets and password requests, locked accounts, maintenance and updates, and changes to your account.'
-          : 'Maintenance and updates, changes to your account, and answers to your tickets.'}
+        subtitle="What’s pending for you, every action you and your team take, maintenance and updates, and changes to your account."
         stats={stats}
         actions={data?.unread > 0 && <Button icon="check" onClick={readAll}>Mark all read</Button>}
       />
